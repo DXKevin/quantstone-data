@@ -69,3 +69,11 @@ def collect(
         writer.writeheader()
         writer.writerows(rows)
     return len(rows)
+
+
+def collect_initial(target: Path, fields: list[str], token: str) -> int:
+    return collect(target, fields, token)
+
+
+def collect_incremental(target: Path, fields: list[str], token: str) -> int:
+    return collect(target, fields, token)

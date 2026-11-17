@@ -10,6 +10,7 @@ def serialize_operation(operation) -> dict:
         "key": operation.key,
         "name": operation.name,
         "description": operation.description,
+        "purpose": operation.purpose,
         "parameters": [
             {
                 "name": parameter.name,

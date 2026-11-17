@@ -40,6 +40,20 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
     if dataset.status != DatasetStatus.ACTIVE.value:
         raise HTTPException(status_code=409, detail="only active datasets can be collected")
 
+    binding = next(
+        (
+            item
+            for item in dataset.collection_bindings
+            if item["purpose"] == payload.operation.value
+        ),
+        None,
+    )
+    if payload.input_method is InputMethod.COLLECTOR and binding is None:
+        raise HTTPException(
+            status_code=409,
+            detail="dataset does not support this collection purpose",
+        )
+
     job = CollectionJob(
         id=str(uuid4()),
         dataset_id=payload.dataset_id,
@@ -52,11 +66,9 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
         ),
         start_date=payload.start_date,
         end_date=payload.end_date,
-        collector_key=(
-            dataset.collector_key if payload.input_method is InputMethod.COLLECTOR else None
-        ),
+        collector_key=(binding["collector_key"] if binding else None),
         collector_operation=(
-            dataset.collector_operation if payload.input_method is InputMethod.COLLECTOR else None
+            binding["operation"] if binding else None
         ),
     )
     session.add(job)
@@ -98,7 +110,7 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     report_path = job_directory / "review.json"
 
     try:
-        row_count = operation.handler(target, fields, load_token())
+        row_count = operation.function(target, fields, load_token())
         job.source_file_name = target.name
         job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
         job.source_size_bytes = target.stat().st_size

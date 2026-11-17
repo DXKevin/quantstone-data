@@ -40,8 +40,7 @@ def serialize_dataset(dataset: Dataset) -> DatasetRead:
         market=dataset.market,
         display_name=dataset.display_name,
         description=dataset.description,
-        collector_key=dataset.collector_key,
-        collector_operation=dataset.collector_operation,
+        collection_bindings=dataset.collection_bindings,
         status=DatasetStatus(dataset.status),
         current_schema_version=dataset.current_schema_version,
         created_at=dataset.created_at,
@@ -72,8 +71,9 @@ def create_dataset(payload: DatasetCreate, session: SessionDep) -> DatasetRead:
         description=payload.description,
         status=DatasetStatus.DRAFT.value,
         current_schema_version=1,
-        collector_key=payload.collector_key,
-        collector_operation=payload.collector_operation,
+        collection_bindings=[
+            binding.model_dump(mode="json") for binding in payload.collection_bindings
+        ],
     )
     schema = DatasetSchemaVersion(
         version=1,
@@ -129,8 +129,9 @@ def update_draft_dataset(
     )
     dataset.display_name = payload.display_name
     dataset.description = payload.description
-    dataset.collector_key = payload.collector_key
-    dataset.collector_operation = payload.collector_operation
+    dataset.collection_bindings = [
+        binding.model_dump(mode="json") for binding in payload.collection_bindings
+    ]
     schema.primary_key = ",".join(payload.primary_key)
     schema.time_field = payload.time_field
     for field in list(schema.fields):
@@ -162,10 +163,12 @@ def activate_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
         raise HTTPException(status_code=404, detail="dataset not found")
     if dataset.status == DatasetStatus.DEPRECATED.value:
         raise HTTPException(status_code=409, detail="deprecated dataset cannot be activated")
-    if dataset.collector_key and dataset.collector_operation:
-        operation = get_operation(dataset.collector_key, dataset.collector_operation)
+    for binding in dataset.collection_bindings:
+        operation = get_operation(binding["collector_key"], binding["operation"])
         if operation is None:
             raise HTTPException(status_code=409, detail="collector operation is not registered")
+        if operation.purpose != binding["purpose"]:
+            raise HTTPException(status_code=409, detail="collector operation purpose mismatch")
         if dataset.id not in operation.datasets:
             raise HTTPException(
                 status_code=409,

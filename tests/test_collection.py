@@ -77,8 +77,7 @@ def test_initial_collection_can_be_created_without_date_range(tmp_path: Path) ->
             json={
                 "dataset_id": dataset_id,
                 "operation": "initial",
-                "input_method": "collector",
-                "collector_key": "mock",
+                "input_method": "file_import",
             },
         )
 
@@ -87,7 +86,7 @@ def test_initial_collection_can_be_created_without_date_range(tmp_path: Path) ->
     assert response.json()["end_date"] is None
 
 
-def test_incremental_collector_job_can_be_created_without_dates(tmp_path: Path) -> None:
+def test_collector_job_requires_a_binding_for_its_purpose(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         dataset_id = create_dataset(client)
         response = client.post(
@@ -100,12 +99,9 @@ def test_incremental_collector_job_can_be_created_without_dates(tmp_path: Path) 
             },
         )
 
-        assert response.status_code == 201
-        assert response.json()["status"] == "created"
-        listed = client.get(f"/api/v1/collection-jobs?dataset_id={dataset_id}")
+        assert response.status_code == 409
 
-    assert listed.status_code == 200
-    assert [job["id"] for job in listed.json()] == [response.json()["id"]]
+    assert "does not support this collection purpose" in response.text
 
 
 def test_manual_file_import_is_staged_with_integrity_metadata(tmp_path: Path) -> None:
@@ -157,8 +153,18 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         "market": None,
         "display_name": "A股股票列表",
         "description": "TuShare 股票基础信息",
-        "collector_key": "tushare",
-        "collector_operation": "stock_basic",
+        "collection_bindings": [
+            {
+                "purpose": "initial",
+                "collector_key": "tushare",
+                "operation": "stock_list_initial",
+            },
+            {
+                "purpose": "incremental",
+                "collector_key": "tushare",
+                "operation": "stock_list_incremental",
+            },
+        ],
         "primary_key": ["ts_code"],
         "time_field": None,
         "fields": [
@@ -209,7 +215,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         )
         assert created.status_code == 201
         assert created.json()["collector_key"] == "tushare"
-        assert created.json()["collector_operation"] == "stock_basic"
+        assert created.json()["collector_operation"] == "stock_list_initial"
 
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         review_response = client.get(

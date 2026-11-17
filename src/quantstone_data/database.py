@@ -35,11 +35,9 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
     dataset_columns = {item["name"] for item in inspector.get_columns("datasets")}
     job_columns = {item["name"] for item in inspector.get_columns("collection_jobs")}
     with engine.begin() as connection:
-        if "collector_key" not in dataset_columns:
-            connection.execute(text("ALTER TABLE datasets ADD COLUMN collector_key VARCHAR(128)"))
-        if "collector_operation" not in dataset_columns:
+        if "collection_bindings" not in dataset_columns:
             connection.execute(
-                text("ALTER TABLE datasets ADD COLUMN collector_operation VARCHAR(128)")
+                text("ALTER TABLE datasets ADD COLUMN collection_bindings JSON DEFAULT '[]'")
             )
         if "collector_operation" not in job_columns:
             connection.execute(
@@ -47,9 +45,13 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             )
         connection.execute(
             text(
-                "UPDATE datasets SET collector_key = 'tushare', "
-                "collector_operation = 'stock_basic' "
-                "WHERE id = 'tushare.cn.stock.stock_basic' AND collector_key IS NULL"
+                "UPDATE datasets SET collection_bindings = "
+                "'[ {\"purpose\":\"initial\",\"collector_key\":\"tushare\","
+                "\"operation\":\"stock_list_initial\"},"
+                "{\"purpose\":\"incremental\",\"collector_key\":\"tushare\","
+                "\"operation\":\"stock_list_incremental\"} ]' "
+                "WHERE id = 'tushare.cn.stock.stock_basic' "
+                "AND (collection_bindings IS NULL OR collection_bindings = '[]')"
             )
         )
 

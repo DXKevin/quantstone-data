@@ -172,6 +172,7 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .operation-outputs code, .binding-preview code { display: block; color: #285c46; font-size: 10px; }
 .binding-preview { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding: 12px 14px; border: 1px solid #cfe0d7; background: #f4faf7; font-size: 11px; }
 .binding-preview span { color: #68746e; }
+.binding-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .hidden-file-input { display: none; }
 .mini-upload-button { min-height: 31px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid #c9d6cf; border-radius: 5px; background: white; color: var(--green); padding: 0 9px; font-size: 10px; cursor: pointer; }
 .staging-note { display: flex; align-items: center; gap: 6px; margin: 12px 2px 0; color: #78837d; font-size: 10px; }

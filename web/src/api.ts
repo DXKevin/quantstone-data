@@ -1,5 +1,6 @@
 export type DatasetStatus = "draft" | "active" | "paused" | "deprecated";
 export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
+export type CollectionPurpose = CollectionOperation;
 export type CollectionInputMethod = "collector" | "file_import";
 export type CollectionJobStatus =
   | "created"
@@ -17,8 +18,7 @@ export interface DatasetSummary {
   market: string | null;
   status: DatasetStatus;
   current_schema_version: number;
-  collector_key: string | null;
-  collector_operation: string | null;
+  collection_bindings: DatasetCollectionBinding[];
 }
 
 export interface DatasetField {
@@ -54,8 +54,7 @@ export interface DatasetCreatePayload {
   market: string | null;
   display_name: string;
   description: string | null;
-  collector_key: string | null;
-  collector_operation: string | null;
+  collection_bindings: DatasetCollectionBinding[];
   primary_key: string[];
   time_field: string | null;
   fields: Array<{
@@ -72,8 +71,7 @@ export type DatasetUpdatePayload = Pick<
   DatasetCreatePayload,
   | "display_name"
   | "description"
-  | "collector_key"
-  | "collector_operation"
+  | "collection_bindings"
   | "primary_key"
   | "time_field"
   | "fields"
@@ -90,9 +88,16 @@ export interface CollectorOperation {
   key: string;
   name: string;
   description: string;
+  purpose: CollectionPurpose;
   parameters: CollectorParameter[];
   datasets: string[];
   joint: boolean;
+}
+
+export interface DatasetCollectionBinding {
+  purpose: CollectionPurpose;
+  collector_key: string;
+  operation: string;
 }
 
 export interface CollectorDefinition {

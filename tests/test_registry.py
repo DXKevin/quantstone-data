@@ -16,7 +16,8 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
     collector = response.json()[0]
     assert collector["key"] == "tushare"
     operation = collector["operations"][0]
-    assert operation["key"] == "stock_basic"
+    assert operation["key"] == "stock_list_initial"
+    assert operation["purpose"] == "initial"
     assert operation["datasets"] == ["tushare.cn.stock.stock_basic"]
     assert operation["joint"] is False
 

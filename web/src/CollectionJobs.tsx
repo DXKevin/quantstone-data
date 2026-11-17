@@ -204,6 +204,8 @@ function CreateCollectionJob(props: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useDateRange, setUseDateRange] = useState(false);
+  const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
+  const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -255,8 +257,8 @@ function CreateCollectionJob(props: {
         <div className="section-number">01</div><div className="section-intro"><h2>任务目标</h2><p>确定目标数据集以及本次任务的处理目的。</p></div>
         <div className="form-content">
           <div className="form-grid two-columns no-margin">
-            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
-            <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); setDatasetId(event.target.value); if (inputMethod === "collector" && next?.collection_bindings.length) setOperation(next.collection_bindings[0].purpose); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
+            <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
           <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>
@@ -269,7 +271,7 @@ function CreateCollectionJob(props: {
         <div className="form-content">
           <div className="method-cards">
             <button type="button" className={inputMethod === "file_import" ? "method-card selected" : "method-card"} onClick={() => setInputMethod("file_import")}><FileUp size={22} /><strong>手动文件</strong><span>上传本地文件到 staging</span></button>
-            <button type="button" className={inputMethod === "collector" ? "method-card selected" : "method-card"} onClick={() => setInputMethod("collector")}><RefreshCw size={22} /><strong>采集器</strong><span>由采集器获取供应商数据</span></button>
+            <button type="button" className={inputMethod === "collector" ? "method-card selected" : "method-card"} onClick={() => { setInputMethod("collector"); if (supportedPurposes.length) setOperation(supportedPurposes[0]); }}><RefreshCw size={22} /><strong>采集器</strong><span>由采集器获取供应商数据</span></button>
           </div>
           {inputMethod === "file_import" ? (
             <label className={file ? "file-drop selected" : "file-drop"}><input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><UploadCloud size={25} /><strong>{file ? file.name : "选择需要导入的文件"}</strong><span>{file ? formatBytes(file.size) : "文件将先进入临时区，不会直接写入正式数据"}</span></label>

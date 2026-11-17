@@ -19,6 +19,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   CollectorDefinition,
+  CollectionPurpose,
   DatasetCreatePayload,
   DatasetDetail,
   DatasetSummary,
@@ -57,6 +58,13 @@ const statusLabels = {
   active: "已启用",
   paused: "已暂停",
   deprecated: "已停用",
+};
+
+const purposeLabels: Record<CollectionPurpose, string> = {
+  initial: "首次采集",
+  incremental: "增量更新",
+  repair: "缺口修复",
+  replace: "范围重建",
 };
 
 function App() {
@@ -195,7 +203,7 @@ function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] })
           <p>{collector.description}</p>
           {collector.operations.map((operation) => (
             <div className="collector-operation" key={operation.key}>
-              <div><strong>{operation.name}</strong><code>{collector.key} · {operation.key}</code><p>{operation.description}</p></div>
+              <div><strong>{operation.name}</strong><code>{collector.key} · {operation.key}</code><span>{purposeLabels[operation.purpose]}</span><p>{operation.description}</p></div>
               <div><span>运行参数</span><strong>{operation.parameters.length ? operation.parameters.map((item) => item.name).join("、") : "无"}</strong></div>
               <div className="operation-outputs"><span>输出数据集 · {operation.joint ? "联合更新" : "独立更新"}</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div>
             </div>
@@ -272,8 +280,13 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
   const [market, setMarket] = useState(props.dataset?.market ?? "");
   const [displayName, setDisplayName] = useState(props.dataset?.display_name ?? "");
   const [description, setDescription] = useState(props.dataset?.description ?? "");
-  const [collectorKey, setCollectorKey] = useState(props.dataset?.collector_key ?? "");
-  const [collectorOperation, setCollectorOperation] = useState(props.dataset?.collector_operation ?? "");
+  const [bindings, setBindings] = useState<Record<CollectionPurpose, string>>(() => {
+    const values = { initial: "", incremental: "", repair: "", replace: "" };
+    for (const binding of props.dataset?.collection_bindings ?? []) {
+      values[binding.purpose] = `${binding.collector_key}::${binding.operation}`;
+    }
+    return values;
+  });
   const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
   const initialFields = props.dataset?.schema.fields.map((field, index) => ({
     key: index + 1,
@@ -293,8 +306,9 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
   const segments = [provider, region, instrument, datasetName, market].filter(Boolean);
   const datasetId = props.dataset?.id ?? segments.join(".");
   const validFields = fields.filter((field) => field.name.trim());
-  const selectedCollector = props.collectors.find((item) => item.key === collectorKey);
-  const availableOperations = selectedCollector?.operations ?? [];
+  const registeredOperations = props.collectors.flatMap((collector) =>
+    collector.operations.map((operation) => ({ collector, operation })),
+  );
 
   function updateField(key: number, patch: Partial<FieldDraft>) {
     setFields((current) => current.map((field) => field.key === key ? { ...field, ...patch } : field));
@@ -327,8 +341,12 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
       market: market || null,
       display_name: displayName,
       description: description || null,
-      collector_key: collectorKey || null,
-      collector_operation: collectorOperation || null,
+      collection_bindings: (Object.entries(bindings) as Array<[CollectionPurpose, string]>)
+        .filter(([, value]) => value)
+        .map(([purpose, value]) => {
+          const [collector_key, operation] = value.split("::");
+          return { purpose, collector_key, operation };
+        }),
       primary_key: primaryKey,
       time_field: timeField || null,
       fields: validFields.map((field) => ({
@@ -347,8 +365,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
         ? await api.updateDataset(datasetId, {
             display_name: payload.display_name,
             description: payload.description,
-            collector_key: payload.collector_key,
-            collector_operation: payload.collector_operation,
+            collection_bindings: payload.collection_bindings,
             primary_key: payload.primary_key,
             time_field: payload.time_field,
             fields: payload.fields,
@@ -392,11 +409,13 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
       <section className="form-section">
         <div className="section-number">02</div><div className="section-intro"><h2>采集绑定</h2><p>指定负责生成该数据集的采集器操作。</p></div>
         <div className="form-content">
-          <div className="form-grid two-columns no-margin">
-            <label className="input-field"><span>采集器</span><select value={collectorKey} onChange={(event) => { setCollectorKey(event.target.value); setCollectorOperation(""); }}><option value="">暂不绑定</option>{props.collectors.map((item) => <option key={item.key} value={item.key}>{item.name} · {item.key}</option>)}</select></label>
-            <label className="input-field"><span>操作</span><select value={collectorOperation} disabled={!collectorKey} onChange={(event) => setCollectorOperation(event.target.value)}><option value="">请选择操作</option>{availableOperations.map((item) => <option key={item.key} value={item.key}>{item.name} · {item.key}</option>)}</select></label>
+          <div className="binding-grid">
+            {(Object.keys(purposeLabels) as CollectionPurpose[]).map((purpose) => {
+              const options = registeredOperations.filter(({ operation }) => operation.purpose === purpose);
+              return <label className="input-field" key={purpose}><span>{purposeLabels[purpose]}</span><select value={bindings[purpose]} onChange={(event) => setBindings((current) => ({ ...current, [purpose]: event.target.value }))}><option value="">不支持</option>{options.map(({ collector, operation }) => <option key={`${collector.key}::${operation.key}`} value={`${collector.key}::${operation.key}`}>{collector.name} · {operation.name}</option>)}</select></label>;
+            })}
           </div>
-          {collectorOperation && (() => { const operation = availableOperations.find((item) => item.key === collectorOperation); return operation ? <div className="binding-preview"><strong>{operation.joint ? "联合更新" : "独立更新"}</strong><span>该操作产生 {operation.datasets.length} 个数据集</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div> : null; })()}
+          {(Object.entries(bindings) as Array<[CollectionPurpose, string]>).filter(([, value]) => value).map(([purpose, value]) => { const [collectorKey, operationKey] = value.split("::"); const operation = registeredOperations.find((item) => item.collector.key === collectorKey && item.operation.key === operationKey)?.operation; return operation ? <div className="binding-preview" key={purpose}><strong>{purposeLabels[purpose]}</strong><span>{collectorKey} · {operation.key}</span><span>{operation.joint ? "联合更新" : "独立更新"}，输出 {operation.datasets.length} 个数据集</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div> : null; })}
         </div>
       </section>
 
@@ -469,7 +488,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
 
       <section className="detail-grid">
         <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
-        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>采集器</dt><dd>{dataset.collector_key || "未绑定"}</dd></div><div><dt>采集操作</dt><dd>{dataset.collector_operation || "未绑定"}</dd></div></dl></div>
+        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div>{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
       <section className="panel fields-detail">

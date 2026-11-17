@@ -14,6 +14,19 @@ class DatasetStatus(StrEnum):
     DEPRECATED = "deprecated"
 
 
+class CollectionPurpose(StrEnum):
+    INITIAL = "initial"
+    INCREMENTAL = "incremental"
+    REPAIR = "repair"
+    REPLACE = "replace"
+
+
+class DatasetCollectionBinding(BaseModel):
+    purpose: CollectionPurpose
+    collector_key: str = Field(min_length=1, max_length=128)
+    operation: str = Field(min_length=1, max_length=128)
+
+
 class DatasetFieldCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*$")
     data_type: str = Field(min_length=1, max_length=64)
@@ -32,16 +45,16 @@ class DatasetCreate(BaseModel):
     market: str | None = Field(default=None, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    collector_key: str | None = Field(default=None, min_length=1, max_length=128)
-    collector_operation: str | None = Field(default=None, min_length=1, max_length=128)
+    collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_contract(self) -> "DatasetCreate":
-        if (self.collector_key is None) != (self.collector_operation is None):
-            raise ValueError("collector_key and collector_operation must be provided together")
+        purposes = [binding.purpose for binding in self.collection_bindings]
+        if len(purposes) != len(set(purposes)):
+            raise ValueError("collection binding purposes must be unique")
         segments = [self.provider, self.region, self.instrument, self.dataset_name]
         if self.market:
             segments.append(self.market)
@@ -66,16 +79,16 @@ class DatasetCreate(BaseModel):
 class DatasetUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    collector_key: str | None = Field(default=None, min_length=1, max_length=128)
-    collector_operation: str | None = Field(default=None, min_length=1, max_length=128)
+    collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_contract(self) -> "DatasetUpdate":
-        if (self.collector_key is None) != (self.collector_operation is None):
-            raise ValueError("collector_key and collector_operation must be provided together")
+        purposes = [binding.purpose for binding in self.collection_bindings]
+        if len(purposes) != len(set(purposes)):
+            raise ValueError("collection binding purposes must be unique")
         names = [field.name for field in self.fields]
         if len(names) != len(set(names)):
             raise ValueError("field names must be unique")
@@ -118,8 +131,7 @@ class DatasetRead(BaseModel):
     market: str | None
     display_name: str
     description: str | None
-    collector_key: str | None
-    collector_operation: str | None
+    collection_bindings: list[DatasetCollectionBinding]
     status: DatasetStatus
     current_schema_version: int
     created_at: datetime
@@ -138,5 +150,4 @@ class DatasetSummary(BaseModel):
     market: str | None
     status: DatasetStatus
     current_schema_version: int
-    collector_key: str | None
-    collector_operation: str | None
+    collection_bindings: list[DatasetCollectionBinding]
