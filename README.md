@@ -34,6 +34,8 @@ tb_l2.cn.stock.l2_trade.sz
 
 ## 本地开发
 
+启动后端：
+
 ```bash
 python -m venv .venv
 python -m pip install -e ".[dev]"
@@ -42,6 +44,16 @@ uvicorn quantstone_data.main:app --reload
 
 API 默认地址为 `http://127.0.0.1:8000`，交互式接口文档位于
 `http://127.0.0.1:8000/docs`。
+
+另开一个终端启动前端：
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+管理界面默认位于 `http://127.0.0.1:5173`。
 
 运行测试：
 
