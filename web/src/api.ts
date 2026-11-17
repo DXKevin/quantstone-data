@@ -1,4 +1,7 @@
 export type DatasetStatus = "draft" | "active" | "paused" | "deprecated";
+export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
+export type CollectionInputMethod = "collector" | "file_import";
+export type CollectionJobStatus = "created" | "awaiting_file" | "staged";
 
 export interface DatasetSummary {
   id: string;
@@ -61,6 +64,32 @@ export type DatasetUpdatePayload = Pick<
   "display_name" | "description" | "primary_key" | "time_field" | "fields"
 >;
 
+export interface CollectionJob {
+  id: string;
+  dataset_id: string;
+  operation: CollectionOperation;
+  input_method: CollectionInputMethod;
+  status: CollectionJobStatus;
+  start_date: string | null;
+  end_date: string | null;
+  collector_key: string | null;
+  source_file_name: string | null;
+  staged_path: string | null;
+  source_size_bytes: number | null;
+  source_sha256: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionJobCreatePayload {
+  dataset_id: string;
+  operation: CollectionOperation;
+  input_method: CollectionInputMethod;
+  start_date: string | null;
+  end_date: string | null;
+  collector_key: string | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -95,4 +124,23 @@ export const api = {
     request<DatasetDetail>(`/api/v1/datasets/${id}/activate`, { method: "POST" }),
   deleteDataset: (id: string) =>
     request<void>(`/api/v1/datasets/${id}`, { method: "DELETE" }),
+  listCollectionJobs: () => request<CollectionJob[]>("/api/v1/collection-jobs"),
+  createCollectionJob: (payload: CollectionJobCreatePayload) =>
+    request<CollectionJob>("/api/v1/collection-jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  uploadCollectionFile: async (jobId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`/api/v1/collection-jobs/${jobId}/file`, {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.detail || `文件上传失败（${response.status}）`);
+    }
+    return response.json() as Promise<CollectionJob>;
+  },
 };

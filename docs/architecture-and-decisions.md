@@ -523,6 +523,8 @@ quantstone_data/
 - `INITIAL`、`INCREMENTAL`、`REPAIR`、`REPLACE` 任务类型；
 - `COLLECTOR` 和 `FILE_IMPORT` 两种输入方式；
 - 手动文件上传到外部 staging，并记录文件大小与 SHA-256；
+- 采集任务列表与创建页面；
+- 手动文件选择、上传和 staging 状态展示；
 - 后端自动化测试和前端生产构建。
 
 当前实现并不包含真实采集器、文件解析与校验、Catalog、Parquet 写入或 SDK 数据读取。`STAGED` 只表示文件安全进入临时区，不表示数据已经入库完成。

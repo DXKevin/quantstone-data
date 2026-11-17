@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api, DatasetCreatePayload, DatasetDetail, DatasetSummary } from "./api";
+import CollectionJobs from "./CollectionJobs";
 
 type View = "list" | "create" | "edit" | "detail";
+type Area = "datasets" | "collection";
 
 interface FieldDraft {
   key: number;
@@ -51,6 +53,7 @@ const statusLabels = {
 };
 
 function App() {
+  const [area, setArea] = useState<Area>("datasets");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [selected, setSelected] = useState<DatasetDetail | null>(null);
@@ -106,8 +109,8 @@ function App() {
           <div><strong>QuantStone</strong><span>DATA</span></div>
         </div>
         <nav>
-          <button className="nav-item active"><Database size={17} />数据集</button>
-          <button className="nav-item" disabled><Activity size={17} />采集任务<span>稍后</span></button>
+          <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
+          <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
           <button className="nav-item" disabled><FileCode2 size={17} />存储目录<span>稍后</span></button>
         </nav>
         <div className="sidebar-bottom">
@@ -118,7 +121,8 @@ function App() {
       </aside>
 
       <main className="main-area">
-        {view === "list" && (
+        {area === "collection" && <CollectionJobs datasets={datasets} />}
+        {area === "datasets" && view === "list" && (
           <DatasetList
             datasets={filtered}
             total={datasets.length}
@@ -131,13 +135,13 @@ function App() {
             onRetry={() => void loadDatasets()}
           />
         )}
-        {view === "create" && (
+        {area === "datasets" && view === "create" && (
           <DatasetForm onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
         )}
-        {view === "edit" && selected && (
+        {area === "datasets" && view === "edit" && selected && (
           <DatasetForm dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
-        {view === "detail" && selected && (
+        {area === "datasets" && view === "detail" && selected && (
           <DatasetDetailView
             dataset={selected}
             onBack={() => setView("list")}
