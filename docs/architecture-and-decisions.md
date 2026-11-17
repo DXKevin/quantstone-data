@@ -275,6 +275,29 @@ REPAIR       修复指定范围
 REPLACE      重建指定范围
 ```
 
+### 8.3 手动文件入库
+
+手动入库不是绕过采集流程的特殊通道。任务目的与数据获取方式是两个独立维度：
+
+```text
+任务目的：INITIAL / INCREMENTAL / REPAIR / REPLACE
+输入方式：COLLECTOR / FILE_IMPORT
+```
+
+手动文件入库流程：
+
+```text
+创建 FILE_IMPORT 任务
+→ 上传文件到 staging
+→ 记录文件名、大小和 SHA-256
+→ 解析与字段对齐
+→ 数据质量校验
+→ 写入正式文件
+→ 更新 Catalog
+```
+
+手动入库可以用于首次初始化、缺口修复或范围替换，但同样必须经过后续校验与发布流程。
+
 ## 9. 采集器原则
 
 - 采集器负责和外部供应商、文件或下载渠道交互；
@@ -371,6 +394,13 @@ FAILED 或 QUARANTINED
 
 任务状态和数据分区状态应分别管理。
 
+当前手动文件导入已先实现两个输入准备状态：
+
+```text
+AWAITING_FILE  等待用户上传文件
+STAGED         文件已进入 staging，尚未校验和发布
+```
+
 ## 14. SDK 原则
 
 第一阶段 SDK 应提供通用数据集访问，而不是假装所有供应商可以互换：
@@ -433,11 +463,14 @@ quantstone-data/
 │   └── dataset-id.md
 ├── src/quantstone_data/
 │   ├── database.py
+│   ├── collection.py
+│   ├── collection_schemas.py
 │   ├── main.py
 │   ├── models.py
 │   ├── registry.py
 │   └── schemas.py
 ├── tests/
+│   ├── test_collection.py
 │   └── test_registry.py
 ├── web/
 │   ├── src/
@@ -486,9 +519,13 @@ quantstone_data/
 - 中文数据集管理前端；
 - 创建数据集表单和字段编辑器；
 - 数据集详情、启用、草稿编辑和删除界面；
+- 采集任务创建、列表和详情 API；
+- `INITIAL`、`INCREMENTAL`、`REPAIR`、`REPLACE` 任务类型；
+- `COLLECTOR` 和 `FILE_IMPORT` 两种输入方式；
+- 手动文件上传到外部 staging，并记录文件大小与 SHA-256；
 - 后端自动化测试和前端生产构建。
 
-当前实现并不包含真实采集器、Catalog、Parquet 写入或 SDK 数据读取。
+当前实现并不包含真实采集器、文件解析与校验、Catalog、Parquet 写入或 SDK 数据读取。`STAGED` 只表示文件安全进入临时区，不表示数据已经入库完成。
 
 ## 18. 前端产品约定
 

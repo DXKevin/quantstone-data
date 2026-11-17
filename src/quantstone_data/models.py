@@ -1,8 +1,18 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -77,3 +87,26 @@ class DatasetField(Base):
     position: Mapped[int] = mapped_column(Integer)
 
     schema_version: Mapped[DatasetSchemaVersion] = relationship(back_populates="fields")
+
+
+class CollectionJob(Base):
+    __tablename__ = "collection_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT"), index=True
+    )
+    operation: Mapped[str] = mapped_column(String(32), index=True)
+    input_method: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    collector_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    staged_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )

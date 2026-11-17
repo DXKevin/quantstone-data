@@ -1,3 +1,4 @@
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -14,6 +15,11 @@ def default_database_url() -> str:
     database_path = Path("var") / "quantstone-data.db"
     database_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{database_path.as_posix()}"
+
+
+def default_data_root() -> Path:
+    configured = os.environ.get("QUANTSTONE_DATA_ROOT")
+    return Path(configured).expanduser() if configured else Path.home() / ".quantstone-data"
 
 
 def create_session_factory(database_url: str) -> sessionmaker[Session]:

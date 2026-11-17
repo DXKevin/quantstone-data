@@ -39,11 +39,14 @@ tb_l2.cn.stock.l2_trade.sz
 
 启动后端：
 
-```bash
+```powershell
 python -m venv .venv
 python -m pip install -e ".[dev]"
+$env:QUANTSTONE_DATA_ROOT = "D:\QuantStoneData"
 uvicorn quantstone_data.main:app --reload
 ```
+
+如果不设置 `QUANTSTONE_DATA_ROOT`，默认使用当前用户目录下的 `.quantstone-data`。真实数据和 staging 文件不应放入 Git 仓库。
 
 API 默认地址为 `http://127.0.0.1:8000`，交互式接口文档位于
 `http://127.0.0.1:8000/docs`。
@@ -73,8 +76,14 @@ GET    /api/v1/datasets/{dataset_id}
 PUT    /api/v1/datasets/{dataset_id}
 POST   /api/v1/datasets/{dataset_id}/activate
 DELETE /api/v1/datasets/{dataset_id}
+POST   /api/v1/collection-jobs
+GET    /api/v1/collection-jobs
+GET    /api/v1/collection-jobs/{job_id}
+POST   /api/v1/collection-jobs/{job_id}/file
 GET    /health
 ```
+
+手动文件入库采用两步流程：先创建 `input_method=file_import` 的采集任务，再将文件上传到该任务的 `/file` 接口。文件只会进入外部数据根目录的 staging 区，不会直接发布为正式数据。
 
 ## 项目状态
 

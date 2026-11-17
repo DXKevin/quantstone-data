@@ -41,7 +41,9 @@ def dataset_payload() -> dict:
 
 
 def test_dataset_lifecycle(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
     with TestClient(app) as client:
         created = client.post("/api/v1/datasets", json=dataset_payload())
         assert created.status_code == 201
@@ -61,7 +63,9 @@ def test_dataset_lifecycle(tmp_path: Path) -> None:
 
 
 def test_dataset_id_must_match_segments(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
     payload = dataset_payload()
     payload["id"] = "wrong.id"
 
@@ -73,7 +77,9 @@ def test_dataset_id_must_match_segments(tmp_path: Path) -> None:
 
 
 def test_duplicate_dataset_is_rejected(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
     with TestClient(app) as client:
         assert client.post("/api/v1/datasets", json=dataset_payload()).status_code == 201
         response = client.post("/api/v1/datasets", json=dataset_payload())
@@ -82,7 +88,9 @@ def test_duplicate_dataset_is_rejected(tmp_path: Path) -> None:
 
 
 def test_draft_dataset_can_be_edited_and_deleted(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
     with TestClient(app) as client:
         created = client.post("/api/v1/datasets", json=dataset_payload())
         payload = {
@@ -104,7 +112,9 @@ def test_draft_dataset_can_be_edited_and_deleted(tmp_path: Path) -> None:
 
 
 def test_active_dataset_cannot_be_edited(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
     with TestClient(app) as client:
         created = client.post("/api/v1/datasets", json=dataset_payload()).json()
         client.post(f"/api/v1/datasets/{created['id']}/activate")
