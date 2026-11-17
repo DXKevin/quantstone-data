@@ -206,10 +206,15 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         assert created.json()["collector_key"] == "tushare.stock_basic"
 
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        review_response = client.get(
+            f"/api/v1/collection-jobs/{created.json()['id']}/review"
+        )
 
     assert executed.status_code == 200
     body = executed.json()
     assert body["status"] == "review_passed"
+    assert review_response.status_code == 200
+    assert review_response.json()["row_count"] == 1
     staged_file = tmp_path / "data" / body["staged_path"]
     assert "000001.SZ" in staged_file.read_text(encoding="utf-8")
     report = staged_file.with_name("review.json").read_text(encoding="utf-8")

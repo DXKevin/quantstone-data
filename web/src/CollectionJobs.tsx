@@ -15,6 +15,7 @@ import {
   type CollectionJob,
   type CollectionJobCreatePayload,
   type CollectionOperation,
+  type CollectionReview,
   type DatasetSummary,
 } from "./api";
 
@@ -44,6 +45,8 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
   const activeDatasets = useMemo(
     () => datasets.filter((dataset) => dataset.status === "active"),
     [datasets],
@@ -74,6 +77,30 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
       await loadJobs();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "文件上传失败");
+    }
+  }
+
+  async function executeJob(job: CollectionJob) {
+    setRunningJobId(job.id);
+    setNotice(null);
+    setError(null);
+    try {
+      const result = await api.executeCollectionJob(job.id);
+      setNotice(result.status === "review_passed" ? "采集完成，暂存数据审核通过。" : "采集完成，但审核发现异常。" );
+      await loadJobs();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "采集任务执行失败");
+    } finally {
+      setRunningJobId(null);
+    }
+  }
+
+  async function showReview(job: CollectionJob) {
+    setError(null);
+    try {
+      setReview({ jobId: job.id, data: await api.getCollectionReview(job.id) });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法读取审核报告");
     }
   }
 
@@ -116,6 +143,15 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
 
       {notice && <div className="notice-banner"><CheckCircle2 size={17} />{notice}</div>}
       {error && <div className="form-error"><AlertCircle size={17} />{error}</div>}
+      {review && (
+        <section className="review-summary">
+          <div><strong>{review.data.passed ? "审核通过" : "审核异常"}</strong><span>任务 {review.jobId.slice(0, 8)}</span></div>
+          <div><span>审核器</span><code>{review.data.reviewer}</code></div>
+          <div><span>数据行数</span><strong>{review.data.row_count.toLocaleString()}</strong></div>
+          <div><span>异常数量</span><strong>{review.data.error_count}</strong></div>
+          <button type="button" className="toolbar-button" onClick={() => setReview(null)}>关闭</button>
+        </section>
+      )}
       {!activeDatasets.length && (
         <div className="warning-banner"><AlertCircle size={17} />请先在数据集页面启用至少一个数据集，才能创建采集任务。</div>
       )}
@@ -131,7 +167,7 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
           <div className="state-box empty-state"><Clock3 size={28} /><strong>还没有采集任务</strong><p>创建一个采集器任务，或手动导入本地文件。</p>{activeDatasets.length > 0 && <button className="secondary-button" onClick={() => setView("create")}><Plus size={16} />创建任务</button>}</div>
         ) : (
           <div className="jobs-table">
-            <div className="job-row job-head"><span>数据集 / 任务</span><span>任务目的</span><span>输入方式</span><span>日期范围</span><span>文件</span><span>状态</span></div>
+            <div className="job-row job-head"><span>数据集 / 任务</span><span>任务目的</span><span>输入方式</span><span>日期范围</span><span>文件</span><span>状态</span><span>操作</span></div>
             {jobs.map((job) => (
               <div className="job-row" key={job.id}>
                 <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)}</small></span>
@@ -140,6 +176,10 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
                 <span className="file-cell">{job.source_file_name ? <><strong>{job.source_file_name}</strong><small>{formatBytes(job.source_size_bytes)}</small></> : job.status === "awaiting_file" ? <UploadFileButton onFile={(file) => void uploadExisting(job, file)} /> : "—"}</span>
                 <span><JobStatus status={job.status} /></span>
+                <span className="job-actions">
+                  {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}><RefreshCw size={14} />{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
+                  {(job.status === "review_passed" || job.status === "review_failed") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
+                </span>
               </div>
             ))}
           </div>
@@ -160,28 +200,26 @@ function CreateCollectionJob(props: {
   const [inputMethod, setInputMethod] = useState<CollectionInputMethod>("file_import");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [collectorKey, setCollectorKey] = useState("mock");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const needsRange = operation !== "incremental";
+  const [useDateRange, setUseDateRange] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     if (!datasetId) return setError("没有可用的已启用数据集。");
-    if (needsRange && (!startDate || !endDate)) return setError("该任务目的需要填写开始和结束日期。");
+    if (useDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
     if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
-    if (inputMethod === "collector" && !collectorKey.trim()) return setError("请填写采集器标识。");
 
     const payload: CollectionJobCreatePayload = {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: needsRange ? startDate : null,
-      end_date: needsRange ? endDate : null,
-      collector_key: inputMethod === "collector" ? collectorKey.trim() : null,
+      start_date: useDateRange ? startDate : null,
+      end_date: useDateRange ? endDate : null,
+      collector_key: null,
     };
 
     setSubmitting(true);
@@ -196,7 +234,7 @@ function CreateCollectionJob(props: {
         }
         await props.onComplete(`任务已创建，文件 ${file.name} 已进入 staging。`);
       } else {
-        await props.onComplete("采集任务已创建，等待后续 Planner 处理。");
+        await props.onComplete("采集任务已创建，可以在任务列表中执行采集器。");
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建任务失败");
@@ -221,7 +259,8 @@ function CreateCollectionJob(props: {
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          {needsRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
+          <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>
+          {useDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
         </div>
       </section>
 
@@ -234,9 +273,7 @@ function CreateCollectionJob(props: {
           </div>
           {inputMethod === "file_import" ? (
             <label className={file ? "file-drop selected" : "file-drop"}><input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><UploadCloud size={25} /><strong>{file ? file.name : "选择需要导入的文件"}</strong><span>{file ? formatBytes(file.size) : "文件将先进入临时区，不会直接写入正式数据"}</span></label>
-          ) : (
-            <label className="input-field collector-field"><span>采集器标识<b>*</b></span><input value={collectorKey} onChange={(event) => setCollectorKey(event.target.value)} placeholder="mock" /><small>当前尚未实现真实采集器，建议保留 `mock` 用于下一阶段联调。</small></label>
-          )}
+          ) : <div className="operation-help">采集器由数据集预先绑定，创建任务后在任务列表执行。</div>}
         </div>
       </section>
     </form>

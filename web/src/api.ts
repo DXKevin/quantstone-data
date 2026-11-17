@@ -95,6 +95,14 @@ export interface CollectionJobCreatePayload {
   collector_key: string | null;
 }
 
+export interface CollectionReview {
+  reviewer: string;
+  passed: boolean;
+  row_count: number;
+  error_count: number;
+  errors: Array<Record<string, unknown>>;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -135,6 +143,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  executeCollectionJob: (jobId: string) =>
+    request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/execute`, { method: "POST" }),
+  getCollectionReview: (jobId: string) =>
+    request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

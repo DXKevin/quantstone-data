@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -134,6 +135,19 @@ def get_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead:
     if job is None:
         raise HTTPException(status_code=404, detail="collection job not found")
     return serialize_job(job)
+
+
+@router.get("/{job_id}/review")
+def get_collection_review(job_id: str, request: Request, session: SessionDep) -> dict:
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    if not job.staged_path:
+        raise HTTPException(status_code=409, detail="job has no staged review result")
+    report_path = (request.app.state.data_root / job.staged_path).parent / "review.json"
+    if not report_path.is_file():
+        raise HTTPException(status_code=404, detail="review report not found")
+    return json.loads(report_path.read_text(encoding="utf-8"))
 
 
 @router.post("/{job_id}/file", response_model=CollectionJobRead)
