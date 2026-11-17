@@ -16,14 +16,14 @@ from .collection_schemas import (
 )
 from .database import get_session
 from .dataset_handlers import handler_for
+from .datasets.tushare.cn.stock.stock_basic import (
+    CollectionError,
+    collect,
+    load_token,
+    review,
+)
 from .models import CollectionJob, Dataset, DatasetSchemaVersion
 from .schemas import DatasetStatus
-from .tushare_stock_basic import (
-    CollectionError,
-    collect_stock_basic,
-    load_tushare_token,
-    review_stock_basic,
-)
 
 router = APIRouter(prefix="/collection-jobs", tags=["collection jobs"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -95,13 +95,13 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     report_path = job_directory / "review.json"
 
     try:
-        row_count = collect_stock_basic(target, fields, load_tushare_token())
+        row_count = collect(target, fields, load_token())
         job.source_file_name = target.name
         job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
         job.source_size_bytes = target.stat().st_size
         job.source_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
         job.status = CollectionJobStatus.STAGED.value
-        passed = review_stock_basic(target, schema, report_path)
+        passed = review(target, schema, report_path)
         job.status = (
             CollectionJobStatus.REVIEW_PASSED.value
             if passed

@@ -186,7 +186,10 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             return []
         return [{"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"}]
 
-    monkeypatch.setattr("quantstone_data.tushare_stock_basic.call_stock_basic", fake_call)
+    monkeypatch.setattr(
+        "quantstone_data.datasets.tushare.cn.stock.stock_basic.collector.call_api",
+        fake_call,
+    )
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
 
     with create_client(tmp_path) as client:

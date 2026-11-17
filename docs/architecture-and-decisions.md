@@ -318,6 +318,20 @@ REPLACE      重建指定范围
 再将绑定信息纳入可配置的数据集契约。首版只采集 TuShare 默认的当前上市状态 `L`，
 其他上市状态需要等通用任务参数和供应商限流调度完成后开放。
 
+数据集专用代码严格按照数据集 ID 的层级组织。例如：
+
+```text
+datasets/tushare/cn/stock/stock_basic/
+├── definition.py
+├── collector.py
+├── reviewer.py
+└── __init__.py
+```
+
+如果数据集 ID 带可选市场层，则继续追加目录，例如
+`datasets/tb_l2/cn/stock/l2_order/sh/`。一个数据集目录提供一个统一入口，内部文件可以
+继续拆分；分页、限流、重试和通用校验等跨数据集能力不放在该目录重复实现。
+
 ## 10. 标准化与质量校验
 
 建议按以下顺序处理：

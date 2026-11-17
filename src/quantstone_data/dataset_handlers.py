@@ -1,5 +1,11 @@
 from dataclasses import dataclass
 
+from .datasets.tushare.cn.stock.stock_basic.definition import (
+    COLLECTOR_KEY,
+    DATASET_ID,
+    REVIEWER_KEY,
+)
+
 
 @dataclass(frozen=True)
 class DatasetHandler:
@@ -8,9 +14,9 @@ class DatasetHandler:
 
 
 DATASET_HANDLERS = {
-    "tushare.cn.stock.stock_basic": DatasetHandler(
-        collector_key="tushare.stock_basic",
-        reviewer_key="tushare.stock_basic",
+    DATASET_ID: DatasetHandler(
+        collector_key=COLLECTOR_KEY,
+        reviewer_key=REVIEWER_KEY,
     )
 }
 
