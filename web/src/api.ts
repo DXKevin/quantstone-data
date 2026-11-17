@@ -56,6 +56,11 @@ export interface DatasetCreatePayload {
   }>;
 }
 
+export type DatasetUpdatePayload = Pick<
+  DatasetCreatePayload,
+  "display_name" | "description" | "primary_key" | "time_field" | "fields"
+>;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -69,6 +74,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       : detail || `请求失败（${response.status}）`;
     throw new Error(message);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -80,6 +86,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateDataset: (id: string, payload: DatasetUpdatePayload) =>
+    request<DatasetDetail>(`/api/v1/datasets/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   activateDataset: (id: string) =>
     request<DatasetDetail>(`/api/v1/datasets/${id}/activate`, { method: "POST" }),
+  deleteDataset: (id: string) =>
+    request<void>(`/api/v1/datasets/${id}`, { method: "DELETE" }),
 };

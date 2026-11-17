@@ -67,6 +67,7 @@ pytest
 POST   /api/v1/datasets
 GET    /api/v1/datasets
 GET    /api/v1/datasets/{dataset_id}
+PUT    /api/v1/datasets/{dataset_id}
 POST   /api/v1/datasets/{dataset_id}/activate
 DELETE /api/v1/datasets/{dataset_id}
 GET    /health

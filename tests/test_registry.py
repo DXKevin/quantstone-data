@@ -79,3 +79,43 @@ def test_duplicate_dataset_is_rejected(tmp_path: Path) -> None:
         response = client.post("/api/v1/datasets", json=dataset_payload())
 
     assert response.status_code == 409
+
+
+def test_draft_dataset_can_be_edited_and_deleted(tmp_path: Path) -> None:
+    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    with TestClient(app) as client:
+        created = client.post("/api/v1/datasets", json=dataset_payload())
+        payload = {
+            "display_name": "上海股票逐笔委托（修订）",
+            "description": "修订后的说明",
+            "primary_key": ["trade_date", "order_no"],
+            "time_field": "event_time",
+            "fields": dataset_payload()["fields"],
+        }
+
+        updated = client.put(f"/api/v1/datasets/{created.json()['id']}", json=payload)
+        assert updated.status_code == 200
+        assert updated.json()["display_name"] == payload["display_name"]
+        assert updated.json()["description"] == payload["description"]
+
+        deleted = client.delete(f"/api/v1/datasets/{created.json()['id']}")
+        assert deleted.status_code == 204
+        assert client.get(f"/api/v1/datasets/{created.json()['id']}").status_code == 404
+
+
+def test_active_dataset_cannot_be_edited(tmp_path: Path) -> None:
+    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    with TestClient(app) as client:
+        created = client.post("/api/v1/datasets", json=dataset_payload()).json()
+        client.post(f"/api/v1/datasets/{created['id']}/activate")
+        payload = {
+            "display_name": "不应保存",
+            "description": None,
+            "primary_key": ["trade_date", "order_no"],
+            "time_field": "event_time",
+            "fields": dataset_payload()["fields"],
+        }
+
+        response = client.put(f"/api/v1/datasets/{created['id']}", json=payload)
+
+    assert response.status_code == 409

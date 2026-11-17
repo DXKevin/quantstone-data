@@ -7,6 +7,7 @@ import {
   Database,
   FileCode2,
   Layers3,
+  Pencil,
   Plus,
   Search,
   Settings,
@@ -16,7 +17,7 @@ import {
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api, DatasetCreatePayload, DatasetDetail, DatasetSummary } from "./api";
 
-type View = "list" | "create" | "detail";
+type View = "list" | "create" | "edit" | "detail";
 
 interface FieldDraft {
   key: number;
@@ -91,7 +92,7 @@ function App() {
     }
   }
 
-  async function handleCreated(dataset: DatasetDetail) {
+  async function handleSaved(dataset: DatasetDetail) {
     await loadDatasets();
     setSelected(dataset);
     setView("detail");
@@ -131,12 +132,21 @@ function App() {
           />
         )}
         {view === "create" && (
-          <CreateDataset onCancel={() => setView("list")} onCreated={(data) => void handleCreated(data)} />
+          <DatasetForm onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
+        )}
+        {view === "edit" && selected && (
+          <DatasetForm dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
         {view === "detail" && selected && (
           <DatasetDetailView
             dataset={selected}
             onBack={() => setView("list")}
+            onEdit={() => setView("edit")}
+            onDeleted={() => {
+              setSelected(null);
+              setView("list");
+              void loadDatasets();
+            }}
             onChanged={(data) => {
               setSelected(data);
               void loadDatasets();
@@ -205,22 +215,33 @@ function DatasetList(props: {
   );
 }
 
-function CreateDataset(props: { onCancel: () => void; onCreated: (dataset: DatasetDetail) => void }) {
-  const [provider, setProvider] = useState("");
-  const [region, setRegion] = useState("cn");
-  const [instrument, setInstrument] = useState("stock");
-  const [datasetName, setDatasetName] = useState("");
-  const [market, setMarket] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [description, setDescription] = useState("");
-  const [timeField, setTimeField] = useState("");
-  const [fields, setFields] = useState<FieldDraft[]>([newField(1)]);
-  const [nextKey, setNextKey] = useState(2);
+function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
+  const editing = Boolean(props.dataset);
+  const [provider, setProvider] = useState(props.dataset?.provider ?? "");
+  const [region, setRegion] = useState(props.dataset?.region ?? "cn");
+  const [instrument, setInstrument] = useState(props.dataset?.instrument ?? "stock");
+  const [datasetName, setDatasetName] = useState(props.dataset?.dataset_name ?? "");
+  const [market, setMarket] = useState(props.dataset?.market ?? "");
+  const [displayName, setDisplayName] = useState(props.dataset?.display_name ?? "");
+  const [description, setDescription] = useState(props.dataset?.description ?? "");
+  const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
+  const initialFields = props.dataset?.schema.fields.map((field, index) => ({
+    key: index + 1,
+    name: field.name,
+    data_type: field.data_type,
+    nullable: field.nullable,
+    description: field.description,
+    unit: field.unit ?? "",
+    source_name: field.source_name ?? "",
+    primary: props.dataset?.schema.primary_key.includes(field.name) ?? false,
+  })) ?? [newField(1)];
+  const [fields, setFields] = useState<FieldDraft[]>(initialFields);
+  const [nextKey, setNextKey] = useState(initialFields.length + 1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const segments = [provider, region, instrument, datasetName, market].filter(Boolean);
-  const datasetId = segments.join(".");
+  const datasetId = props.dataset?.id ?? segments.join(".");
   const validFields = fields.filter((field) => field.name.trim());
 
   function updateField(key: number, patch: Partial<FieldDraft>) {
@@ -268,7 +289,16 @@ function CreateDataset(props: { onCancel: () => void; onCreated: (dataset: Datas
 
     setSubmitting(true);
     try {
-      props.onCreated(await api.createDataset(payload));
+      const saved = editing
+        ? await api.updateDataset(datasetId, {
+            display_name: payload.display_name,
+            description: payload.description,
+            primary_key: payload.primary_key,
+            time_field: payload.time_field,
+            fields: payload.fields,
+          })
+        : await api.createDataset(payload);
+      props.onSaved(saved);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建失败");
     } finally {
@@ -279,8 +309,8 @@ function CreateDataset(props: { onCancel: () => void; onCreated: (dataset: Datas
   return (
     <form className="page create-page" onSubmit={(event) => void submit(event)}>
       <header className="page-header compact">
-        <div><button type="button" className="back-button" onClick={props.onCancel}><ArrowLeft size={16} />返回数据集</button><h1>创建数据集</h1><p className="subtitle">定义供应商数据集的身份与首个 Schema 版本。</p></div>
-        <div className="header-actions"><button type="button" className="ghost-button" onClick={props.onCancel}>取消</button><button className="primary-button" disabled={submitting}>{submitting ? "正在创建…" : "创建草稿"}</button></div>
+        <div><button type="button" className="back-button" onClick={props.onCancel}><ArrowLeft size={16} />返回数据集</button><h1>{editing ? "编辑数据集" : "创建数据集"}</h1><p className="subtitle">{editing ? "修改草稿的数据契约，数据集 ID 保持不变。" : "定义供应商数据集的身份与首个 Schema 版本。"}</p></div>
+        <div className="header-actions"><button type="button" className="ghost-button" onClick={props.onCancel}>取消</button><button className="primary-button" disabled={submitting}>{submitting ? "正在保存…" : editing ? "保存修改" : "创建草稿"}</button></div>
       </header>
 
       {error && <div className="form-error"><X size={17} />{error}</div>}
@@ -289,11 +319,11 @@ function CreateDataset(props: { onCancel: () => void; onCreated: (dataset: Datas
         <div className="section-number">01</div><div className="section-intro"><h2>数据集身份</h2><p>ID 创建后保持稳定，结构变化使用 Schema 版本表示。</p></div>
         <div className="form-content">
           <div className="form-grid five-columns">
-            <Input label="供应商" value={provider} onChange={setProvider} placeholder="tushare" required idSegment />
-            <Input label="区域" value={region} onChange={setRegion} placeholder="cn" required idSegment />
-            <Input label="品种" value={instrument} onChange={setInstrument} placeholder="stock" required idSegment />
-            <Input label="数据集名称" value={datasetName} onChange={setDatasetName} placeholder="daily" required idSegment />
-            <Input label="市场（可选）" value={market} onChange={setMarket} placeholder="sh" idSegment />
+            <Input label="供应商" value={provider} onChange={setProvider} placeholder="tushare" required idSegment disabled={editing} />
+            <Input label="区域" value={region} onChange={setRegion} placeholder="cn" required idSegment disabled={editing} />
+            <Input label="品种" value={instrument} onChange={setInstrument} placeholder="stock" required idSegment disabled={editing} />
+            <Input label="数据集名称" value={datasetName} onChange={setDatasetName} placeholder="daily" required idSegment disabled={editing} />
+            <Input label="市场（可选）" value={market} onChange={setMarket} placeholder="sh" idSegment disabled={editing} />
           </div>
           <div className="id-preview"><span>数据集 ID</span><code>{datasetId || "provider.region.instrument.dataset[.market]"}</code></div>
           <div className="form-grid two-columns">
@@ -331,8 +361,9 @@ function CreateDataset(props: { onCancel: () => void; onCreated: (dataset: Datas
   );
 }
 
-function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onChanged: (dataset: DatasetDetail) => void }) {
+function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
   const [activating, setActivating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function activate() {
@@ -347,12 +378,25 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
     }
   }
 
+  async function remove() {
+    if (!window.confirm(`确定删除草稿“${props.dataset.display_name}”吗？此操作无法撤销。`)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteDataset(props.dataset.id);
+      props.onDeleted();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除失败");
+      setDeleting(false);
+    }
+  }
+
   const dataset = props.dataset;
   return (
     <div className="page">
       <header className="page-header compact">
         <div><button className="back-button" onClick={props.onBack}><ArrowLeft size={16} />返回数据集</button><div className="title-line"><h1>{dataset.display_name}</h1><StatusBadge status={dataset.status} /></div><code className="large-id">{dataset.id}</code></div>
-        {dataset.status === "draft" && <button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button>}
+        {dataset.status === "draft" && <div className="header-actions"><button className="danger-button" onClick={() => void remove()} disabled={deleting}><Trash2 size={16} />{deleting ? "正在删除…" : "删除草稿"}</button><button className="ghost-button" onClick={props.onEdit}><Pencil size={16} />编辑</button><button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button></div>}
       </header>
       {error && <div className="form-error"><X size={17} />{error}</div>}
 
@@ -378,11 +422,11 @@ function StatusBadge({ status }: { status: DatasetSummary["status"] }) {
   return <span className={`status status-${status}`}><i />{statusLabels[status]}</span>;
 }
 
-function Input(props: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; idSegment?: boolean }) {
+function Input(props: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; idSegment?: boolean; disabled?: boolean }) {
   function change(value: string) {
     props.onChange(props.idSegment ? value.toLowerCase().replace(/[^a-z0-9_]/g, "") : value);
   }
-  return <label className="input-field"><span>{props.label}{props.required && <b>*</b>}</span><input value={props.value} onChange={(event) => change(event.target.value)} placeholder={props.placeholder} /></label>;
+  return <label className="input-field"><span>{props.label}{props.required && <b>*</b>}</span><input value={props.value} onChange={(event) => change(event.target.value)} placeholder={props.placeholder} disabled={props.disabled} /></label>;
 }
 
 export default App;

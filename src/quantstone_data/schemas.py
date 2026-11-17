@@ -59,6 +59,26 @@ class DatasetCreate(BaseModel):
         return self
 
 
+class DatasetUpdate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    primary_key: list[str] = Field(min_length=1)
+    time_field: str | None = None
+    fields: list[DatasetFieldCreate] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> "DatasetUpdate":
+        names = [field.name for field in self.fields]
+        if len(names) != len(set(names)):
+            raise ValueError("field names must be unique")
+        unknown_primary_key = set(self.primary_key) - set(names)
+        if unknown_primary_key:
+            raise ValueError(f"primary key fields are undefined: {sorted(unknown_primary_key)}")
+        if self.time_field and self.time_field not in names:
+            raise ValueError(f"time field is undefined: {self.time_field}")
+        return self
+
+
 class DatasetFieldRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

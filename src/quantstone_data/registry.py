@@ -13,6 +13,7 @@ from .schemas import (
     DatasetSchemaRead,
     DatasetStatus,
     DatasetSummary,
+    DatasetUpdate,
 )
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -106,6 +107,45 @@ def get_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
     if dataset is None:
         raise HTTPException(status_code=404, detail="dataset not found")
     return serialize_dataset(dataset)
+
+
+@router.put("/{dataset_id}", response_model=DatasetRead)
+def update_draft_dataset(
+    dataset_id: str, payload: DatasetUpdate, session: SessionDep
+) -> DatasetRead:
+    dataset = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    if dataset.status != DatasetStatus.DRAFT.value:
+        raise HTTPException(status_code=409, detail="only draft datasets can be edited")
+
+    schema = next(
+        item for item in dataset.schemas if item.version == dataset.current_schema_version
+    )
+    dataset.display_name = payload.display_name
+    dataset.description = payload.description
+    schema.primary_key = ",".join(payload.primary_key)
+    schema.time_field = payload.time_field
+    for field in list(schema.fields):
+        session.delete(field)
+    session.flush()
+    schema.fields = [
+        DatasetField(
+            name=field.name,
+            data_type=field.data_type,
+            nullable=field.nullable,
+            description=field.description,
+            unit=field.unit,
+            source_name=field.source_name,
+            position=position,
+        )
+        for position, field in enumerate(payload.fields)
+    ]
+    session.commit()
+
+    stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    assert stored is not None
+    return serialize_dataset(stored)
 
 
 @router.post("/{dataset_id}/activate", response_model=DatasetRead)

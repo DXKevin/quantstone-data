@@ -39,12 +39,14 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: 2.1px; }
 h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
-.primary-button, .secondary-button, .ghost-button { border-radius: 6px; min-height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.primary-button, .secondary-button, .ghost-button, .danger-button { border-radius: 6px; min-height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-weight: 600; font-size: 13px; cursor: pointer; }
 .primary-button { border: 1px solid var(--green); background: var(--green); color: white; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
 .primary-button:hover { background: var(--green-dark); }
 .primary-button:disabled { opacity: .55; cursor: wait; }
 .secondary-button { border: 1px solid #cfd8d3; background: white; }
 .ghost-button { border: 1px solid var(--line); background: transparent; }
+.danger-button { border: 1px solid #e4c7c7; background: #fff8f8; color: #a43c3c; }
+.danger-button:disabled { opacity: .55; cursor: wait; }
 .summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); background: var(--panel); margin-bottom: 20px; }
 .summary-strip > div { min-height: 91px; padding: 20px 22px; border-right: 1px solid var(--line); }
 .summary-strip > div:last-child { border: 0; }
@@ -94,6 +96,7 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .input-field b { color: #bd4c4c; margin-left: 3px; }
 .input-field input, .field-row input, .field-row select, .select-field select { width: 100%; height: 37px; border: 1px solid #d6ddd9; border-radius: 5px; outline: 0; background: white; padding: 0 10px; font-size: 12px; }
 .input-field input:focus, .field-row input:focus, .field-row select:focus, .select-field select:focus { border-color: #59a686; box-shadow: 0 0 0 2px rgba(8,122,84,.08); }
+.input-field input:disabled { background: #f0f2f0; color: #78827d; cursor: not-allowed; }
 .id-preview { margin-top: 16px; min-height: 55px; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: #edf2ef; border-left: 3px solid var(--green); }
 .id-preview span { color: var(--muted); font-size: 10px; }
 .id-preview code { font-size: 12px; color: #164c39; }
