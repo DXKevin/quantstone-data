@@ -69,7 +69,7 @@ def test_only_active_datasets_can_create_collection_jobs(tmp_path: Path) -> None
     assert response.status_code == 409
 
 
-def test_initial_collection_requires_date_range(tmp_path: Path) -> None:
+def test_initial_collection_can_be_created_without_date_range(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         dataset_id = create_dataset(client)
         response = client.post(
@@ -82,8 +82,9 @@ def test_initial_collection_requires_date_range(tmp_path: Path) -> None:
             },
         )
 
-    assert response.status_code == 422
-    assert "requires a date range" in response.text
+    assert response.status_code == 201
+    assert response.json()["start_date"] is None
+    assert response.json()["end_date"] is None
 
 
 def test_incremental_collector_job_can_be_created_without_dates(tmp_path: Path) -> None:
@@ -144,3 +145,72 @@ def test_manual_file_import_is_staged_with_integrity_metadata(tmp_path: Path) ->
         )
 
     assert duplicate.status_code == 409
+
+
+def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypatch) -> None:
+    payload = {
+        "id": "tushare.cn.stock.stock_basic",
+        "provider": "tushare",
+        "region": "cn",
+        "instrument": "stock",
+        "dataset_name": "stock_basic",
+        "market": None,
+        "display_name": "A股股票列表",
+        "description": "TuShare 股票基础信息",
+        "primary_key": ["ts_code"],
+        "time_field": None,
+        "fields": [
+            {
+                "name": "ts_code",
+                "data_type": "string",
+                "nullable": False,
+                "description": "TS代码",
+            },
+            {
+                "name": "name",
+                "data_type": "string",
+                "nullable": False,
+                "description": "股票名称",
+            },
+            {
+                "name": "list_status",
+                "data_type": "string",
+                "nullable": False,
+                "description": "上市状态",
+            },
+        ],
+    }
+
+    def fake_call(_token: str, list_status: str, _fields: list[str]) -> list[dict]:
+        if list_status != "L":
+            return []
+        return [{"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"}]
+
+    monkeypatch.setattr("quantstone_data.tushare_stock_basic.call_stock_basic", fake_call)
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        created_dataset = client.post("/api/v1/datasets", json=payload)
+        assert created_dataset.status_code == 201
+        activated = client.post("/api/v1/datasets/tushare.cn.stock.stock_basic/activate")
+        assert activated.status_code == 200
+        created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.stock_basic",
+                "operation": "initial",
+                "input_method": "collector",
+            },
+        )
+        assert created.status_code == 201
+        assert created.json()["collector_key"] == "tushare.stock_basic"
+
+        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+
+    assert executed.status_code == 200
+    body = executed.json()
+    assert body["status"] == "review_passed"
+    staged_file = tmp_path / "data" / body["staged_path"]
+    assert "000001.SZ" in staged_file.read_text(encoding="utf-8")
+    report = staged_file.with_name("review.json").read_text(encoding="utf-8")
+    assert '"passed": true' in report

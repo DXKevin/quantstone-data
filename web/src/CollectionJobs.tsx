@@ -34,6 +34,8 @@ const statusLabels = {
   created: "已创建",
   awaiting_file: "等待文件",
   staged: "已进入临时区",
+  review_passed: "审核通过",
+  review_failed: "审核异常",
 };
 
 export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[] }) {

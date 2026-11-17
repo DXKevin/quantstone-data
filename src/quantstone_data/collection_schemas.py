@@ -20,6 +20,8 @@ class CollectionJobStatus(StrEnum):
     CREATED = "created"
     AWAITING_FILE = "awaiting_file"
     STAGED = "staged"
+    REVIEW_PASSED = "review_passed"
+    REVIEW_FAILED = "review_failed"
 
 
 class CollectionJobCreate(BaseModel):
@@ -36,14 +38,6 @@ class CollectionJobCreate(BaseModel):
             raise ValueError("start_date and end_date must be provided together")
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("start_date must not be after end_date")
-        if self.operation in {
-            CollectionOperation.INITIAL,
-            CollectionOperation.REPAIR,
-            CollectionOperation.REPLACE,
-        } and (self.start_date is None or self.end_date is None):
-            raise ValueError(f"{self.operation.value} operation requires a date range")
-        if self.input_method is InputMethod.COLLECTOR and not self.collector_key:
-            raise ValueError("collector input requires collector_key")
         if self.input_method is InputMethod.FILE_IMPORT and self.collector_key:
             raise ValueError("file import must not specify collector_key")
         return self

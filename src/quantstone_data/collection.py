@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .collection_schemas import (
     CollectionJobCreate,
@@ -14,8 +14,15 @@ from .collection_schemas import (
     InputMethod,
 )
 from .database import get_session
-from .models import CollectionJob, Dataset
+from .dataset_handlers import handler_for
+from .models import CollectionJob, Dataset, DatasetSchemaVersion
 from .schemas import DatasetStatus
+from .tushare_stock_basic import (
+    CollectionError,
+    collect_stock_basic,
+    load_tushare_token,
+    review_stock_basic,
+)
 
 router = APIRouter(prefix="/collection-jobs", tags=["collection jobs"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -45,11 +52,68 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
         ),
         start_date=payload.start_date,
         end_date=payload.end_date,
-        collector_key=payload.collector_key,
+        collector_key=(
+            handler_for(payload.dataset_id).collector_key
+            if payload.input_method is InputMethod.COLLECTOR
+            and handler_for(payload.dataset_id)
+            else payload.collector_key
+        ),
     )
     session.add(job)
     session.commit()
     session.refresh(job)
+    return serialize_job(job)
+
+
+@router.post("/{job_id}/execute", response_model=CollectionJobRead)
+def execute_collection_job(job_id: str, request: Request, session: SessionDep) -> CollectionJobRead:
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    if job.input_method != InputMethod.COLLECTOR.value:
+        raise HTTPException(status_code=409, detail="job is not a collector job")
+    if job.status != CollectionJobStatus.CREATED.value:
+        raise HTTPException(status_code=409, detail="job has already been executed")
+
+    handler = handler_for(job.dataset_id)
+    if handler is None or handler.collector_key != "tushare.stock_basic":
+        raise HTTPException(status_code=409, detail="dataset has no executable collector")
+
+    dataset = session.scalar(
+        select(Dataset)
+        .options(selectinload(Dataset.schemas).selectinload(DatasetSchemaVersion.fields))
+        .where(Dataset.id == job.dataset_id)
+    )
+    assert dataset is not None
+    schema = next(
+        item for item in dataset.schemas if item.version == dataset.current_schema_version
+    )
+    fields = [field.source_name or field.name for field in schema.fields]
+    job_directory = request.app.state.data_root / "staging" / job.id
+    target = job_directory / "stock_basic.csv"
+    report_path = job_directory / "review.json"
+
+    try:
+        row_count = collect_stock_basic(target, fields, load_tushare_token())
+        job.source_file_name = target.name
+        job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
+        job.source_size_bytes = target.stat().st_size
+        job.source_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+        job.status = CollectionJobStatus.STAGED.value
+        passed = review_stock_basic(target, schema, report_path)
+        job.status = (
+            CollectionJobStatus.REVIEW_PASSED.value
+            if passed
+            else CollectionJobStatus.REVIEW_FAILED.value
+        )
+        if row_count == 0:
+            job.status = CollectionJobStatus.REVIEW_FAILED.value
+        session.commit()
+        session.refresh(job)
+    except (CollectionError, OSError) as error:
+        session.rollback()
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
     return serialize_job(job)
 
 

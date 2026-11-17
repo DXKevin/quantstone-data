@@ -1,7 +1,12 @@
 export type DatasetStatus = "draft" | "active" | "paused" | "deprecated";
 export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
 export type CollectionInputMethod = "collector" | "file_import";
-export type CollectionJobStatus = "created" | "awaiting_file" | "staged";
+export type CollectionJobStatus =
+  | "created"
+  | "awaiting_file"
+  | "staged"
+  | "review_passed"
+  | "review_failed";
 
 export interface DatasetSummary {
   id: string;

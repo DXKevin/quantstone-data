@@ -81,11 +81,17 @@ DELETE /api/v1/datasets/{dataset_id}
 POST   /api/v1/collection-jobs
 GET    /api/v1/collection-jobs
 GET    /api/v1/collection-jobs/{job_id}
+POST   /api/v1/collection-jobs/{job_id}/execute
 POST   /api/v1/collection-jobs/{job_id}/file
 GET    /health
 ```
 
 手动文件入库采用两步流程：先创建 `input_method=file_import` 的采集任务，再将文件上传到该任务的 `/file` 接口。文件只会进入外部数据根目录的 staging 区，不会直接发布为正式数据。
+
+当前第一个真实采集器为 `tushare.cn.stock.stock_basic`。项目从本地 `.env`
+或进程环境变量读取 `TUSHARE_TOKEN`，密钥文件不会提交到 Git。执行任务后，
+CSV 数据和 `review.json` 审核报告会保存在外部数据根目录的 staging 区；审核通过
+仍不代表已经发布为正式数据。
 
 ## 项目状态
 
