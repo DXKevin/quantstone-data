@@ -32,6 +32,9 @@ tb_l2.cn.stock.l2_trade.sz
 
 完整规则见 [数据集 ID 命名规范](docs/dataset-id.md)。
 
+项目的完整定位、架构原则、当前实现与待定事项见
+[项目架构、设计原则与开发约定](docs/architecture-and-decisions.md)。
+
 ## 本地开发
 
 启动后端：
