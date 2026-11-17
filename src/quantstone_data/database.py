@@ -54,6 +54,18 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "AND (collection_bindings IS NULL OR collection_bindings = '[]')"
             )
         )
+        connection.execute(
+            text(
+                "UPDATE collection_jobs SET collector_key = 'tushare', "
+                "collector_operation = CASE "
+                "WHEN operation = 'incremental' THEN 'stock_list_incremental' "
+                "ELSE 'stock_list_initial' END "
+                "WHERE dataset_id = 'tushare.cn.stock.stock_basic' "
+                "AND input_method = 'collector' "
+                "AND (collector_operation IS NULL "
+                "OR collector_operation IN ('stock_basic', 'tushare.stock_basic'))"
+            )
+        )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:
