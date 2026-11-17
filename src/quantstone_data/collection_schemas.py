@@ -52,6 +52,7 @@ class CollectionJobRead(BaseModel):
     start_date: date | None
     end_date: date | None
     collector_key: str | None
+    collector_operation: str | None
     source_file_name: str | None
     staged_path: str | None
     source_size_bytes: int | None

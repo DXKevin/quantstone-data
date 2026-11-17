@@ -5,6 +5,22 @@ from fastapi.testclient import TestClient
 from quantstone_data.main import create_app
 
 
+def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/collectors")
+
+    assert response.status_code == 200
+    collector = response.json()[0]
+    assert collector["key"] == "tushare"
+    operation = collector["operations"][0]
+    assert operation["key"] == "stock_basic"
+    assert operation["datasets"] == ["tushare.cn.stock.stock_basic"]
+    assert operation["joint"] is False
+
+
 def dataset_payload() -> dict:
     return {
         "id": "tb_l2.cn.stock.l2_order.sh",

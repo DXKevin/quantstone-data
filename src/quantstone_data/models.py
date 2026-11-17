@@ -35,6 +35,8 @@ class Dataset(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     current_schema_version: Mapped[int] = mapped_column(Integer, default=1)
+    collector_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    collector_operation: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -102,6 +104,7 @@ class CollectionJob(Base):
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     collector_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    collector_operation: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     staged_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

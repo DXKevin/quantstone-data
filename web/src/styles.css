@@ -149,6 +149,8 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .job-identity strong, .file-cell strong { display: block; margin-bottom: 4px; font-size: 12px; }
 .job-identity code { display: block; color: #4e655b; font-size: 10px; }
 .job-identity small, .file-cell small { display: block; margin-top: 4px; color: #8a948f; font-size: 9px; }
+.job-source { display: flex; flex-direction: column; gap: 4px; }
+.job-source code { color: #4e655b; font-size: 9px; }
 .job-status { width: max-content; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #edf0ee; color: #606c66; font-size: 10px; font-weight: 600; }
 .job-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .job-status-awaiting_file { background: #fff3d9; color: #956400; }
@@ -161,6 +163,15 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .review-summary div { display: flex; flex-direction: column; gap: 3px; }
 .review-summary span { color: #728078; font-size: 10px; }
 .range-toggle { display: flex; align-items: center; gap: 7px; margin-top: 16px; color: #56625c; font-size: 11px; }
+.collector-card { margin-bottom: 16px; padding: 20px; }
+.collector-card > p { margin: 8px 0 18px; color: #68746e; font-size: 12px; }
+.collector-operation { display: grid; grid-template-columns: minmax(240px, 1.3fr) .6fr 1.5fr; gap: 24px; align-items: start; padding: 17px 0; border-top: 1px solid var(--line); font-size: 11px; }
+.collector-operation > div { display: flex; flex-direction: column; gap: 5px; }
+.collector-operation p { margin: 2px 0 0; color: #728078; }
+.collector-operation span, .operation-outputs span { color: #7c8781; font-size: 10px; }
+.operation-outputs code, .binding-preview code { display: block; color: #285c46; font-size: 10px; }
+.binding-preview { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding: 12px 14px; border: 1px solid #cfe0d7; background: #f4faf7; font-size: 11px; }
+.binding-preview span { color: #68746e; }
 .hidden-file-input { display: none; }
 .mini-upload-button { min-height: 31px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid #c9d6cf; border-radius: 5px; background: white; color: var(--green); padding: 0 9px; font-size: 10px; cursor: pointer; }
 .staging-note { display: flex; align-items: center; gap: 6px; margin: 12px 2px 0; color: #78837d; font-size: 10px; }

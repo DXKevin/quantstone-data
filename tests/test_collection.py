@@ -157,6 +157,8 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         "market": None,
         "display_name": "A股股票列表",
         "description": "TuShare 股票基础信息",
+        "collector_key": "tushare",
+        "collector_operation": "stock_basic",
         "primary_key": ["ts_code"],
         "time_field": None,
         "fields": [
@@ -206,7 +208,8 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             },
         )
         assert created.status_code == 201
-        assert created.json()["collector_key"] == "tushare.stock_basic"
+        assert created.json()["collector_key"] == "tushare"
+        assert created.json()["collector_operation"] == "stock_basic"
 
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         review_response = client.get(

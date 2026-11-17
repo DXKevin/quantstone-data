@@ -78,6 +78,8 @@ GET    /api/v1/datasets/{dataset_id}
 PUT    /api/v1/datasets/{dataset_id}
 POST   /api/v1/datasets/{dataset_id}/activate
 DELETE /api/v1/datasets/{dataset_id}
+GET    /api/v1/collectors
+GET    /api/v1/collectors/{collector_key}/operations/{operation_key}
 POST   /api/v1/collection-jobs
 GET    /api/v1/collection-jobs
 GET    /api/v1/collection-jobs/{job_id}

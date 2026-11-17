@@ -14,11 +14,10 @@ from .collection_schemas import (
     CollectionJobStatus,
     InputMethod,
 )
+from .collector_registry import get_operation
 from .database import get_session
-from .dataset_handlers import handler_for
 from .datasets.tushare.cn.stock.stock_basic import (
     CollectionError,
-    collect,
     load_token,
     review,
 )
@@ -54,10 +53,10 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
         start_date=payload.start_date,
         end_date=payload.end_date,
         collector_key=(
-            handler_for(payload.dataset_id).collector_key
-            if payload.input_method is InputMethod.COLLECTOR
-            and handler_for(payload.dataset_id)
-            else payload.collector_key
+            dataset.collector_key if payload.input_method is InputMethod.COLLECTOR else None
+        ),
+        collector_operation=(
+            dataset.collector_operation if payload.input_method is InputMethod.COLLECTOR else None
         ),
     )
     session.add(job)
@@ -76,9 +75,13 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     if job.status != CollectionJobStatus.CREATED.value:
         raise HTTPException(status_code=409, detail="job has already been executed")
 
-    handler = handler_for(job.dataset_id)
-    if handler is None or handler.collector_key != "tushare.stock_basic":
+    if not job.collector_key or not job.collector_operation:
+        raise HTTPException(status_code=409, detail="dataset has no collector binding")
+    operation = get_operation(job.collector_key, job.collector_operation)
+    if operation is None or job.dataset_id not in operation.datasets:
         raise HTTPException(status_code=409, detail="dataset has no executable collector")
+    if len(operation.datasets) > 1:
+        raise HTTPException(status_code=501, detail="joint collection execution is not implemented")
 
     dataset = session.scalar(
         select(Dataset)
@@ -95,7 +98,7 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     report_path = job_directory / "review.json"
 
     try:
-        row_count = collect(target, fields, load_token())
+        row_count = operation.handler(target, fields, load_token())
         job.source_file_name = target.name
         job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
         job.source_size_bytes = target.stat().st_size

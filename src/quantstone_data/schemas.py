@@ -32,12 +32,16 @@ class DatasetCreate(BaseModel):
     market: str | None = Field(default=None, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    collector_key: str | None = Field(default=None, min_length=1, max_length=128)
+    collector_operation: str | None = Field(default=None, min_length=1, max_length=128)
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_contract(self) -> "DatasetCreate":
+        if (self.collector_key is None) != (self.collector_operation is None):
+            raise ValueError("collector_key and collector_operation must be provided together")
         segments = [self.provider, self.region, self.instrument, self.dataset_name]
         if self.market:
             segments.append(self.market)
@@ -62,12 +66,16 @@ class DatasetCreate(BaseModel):
 class DatasetUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    collector_key: str | None = Field(default=None, min_length=1, max_length=128)
+    collector_operation: str | None = Field(default=None, min_length=1, max_length=128)
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_contract(self) -> "DatasetUpdate":
+        if (self.collector_key is None) != (self.collector_operation is None):
+            raise ValueError("collector_key and collector_operation must be provided together")
         names = [field.name for field in self.fields]
         if len(names) != len(set(names)):
             raise ValueError("field names must be unique")
@@ -110,6 +118,8 @@ class DatasetRead(BaseModel):
     market: str | None
     display_name: str
     description: str | None
+    collector_key: str | None
+    collector_operation: str | None
     status: DatasetStatus
     current_schema_version: int
     created_at: datetime
@@ -128,3 +138,5 @@ class DatasetSummary(BaseModel):
     market: str | None
     status: DatasetStatus
     current_schema_version: int
+    collector_key: str | None
+    collector_operation: str | None

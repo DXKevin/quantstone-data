@@ -4,6 +4,7 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  Cable,
   Database,
   FileCode2,
   Layers3,
@@ -15,11 +16,17 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { api, DatasetCreatePayload, DatasetDetail, DatasetSummary } from "./api";
+import {
+  api,
+  CollectorDefinition,
+  DatasetCreatePayload,
+  DatasetDetail,
+  DatasetSummary,
+} from "./api";
 import CollectionJobs from "./CollectionJobs";
 
 type View = "list" | "create" | "edit" | "detail";
-type Area = "datasets" | "collection";
+type Area = "datasets" | "collectors" | "collection";
 
 interface FieldDraft {
   key: number;
@@ -56,6 +63,7 @@ function App() {
   const [area, setArea] = useState<Area>("datasets");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
+  const [collectors, setCollectors] = useState<CollectorDefinition[]>([]);
   const [selected, setSelected] = useState<DatasetDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +73,12 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      setDatasets(await api.listDatasets());
+      const [datasetItems, collectorItems] = await Promise.all([
+        api.listDatasets(),
+        api.listCollectors(),
+      ]);
+      setDatasets(datasetItems);
+      setCollectors(collectorItems);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载数据集");
     } finally {
@@ -110,6 +123,7 @@ function App() {
         </div>
         <nav>
           <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
+          <button className={area === "collectors" ? "nav-item active" : "nav-item"} onClick={() => setArea("collectors")}><Cable size={17} />采集器</button>
           <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
           <button className="nav-item" disabled><FileCode2 size={17} />存储目录<span>稍后</span></button>
         </nav>
@@ -122,6 +136,7 @@ function App() {
 
       <main className="main-area">
         {area === "collection" && <CollectionJobs datasets={datasets} />}
+        {area === "collectors" && <CollectorCatalog collectors={collectors} />}
         {area === "datasets" && view === "list" && (
           <DatasetList
             datasets={filtered}
@@ -136,10 +151,10 @@ function App() {
           />
         )}
         {area === "datasets" && view === "create" && (
-          <DatasetForm onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
+          <DatasetForm collectors={collectors} onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
         )}
         {area === "datasets" && view === "edit" && selected && (
-          <DatasetForm dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
+          <DatasetForm collectors={collectors} dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
         {area === "datasets" && view === "detail" && selected && (
           <DatasetDetailView
@@ -158,6 +173,35 @@ function App() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] }) {
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div><p className="eyebrow">COLLECTOR REGISTRY</p><h1>采集器</h1><p className="subtitle">查看采集器、公开操作、运行参数和输出数据集。</p></div>
+      </header>
+      <section className="summary-strip">
+        <div><span>采集器</span><strong>{collectors.length}</strong></div>
+        <div><span>操作</span><strong>{collectors.reduce((total, item) => total + item.operations.length, 0)}</strong></div>
+        <div><span>联合操作</span><strong>{collectors.flatMap((item) => item.operations).filter((item) => item.joint).length}</strong></div>
+        <div><span>注册方式</span><strong className="summary-text">显式注册</strong></div>
+      </section>
+      {collectors.map((collector) => (
+        <section className="panel collector-card" key={collector.key}>
+          <div className="card-title"><div><h2>{collector.name}</h2><code>{collector.key}</code></div><span>{collector.operations.length} 个操作</span></div>
+          <p>{collector.description}</p>
+          {collector.operations.map((operation) => (
+            <div className="collector-operation" key={operation.key}>
+              <div><strong>{operation.name}</strong><code>{collector.key} · {operation.key}</code><p>{operation.description}</p></div>
+              <div><span>运行参数</span><strong>{operation.parameters.length ? operation.parameters.map((item) => item.name).join("、") : "无"}</strong></div>
+              <div className="operation-outputs"><span>输出数据集 · {operation.joint ? "联合更新" : "独立更新"}</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div>
+            </div>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }
@@ -219,7 +263,7 @@ function DatasetList(props: {
   );
 }
 
-function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
+function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
   const editing = Boolean(props.dataset);
   const [provider, setProvider] = useState(props.dataset?.provider ?? "");
   const [region, setRegion] = useState(props.dataset?.region ?? "cn");
@@ -228,6 +272,8 @@ function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onS
   const [market, setMarket] = useState(props.dataset?.market ?? "");
   const [displayName, setDisplayName] = useState(props.dataset?.display_name ?? "");
   const [description, setDescription] = useState(props.dataset?.description ?? "");
+  const [collectorKey, setCollectorKey] = useState(props.dataset?.collector_key ?? "");
+  const [collectorOperation, setCollectorOperation] = useState(props.dataset?.collector_operation ?? "");
   const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
   const initialFields = props.dataset?.schema.fields.map((field, index) => ({
     key: index + 1,
@@ -247,6 +293,8 @@ function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onS
   const segments = [provider, region, instrument, datasetName, market].filter(Boolean);
   const datasetId = props.dataset?.id ?? segments.join(".");
   const validFields = fields.filter((field) => field.name.trim());
+  const selectedCollector = props.collectors.find((item) => item.key === collectorKey);
+  const availableOperations = selectedCollector?.operations ?? [];
 
   function updateField(key: number, patch: Partial<FieldDraft>) {
     setFields((current) => current.map((field) => field.key === key ? { ...field, ...patch } : field));
@@ -279,6 +327,8 @@ function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onS
       market: market || null,
       display_name: displayName,
       description: description || null,
+      collector_key: collectorKey || null,
+      collector_operation: collectorOperation || null,
       primary_key: primaryKey,
       time_field: timeField || null,
       fields: validFields.map((field) => ({
@@ -297,6 +347,8 @@ function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onS
         ? await api.updateDataset(datasetId, {
             display_name: payload.display_name,
             description: payload.description,
+            collector_key: payload.collector_key,
+            collector_operation: payload.collector_operation,
             primary_key: payload.primary_key,
             time_field: payload.time_field,
             fields: payload.fields,
@@ -337,8 +389,19 @@ function DatasetForm(props: { dataset?: DatasetDetail; onCancel: () => void; onS
         </div>
       </section>
 
+      <section className="form-section">
+        <div className="section-number">02</div><div className="section-intro"><h2>采集绑定</h2><p>指定负责生成该数据集的采集器操作。</p></div>
+        <div className="form-content">
+          <div className="form-grid two-columns no-margin">
+            <label className="input-field"><span>采集器</span><select value={collectorKey} onChange={(event) => { setCollectorKey(event.target.value); setCollectorOperation(""); }}><option value="">暂不绑定</option>{props.collectors.map((item) => <option key={item.key} value={item.key}>{item.name} · {item.key}</option>)}</select></label>
+            <label className="input-field"><span>操作</span><select value={collectorOperation} disabled={!collectorKey} onChange={(event) => setCollectorOperation(event.target.value)}><option value="">请选择操作</option>{availableOperations.map((item) => <option key={item.key} value={item.key}>{item.name} · {item.key}</option>)}</select></label>
+          </div>
+          {collectorOperation && (() => { const operation = availableOperations.find((item) => item.key === collectorOperation); return operation ? <div className="binding-preview"><strong>{operation.joint ? "联合更新" : "独立更新"}</strong><span>该操作产生 {operation.datasets.length} 个数据集</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div> : null; })()}
+        </div>
+      </section>
+
       <section className="form-section fields-section">
-        <div className="section-number">02</div><div className="section-intro"><h2>字段定义</h2><p>描述字段类型、语义、可空性与主键。</p></div>
+        <div className="section-number">03</div><div className="section-intro"><h2>字段定义</h2><p>描述字段类型、语义、可空性与主键。</p></div>
         <div className="form-content">
           <div className="fields-table">
             <div className="field-row field-head"><span>主键</span><span>字段名</span><span>数据类型</span><span>字段说明</span><span>原始字段</span><span>单位</span><span>可空</span><span /></div>
@@ -406,7 +469,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
 
       <section className="detail-grid">
         <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
-        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div></dl></div>
+        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>采集器</dt><dd>{dataset.collector_key || "未绑定"}</dd></div><div><dt>采集操作</dt><dd>{dataset.collector_operation || "未绑定"}</dd></div></dl></div>
       </section>
 
       <section className="panel fields-detail">

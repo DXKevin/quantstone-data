@@ -17,6 +17,8 @@ export interface DatasetSummary {
   market: string | null;
   status: DatasetStatus;
   current_schema_version: number;
+  collector_key: string | null;
+  collector_operation: string | null;
 }
 
 export interface DatasetField {
@@ -52,6 +54,8 @@ export interface DatasetCreatePayload {
   market: string | null;
   display_name: string;
   description: string | null;
+  collector_key: string | null;
+  collector_operation: string | null;
   primary_key: string[];
   time_field: string | null;
   fields: Array<{
@@ -66,8 +70,37 @@ export interface DatasetCreatePayload {
 
 export type DatasetUpdatePayload = Pick<
   DatasetCreatePayload,
-  "display_name" | "description" | "primary_key" | "time_field" | "fields"
+  | "display_name"
+  | "description"
+  | "collector_key"
+  | "collector_operation"
+  | "primary_key"
+  | "time_field"
+  | "fields"
 >;
+
+export interface CollectorParameter {
+  name: string;
+  data_type: string;
+  required: boolean;
+  description: string;
+}
+
+export interface CollectorOperation {
+  key: string;
+  name: string;
+  description: string;
+  parameters: CollectorParameter[];
+  datasets: string[];
+  joint: boolean;
+}
+
+export interface CollectorDefinition {
+  key: string;
+  name: string;
+  description: string;
+  operations: CollectorOperation[];
+}
 
 export interface CollectionJob {
   id: string;
@@ -78,6 +111,7 @@ export interface CollectionJob {
   start_date: string | null;
   end_date: string | null;
   collector_key: string | null;
+  collector_operation: string | null;
   source_file_name: string | null;
   staged_path: string | null;
   source_size_bytes: number | null;
@@ -122,6 +156,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listDatasets: () => request<DatasetSummary[]>("/api/v1/datasets"),
+  listCollectors: () => request<CollectorDefinition[]>("/api/v1/collectors"),
   getDataset: (id: string) => request<DatasetDetail>(`/api/v1/datasets/${id}`),
   createDataset: (payload: DatasetCreatePayload) =>
     request<DatasetDetail>("/api/v1/datasets", {

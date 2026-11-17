@@ -3,7 +3,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -26,6 +26,32 @@ def create_session_factory(database_url: str) -> sessionmaker[Session]:
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     engine = create_engine(database_url, connect_args=connect_args)
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def upgrade_sqlite_schema(engine: Engine) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(engine)
+    dataset_columns = {item["name"] for item in inspector.get_columns("datasets")}
+    job_columns = {item["name"] for item in inspector.get_columns("collection_jobs")}
+    with engine.begin() as connection:
+        if "collector_key" not in dataset_columns:
+            connection.execute(text("ALTER TABLE datasets ADD COLUMN collector_key VARCHAR(128)"))
+        if "collector_operation" not in dataset_columns:
+            connection.execute(
+                text("ALTER TABLE datasets ADD COLUMN collector_operation VARCHAR(128)")
+            )
+        if "collector_operation" not in job_columns:
+            connection.execute(
+                text("ALTER TABLE collection_jobs ADD COLUMN collector_operation VARCHAR(128)")
+            )
+        connection.execute(
+            text(
+                "UPDATE datasets SET collector_key = 'tushare', "
+                "collector_operation = 'stock_basic' "
+                "WHERE id = 'tushare.cn.stock.stock_basic' AND collector_key IS NULL"
+            )
+        )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

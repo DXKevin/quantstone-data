@@ -1,5 +1,6 @@
 DATASET_ID = "tushare.cn.stock.stock_basic"
-COLLECTOR_KEY = "tushare.stock_basic"
+COLLECTOR_KEY = "tushare"
+COLLECTOR_OPERATION = "stock_basic"
 REVIEWER_KEY = "tushare.stock_basic"
 
 # 首版按 TuShare 官方默认范围采集当前上市股票。其他状态将在通用任务参数和

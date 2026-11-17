@@ -172,7 +172,7 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
               <div className="job-row" key={job.id}>
                 <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)}</small></span>
                 <span>{operationLabels[job.operation]}</span>
-                <span>{inputLabels[job.input_method]}</span>
+                <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key} · {job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
                 <span className="file-cell">{job.source_file_name ? <><strong>{job.source_file_name}</strong><small>{formatBytes(job.source_size_bytes)}</small></> : job.status === "awaiting_file" ? <UploadFileButton onFile={(file) => void uploadExisting(job, file)} /> : "—"}</span>
                 <span><JobStatus status={job.status} /></span>
