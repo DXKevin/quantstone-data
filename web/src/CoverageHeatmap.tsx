@@ -85,33 +85,34 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
       ) : !data || !data.datasets.length ? (
         <div className="state-box empty-state"><strong>没有可展示的日分区数据集</strong><p>只有绑定了交易日历的数据集才会出现在热力图里。</p></div>
       ) : (
-        <div className="coverage-scroll" ref={scrollRef}>
-          <div
-            className="coverage-grid"
-            style={{ gridTemplateColumns: `max-content repeat(${data.dates.length}, 13px)` }}
-          >
-            <div className="coverage-corner" />
-            {months.map((month) => (
-              <div key={month.key} className="coverage-month" style={{ gridColumn: `span ${month.span}` }}>
-                {month.label}
+        <div className="coverage-body">
+          <div className="coverage-names">
+            <div className="coverage-names-spacer" />
+            {data.datasets.map((dataset) => (
+              <div className="coverage-name" key={dataset.dataset_id} title={dataset.dataset_id}>
+                <strong>{dataset.display_name}</strong>
+                <small>{summaryText(dataset.summary)}</small>
               </div>
             ))}
-            {data.datasets.map((dataset) => {
-              const missing = dataset.summary?.missing ?? 0;
-              const failed = dataset.summary?.failed ?? 0;
-              const abnormal = dataset.summary?.abnormal ?? 0;
-              return (
+          </div>
+          <div className="coverage-scroll" ref={scrollRef}>
+            <div
+              className="coverage-grid"
+              style={{ gridTemplateColumns: `repeat(${data.dates.length}, 13px)` }}
+            >
+              <div className="coverage-months" style={{ gridColumn: `span ${data.dates.length}` }}>
+                {months.map((month) => (
+                  <span
+                    key={month.key}
+                    className="coverage-month"
+                    style={{ width: `${month.span * 15 - 2}px` }}
+                  >
+                    {month.label}
+                  </span>
+                ))}
+              </div>
+              {data.datasets.map((dataset) => (
                 <Fragment key={dataset.dataset_id}>
-                  <div className="coverage-name" title={dataset.dataset_id}>
-                    <strong>{dataset.display_name}</strong>
-                    <small>
-                      {missing || failed || abnormal
-                        ? [missing ? `缺 ${missing}` : "", failed ? `失败 ${failed}` : "", abnormal ? `异常 ${abnormal}` : ""]
-                            .filter(Boolean)
-                            .join(" · ")
-                        : "无缺口"}
-                    </small>
-                  </div>
                   {data.dates.map((day) => {
                     const status = dataset.cells[day] ?? "none";
                     const detail = dataset.details[day];
@@ -132,13 +133,27 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
                     );
                   })}
                 </Fragment>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
       )}
     </section>
   );
+}
+
+function summaryText(summary: Record<string, number> | undefined) {
+  const missing = summary?.missing ?? 0;
+  const failed = summary?.failed ?? 0;
+  const abnormal = summary?.abnormal ?? 0;
+  if (!missing && !failed && !abnormal) return "无缺口";
+  return [
+    missing ? `缺 ${missing}` : "",
+    failed ? `失败 ${failed}` : "",
+    abnormal ? `异常 ${abnormal}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function groups(dates: string[]) {
