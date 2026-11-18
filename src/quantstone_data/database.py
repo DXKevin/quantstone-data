@@ -82,6 +82,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE collection_bindings LIKE '%\"collector_key\": \"tushare\"%'"
             )
         )
+        for binding_index in (0, 1):
+            connection.execute(
+                text(
+                    "UPDATE datasets SET collection_bindings = "
+                    f"json_set(collection_bindings, '$[{binding_index}].collector_key', "
+                    "'tushare_cn_stock') "
+                    f"WHERE json_extract(collection_bindings, "
+                    f"'$[{binding_index}].collector_key') = 'tushare'"
+                )
+            )
         connection.execute(
             text(
                 "UPDATE collection_jobs SET collector_key = 'tushare_cn_stock' "

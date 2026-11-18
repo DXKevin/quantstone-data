@@ -42,6 +42,54 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
     }
 
 
+def test_legacy_tushare_collector_key_is_migrated(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
+    data_root = tmp_path / "data"
+    payload = {
+        "id": "tushare.cn.stock.stock_basic",
+        "provider": "tushare",
+        "region": "cn",
+        "instrument": "stock",
+        "dataset_name": "stock_basic",
+        "market": None,
+        "display_name": "A股股票信息",
+        "description": "旧采集器绑定迁移测试",
+        "collection_bindings": [
+            {
+                "purpose": "initial",
+                "collector_key": "tushare",
+                "operation": "stock_list_initial",
+            },
+            {
+                "purpose": "incremental",
+                "collector_key": "tushare",
+                "operation": "stock_list_incremental",
+            },
+        ],
+        "primary_key": ["ts_code"],
+        "time_field": None,
+        "fields": [
+            {
+                "name": "ts_code",
+                "data_type": "string",
+                "nullable": False,
+                "description": "TS代码",
+            }
+        ],
+    }
+
+    with TestClient(create_app(database_url, data_root=data_root)) as client:
+        assert client.post("/api/v1/datasets", json=payload).status_code == 201
+
+    with TestClient(create_app(database_url, data_root=data_root)) as restarted:
+        dataset = restarted.get("/api/v1/datasets/tushare.cn.stock.stock_basic")
+
+    assert dataset.status_code == 200
+    assert {item["collector_key"] for item in dataset.json()["collection_bindings"]} == {
+        "tushare_cn_stock"
+    }
+
+
 def dataset_payload() -> dict:
     return {
         "id": "tb_l2.cn.stock.l2_order.sh",

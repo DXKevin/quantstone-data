@@ -25,6 +25,7 @@ import {
   DatasetSummary,
 } from "./api";
 import CollectionJobs from "./CollectionJobs";
+import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "detail";
@@ -537,6 +538,8 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
         <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
         <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
+
+      <DatasetPreview dataset={dataset} />
 
       <section className="panel fields-detail">
         <div className="card-title"><div><h2>字段</h2><p>当前生效的 Schema v{dataset.schema.version}</p></div><span>{dataset.schema.fields.length} 个字段</span></div>

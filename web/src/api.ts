@@ -233,6 +233,14 @@ export interface CollectionReview {
   }>;
 }
 
+export interface DatasetRows {
+  dataset_id: string;
+  files_read: number;
+  row_count: number;
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -289,6 +297,8 @@ export const api = {
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   getCoverage: (days: number) =>
     request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),
+  readDatasetRows: (datasetId: string, limit = 20) =>
+    request<DatasetRows>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/rows?limit=${limit}`),
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
