@@ -275,3 +275,31 @@ dd { margin: 6px 0 0; font-size: 12px; }
   .jobs-table { overflow-x: auto; }
   .job-row { min-width: 860px; grid-template-columns: minmax(180px, 1.4fr) .7fr .7fr .9fr .9fr .9fr minmax(140px, auto); gap: 10px; }
 }
+
+/* 可读性调整：整体上调偏小字号、加深次要文字和危险操作颜色 */
+:root {
+  --muted: #55605a;
+  text-rendering: auto;
+}
+
+body { font-size: 14px; }
+
+.page { font-size: 13px; }
+.subtitle { font-size: 14px; color: #55605a; }
+.eyebrow { font-size: 11px; }
+
+.panel-toolbar h2, .card-title h2 { font-size: 15px; }
+.panel-toolbar > div > span { font-size: 12px; }
+.table-head, .job-head, .field-head, .schema-head, .storage-head { font-size: 11px; }
+.data-row, .job-row, .field-row, .schema-row, .storage-row { font-size: 12.5px; }
+.job-identity strong, .file-cell strong, .dataset-cell strong, .storage-dataset strong { font-size: 13px; }
+.job-identity code, .job-source code, .dataset-cell code, .storage-dataset code { font-size: 11px; }
+.job-identity small, .file-cell small, .storage-dataset small { font-size: 10.5px; color: #5f6a64; }
+.job-status { font-size: 11px; }
+.job-progress { font-size: 11px; color: #4d5852; }
+.mini-upload-button, .toolbar-button { font-size: 11px; }
+.mini-upload-button { min-height: 32px; padding: 0 10px; }
+.job-actions .mini-upload-button { padding: 0 11px; }
+.staging-note { font-size: 11px; color: #5f6a64; }
+
+.mini-upload-button.danger-mini { border-color: #d99b93; color: #b42318; background: #fef3f2; font-weight: 600; }
