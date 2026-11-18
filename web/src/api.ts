@@ -190,27 +190,6 @@ export interface CollectionReview {
   }>;
 }
 
-export interface StorageOverview {
-  data_root: string;
-  published_partitions: number;
-  published_files: number;
-  published_rows: number;
-  published_bytes: number;
-  staged_runs: number;
-  missing_files: number;
-}
-
-export interface CatalogPartition {
-  dataset_id: string;
-  partition_key: string;
-  file_path: string;
-  row_count: number;
-  size_bytes: number;
-  sha256: string;
-  collection_run_id: string;
-  published_at: string;
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -264,8 +243,6 @@ export const api = {
     request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
-  getStorageOverview: () => request<StorageOverview>("/api/v1/storage/overview"),
-  listCatalogPartitions: () => request<CatalogPartition[]>("/api/v1/catalog/partitions"),
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
