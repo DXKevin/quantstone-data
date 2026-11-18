@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
-from quantstone_data.overview import build_coverage_cells
+from quantstone_data.overview import build_coverage_cells, describe_review_errors
 
 TODAY = date(2026, 11, 18)
 
@@ -60,6 +60,22 @@ def test_today_without_partition_is_pending() -> None:
     cells, _ = build_coverage_cells([TODAY], {}, set(), {}, TODAY)
 
     assert cells[TODAY.isoformat()] == "pending"
+
+
+def test_describe_review_errors() -> None:
+    text = describe_review_errors(
+        [
+            {"rule": "not_empty"},
+            {
+                "rule": "partition_matches_trade_date",
+                "expected": "2026-11-18",
+                "actual": ["2026-11-17"],
+            },
+        ]
+    )
+
+    assert "接口返回 0 行" in text
+    assert "2026-11-18" in text
 
 
 def test_coverage_endpoint_without_calendar_datasets(tmp_path) -> None:

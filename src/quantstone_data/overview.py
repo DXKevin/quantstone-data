@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -21,6 +22,50 @@ FAILED_RUN_STATUSES = ("failed", "review_failed")
 COVERAGE_DEFAULT_DAYS = 90
 COVERAGE_MIN_DAYS = 7
 COVERAGE_MAX_DAYS = 400
+
+
+def describe_review_errors(errors: list[dict]) -> str:
+    """把审核规则错误压缩成一句可读的中文说明。"""
+    parts: list[str] = []
+    for item in errors:
+        rule = item.get("rule")
+        if rule == "not_empty":
+            parts.append("接口返回 0 行")
+        elif rule == "required_fields":
+            missing = ", ".join(item.get("missing") or [])
+            parts.append(f"缺少字段：{missing}" if missing else "缺少必需字段")
+        elif rule == "primary_key_not_null":
+            parts.append("主键存在空值")
+        elif rule == "primary_key_unique":
+            parts.append("主键存在重复记录")
+        elif rule == "partition_matches_trade_date":
+            expected = item.get("expected")
+            actual = item.get("actual")
+            parts.append(f"分区日期不一致（期望 {expected}，实际 {actual}）")
+        else:
+            detail = item.get("message") or item.get("detail")
+            parts.append(f"{rule}：{detail}" if detail else str(rule))
+    return "；".join(part for part in parts if part)
+
+
+def _review_errors_by_partition(data_root: Path, job: CollectionJob | None) -> dict[str, str]:
+    if job is None or not job.staged_path:
+        return {}
+    path = data_root / job.staged_path
+    if path.name != "review.json":
+        path = path.parent / "review.json"
+    if not path.is_file():
+        return {}
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    result: dict[str, str] = {}
+    for run in report.get("runs") or []:
+        key = run.get("partition_key")
+        if key and not run.get("passed"):
+            result[key] = describe_review_errors(run.get("errors") or []) or "审核未通过"
+    return result
 
 
 def _open_days(data_root, catalog: CatalogPartition | None) -> list[date]:
@@ -229,8 +274,9 @@ def dataset_coverage(
             if not (data_root / item.file_path).is_file()
         }
         failures: dict[str, str | None] = {}
-        for key, error in session.execute(
-            select(CollectionRun.partition_key, CollectionRun.error)
+        review_cache: dict[str, dict[str, str]] = {}
+        for key, run_error, job_id in session.execute(
+            select(CollectionRun.partition_key, CollectionRun.error, CollectionRun.job_id)
             .join(CollectionJob, CollectionJob.id == CollectionRun.job_id)
             .where(
                 CollectionJob.dataset_id == dataset.id,
@@ -238,7 +284,16 @@ def dataset_coverage(
                 CollectionRun.status.in_(FAILED_RUN_STATUSES),
             )
         ).all():
-            failures.setdefault(key, error)
+            if failures.get(key):
+                continue
+            text = run_error
+            if not text:
+                if job_id not in review_cache:
+                    review_cache[job_id] = _review_errors_by_partition(
+                        data_root, session.get(CollectionJob, job_id)
+                    )
+                text = review_cache[job_id].get(key)
+            failures[key] = text or "采集或审核失败"
 
         cells, details = build_coverage_cells(
             dates, partitions, missing_files, failures, today
