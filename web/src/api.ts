@@ -164,6 +164,16 @@ export interface CollectionProgress {
   percent: number | null;
 }
 
+export interface CollectionRun {
+  id: string;
+  partition_key: string;
+  status: string;
+  staged_path: string | null;
+  published_path: string | null;
+  row_count: number | null;
+  error: string | null;
+}
+
 export interface CollectionReview {
   reviewer: string;
   passed: boolean;
@@ -250,6 +260,8 @@ export const api = {
     request<void>(`/api/v1/collection-jobs/${jobId}`, { method: "DELETE" }),
   getCollectionProgress: (jobId: string) =>
     request<CollectionProgress>(`/api/v1/collection-jobs/${jobId}/progress`),
+  listCollectionRuns: (jobId: string) =>
+    request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   getStorageOverview: () => request<StorageOverview>("/api/v1/storage/overview"),

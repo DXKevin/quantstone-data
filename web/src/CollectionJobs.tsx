@@ -21,6 +21,7 @@ import {
   type CollectionOperation,
   type CollectionProgress,
   type CollectionReview,
+  type CollectionRun,
   type DatasetSummary,
 } from "./api";
 
@@ -49,6 +50,14 @@ const statusLabels = {
   failed: "执行失败",
 };
 
+const runStatusLabels: Record<string, string> = {
+  fetching: "采集中",
+  staged: "已暂存",
+  succeeded: "已发布",
+  failed: "失败",
+  review_failed: "审核异常",
+};
+
 export default function CollectionJobs({ datasets, collectors }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[] }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
   const [view, setView] = useState<"list" | "create">("list");
@@ -57,6 +66,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   const [notice, setNotice] = useState<string | null>(null);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [runs, setRuns] = useState<Record<string, CollectionRun[]>>({});
   const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
   const jobsRef = useRef<CollectionJob[]>([]);
@@ -113,6 +124,9 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
         return next;
       });
       await loadJobs(true);
+      if (expandedJobId && running.some((job) => job.id === expandedJobId)) {
+        await loadRuns(expandedJobId);
+      }
     }
 
     void poll();
@@ -121,7 +135,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       alive = false;
       window.clearInterval(timer);
     };
-  }, [hasRunning, loadJobs]);
+  }, [hasRunning, loadJobs, expandedJobId]);
 
   async function uploadExisting(job: CollectionJob, file: File) {
     setNotice(null);
@@ -154,6 +168,24 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     } finally {
       setRunningJobId(null);
     }
+  }
+
+  async function loadRuns(jobId: string) {
+    try {
+      const data = await api.listCollectionRuns(jobId);
+      setRuns((current) => ({ ...current, [jobId]: data }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法加载执行明细");
+    }
+  }
+
+  async function toggleJob(job: CollectionJob) {
+    if (expandedJobId === job.id) {
+      setExpandedJobId(null);
+      return;
+    }
+    setExpandedJobId(job.id);
+    if (!runs[job.id]) await loadRuns(job.id);
   }
 
   async function showReview(job: CollectionJob) {
@@ -280,23 +312,53 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
             {jobs.map((job) => {
               const jobProgress = progress[job.id];
               const running = job.status === "running" || job.status === "cancelling";
+              const expanded = expandedJobId === job.id;
+              const jobRuns = runs[job.id] ?? [];
               return (
-              <div className="job-row" key={job.id}>
-                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)}</small></span>
+              <div className="job-block" key={job.id}>
+              <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
+                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · {expanded ? "点击收起明细" : "点击查看明细"}</small></span>
                 <span>{operationLabels[job.operation]}</span>
                 <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key}</code>}{job.collector_operation && <code>{job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
                 <span className="file-cell">{job.source_file_name ? <><strong>{job.source_file_name}</strong><small>{formatBytes(job.source_size_bytes)}</small></> : job.status === "awaiting_file" ? <UploadFileButton onFile={(file) => void uploadExisting(job, file)} /> : "—"}</span>
                 <span className="job-status-cell">
                   <JobStatus status={job.status} />
-                  {jobProgress && <small className="job-progress">{formatProgress(jobProgress)}</small>}
                 </span>
-                <span className="job-actions">
+                <span className="job-actions" onClick={(event) => event.stopPropagation()}>
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
                   {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : "取消"}</button>}
                   {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
                   {!running && <button type="button" className={confirming === `${job.id}:delete` ? "mini-upload-button danger-mini" : "mini-upload-button quiet-mini"} onClick={() => void deleteJob(job)}><Trash2 size={14} />{confirming === `${job.id}:delete` ? "确认删除" : "删除"}</button>}
                 </span>
+              </div>
+              {expanded && (
+                <div className="job-detail">
+                  <div className="job-detail-head">
+                    <div>
+                      <strong>执行明细</strong>
+                      <span>{jobProgress ? formatProgress(jobProgress) : "尚无运行记录"}</span>
+                    </div>
+                    <button type="button" className="toolbar-button" onClick={() => void loadRuns(job.id)}><RefreshCw size={14} />刷新明细</button>
+                  </div>
+                  {jobRuns.length ? (
+                    <div className="run-table">
+                      <div className="run-row run-head"><span>分区</span><span>状态</span><span>行数</span><span>文件</span><span>错误</span></div>
+                      {[...jobRuns].reverse().map((run) => (
+                        <div className="run-row" key={run.id}>
+                          <code>{run.partition_key}</code>
+                          <span className={`run-status run-status-${run.status}`}>{runStatusLabels[run.status] ?? run.status}</span>
+                          <span>{run.row_count === null ? "—" : run.row_count.toLocaleString()}</span>
+                          <code className="run-path">{run.published_path ?? run.staged_path ?? "—"}</code>
+                          <span className="run-error">{run.error ?? ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="job-detail-empty">还没有分区运行记录。</p>
+                  )}
+                </div>
+              )}
               </div>
               );
             })}
