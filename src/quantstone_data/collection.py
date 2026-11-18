@@ -700,8 +700,10 @@ def cancel_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead
         raise HTTPException(status_code=409, detail="任务已结束，无法取消")
 
     if job.id in _RUNNING_JOBS:
-        _CANCEL_REQUESTS.add(job.id)
+        # 先落库再登记取消请求，避免与执行线程写回 CANCELLED 的顺序竞争。
         job.status = CollectionJobStatus.CANCELLING.value
+        session.commit()
+        _CANCEL_REQUESTS.add(job.id)
         log_event(
             "collection_job_cancel_requested",
             job_id=job.id,
