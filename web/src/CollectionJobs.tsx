@@ -66,6 +66,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [runs, setRuns] = useState<Record<string, CollectionRun[]>>({});
@@ -168,6 +169,31 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       setError(reason instanceof Error ? reason.message : "采集任务执行失败");
     } finally {
       setRunningJobId(null);
+    }
+  }
+
+  async function retryJob(job: CollectionJob) {
+    setRetryingJobId(job.id);
+    setNotice(null);
+    setError(null);
+    try {
+      const retried = await api.retryCollectionJob(job.id);
+      setRunningJobId(retried.id);
+      await loadJobs();
+      const result = await api.executeCollectionJob(retried.id);
+      if (result.status === "review_failed") {
+        const report = await api.getCollectionReview(retried.id);
+        setReview({ jobId: retried.id, data: report });
+        setNotice("重试已停止：审核仍有异常，具体原因已展开。");
+      } else {
+        setNotice(result.status === "succeeded" ? "重试任务已采集、审核并发布。" : "重试任务执行完成。");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "重试任务失败");
+    } finally {
+      setRetryingJobId(null);
+      setRunningJobId(null);
+      await loadJobs();
     }
   }
 
@@ -318,7 +344,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
               return (
               <div className="job-block" key={job.id}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
-                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · {expanded ? "点击收起明细" : "点击查看明细"}</small></span>
+                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · {expanded ? "点击收起明细" : "点击查看明细"}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}</span>
                 <span>{operationLabels[job.operation]}</span>
                 <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key}</code>}{job.collector_operation && <code>{job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
@@ -328,6 +354,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                 </span>
                 <span className="job-actions" onClick={(event) => event.stopPropagation()}>
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
+                  {job.input_method === "collector" && (job.status === "failed" || job.status === "review_failed" || job.status === "cancelled") && <button type="button" className="mini-upload-button" disabled={retryingJobId === job.id} onClick={() => void retryJob(job)}><RefreshCw size={14} className={retryingJobId === job.id ? "spin" : ""} />{retryingJobId === job.id ? "重试中…" : "重试"}</button>}
                   {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : "取消"}</button>}
                   {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
                   {!running && <button type="button" className={confirming === `${job.id}:delete` ? "mini-upload-button danger-mini" : "mini-upload-button quiet-mini"} onClick={() => void deleteJob(job)}><Trash2 size={14} />{confirming === `${job.id}:delete` ? "确认删除" : "删除"}</button>}
@@ -449,7 +476,7 @@ function CreateCollectionJob(props: {
         <div className="section-number">01</div><div className="section-intro"><h2>任务目标</h2><p>确定目标数据集以及本次任务的处理目的。</p></div>
         <div className="form-content">
           <div className="form-grid two-columns no-margin">
-            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); setDatasetId(event.target.value); if (inputMethod === "collector" && next?.collection_bindings.length) setOperation(next.collection_bindings[0].purpose); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
+            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); const nextPurposes = next?.collection_bindings.map((item) => item.purpose) ?? []; setDatasetId(event.target.value); if (inputMethod === "collector" && !nextPurposes.includes(operation) && nextPurposes.length) setOperation(nextPurposes[0]); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
@@ -462,7 +489,7 @@ function CreateCollectionJob(props: {
         <div className="form-content">
           <div className="method-cards">
             <button type="button" className={inputMethod === "file_import" ? "method-card selected" : "method-card"} onClick={() => setInputMethod("file_import")}><FileUp size={22} /><strong>手动文件</strong><span>上传本地文件到 staging</span></button>
-            <button type="button" className={inputMethod === "collector" ? "method-card selected" : "method-card"} onClick={() => { setInputMethod("collector"); if (supportedPurposes.length) setOperation(supportedPurposes[0]); }}><RefreshCw size={22} /><strong>采集器</strong><span>由采集器获取供应商数据</span></button>
+            <button type="button" className={inputMethod === "collector" ? "method-card selected" : "method-card"} onClick={() => { setInputMethod("collector"); if (!supportedPurposes.includes(operation) && supportedPurposes.length) setOperation(supportedPurposes[0]); }}><RefreshCw size={22} /><strong>采集器</strong><span>由采集器获取供应商数据</span></button>
           </div>
           {inputMethod === "file_import" ? (
             <label className={file ? "file-drop selected" : "file-drop"}><input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><UploadCloud size={25} /><strong>{file ? file.name : "选择需要导入的文件"}</strong><span>{file ? formatBytes(file.size) : "文件将先进入临时区，不会直接写入正式数据"}</span></label>

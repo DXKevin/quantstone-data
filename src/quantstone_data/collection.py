@@ -49,6 +49,11 @@ TERMINAL_JOB_STATUSES = {
     CollectionJobStatus.REVIEW_FAILED.value,
     CollectionJobStatus.CANCELLED.value,
 }
+RETRYABLE_JOB_STATUSES = {
+    CollectionJobStatus.FAILED.value,
+    CollectionJobStatus.REVIEW_FAILED.value,
+    CollectionJobStatus.CANCELLED.value,
+}
 
 INTERRUPTED_JOB_ERROR = "应用重启时任务仍处于执行状态，已标记为失败；请新建任务继续。"
 
@@ -751,6 +756,59 @@ def create_collection_job(
         collector_operation=job.collector_operation,
     )
     return serialize_job(job)
+
+
+@router.post(
+    "/{job_id}/retry",
+    response_model=CollectionJobRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def retry_collection_job(
+    job_id: str,
+    session: SessionDep,
+) -> CollectionJobRead:
+    source = session.get(CollectionJob, job_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    if source.input_method != InputMethod.COLLECTOR.value:
+        raise HTTPException(status_code=409, detail="只有采集器任务可以重试")
+    if source.status not in RETRYABLE_JOB_STATUSES:
+        raise HTTPException(status_code=409, detail="只有失败、审核异常或已取消的任务可以重试")
+    dataset = session.get(Dataset, source.dataset_id)
+    if dataset is None or dataset.status != DatasetStatus.ACTIVE.value:
+        raise HTTPException(status_code=409, detail="只有已启用数据集的任务可以重试")
+    operation = (
+        get_operation(source.collector_key, source.collector_operation)
+        if source.collector_key and source.collector_operation
+        else None
+    )
+    if operation is None or source.dataset_id not in operation.datasets:
+        raise HTTPException(status_code=409, detail="原任务绑定的采集器操作已不可用")
+
+    retried_job = CollectionJob(
+        id=str(uuid4()),
+        dataset_id=source.dataset_id,
+        operation=source.operation,
+        input_method=InputMethod.COLLECTOR.value,
+        status=CollectionJobStatus.CREATED.value,
+        start_date=source.start_date,
+        end_date=source.end_date,
+        collector_key=source.collector_key,
+        collector_operation=source.collector_operation,
+        parameters=dict(source.parameters or {}),
+        retry_of_job_id=source.id,
+    )
+    session.add(retried_job)
+    session.commit()
+    session.refresh(retried_job)
+    log_event(
+        "collection_job_retried",
+        job_id=retried_job.id,
+        retry_of_job_id=source.id,
+        dataset_id=retried_job.dataset_id,
+        operation=retried_job.operation,
+    )
+    return serialize_job(retried_job)
 
 
 @router.post("/{job_id}/execute", response_model=CollectionJobRead)

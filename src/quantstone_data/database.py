@@ -51,6 +51,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             )
         if "error" not in job_columns:
             connection.execute(text("ALTER TABLE collection_jobs ADD COLUMN error TEXT"))
+        if "retry_of_job_id" not in job_columns:
+            connection.execute(
+                text("ALTER TABLE collection_jobs ADD COLUMN retry_of_job_id VARCHAR(36)")
+            )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_collection_jobs_retry_of_job_id "
+                "ON collection_jobs (retry_of_job_id)"
+            )
+        )
         connection.execute(
             text(
                 "UPDATE datasets SET collection_bindings = "

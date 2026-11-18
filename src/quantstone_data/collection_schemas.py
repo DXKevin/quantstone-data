@@ -61,6 +61,7 @@ class CollectionJobRead(BaseModel):
     collector_key: str | None
     collector_operation: str | None
     parameters: dict[str, Any]
+    retry_of_job_id: str | None
     source_file_name: str | None
     staged_path: str | None
     source_size_bytes: int | None

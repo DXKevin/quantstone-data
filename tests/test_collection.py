@@ -318,6 +318,19 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         failed_record = client.get(
             f"/api/v1/collection-jobs/{failed_created.json()['id']}"
         )
+        retried = client.post(
+            f"/api/v1/collection-jobs/{failed_created.json()['id']}/retry"
+        )
+        retry_of_created = client.post(
+            f"/api/v1/collection-jobs/{created.json()['id']}/retry"
+        )
+        monkeypatch.setattr(
+            "quantstone_data.collectors.tushare_cn_stock.stock_basic.call_api",
+            fake_call,
+        )
+        retried_executed = client.post(
+            f"/api/v1/collection-jobs/{retried.json()['id']}/execute"
+        )
 
     assert executed.status_code == 200
     body = executed.json()
@@ -331,6 +344,13 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert failed_executed.status_code == 502
     assert failed_record.json()["status"] == "failed"
     assert failed_record.json()["error"] == "供应商暂时不可用"
+    assert retried.status_code == 201
+    assert retried.json()["status"] == "created"
+    assert retried.json()["retry_of_job_id"] == failed_created.json()["id"]
+    assert retried.json()["operation"] == failed_created.json()["operation"]
+    assert retried.json()["parameters"] == failed_created.json()["parameters"]
+    assert retry_of_created.status_code == 409
+    assert retried_executed.status_code == 200
 
 
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:

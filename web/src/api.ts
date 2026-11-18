@@ -135,6 +135,7 @@ export interface CollectionJob {
   collector_key: string | null;
   collector_operation: string | null;
   parameters: Record<string, unknown>;
+  retry_of_job_id: string | null;
   source_file_name: string | null;
   staged_path: string | null;
   source_size_bytes: number | null;
@@ -287,6 +288,8 @@ export const api = {
     }),
   executeCollectionJob: (jobId: string) =>
     request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/execute`, { method: "POST" }),
+  retryCollectionJob: (jobId: string) =>
+    request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/retry`, { method: "POST" }),
   cancelCollectionJob: (jobId: string) =>
     request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/cancel`, { method: "POST" }),
   deleteCollectionJob: (jobId: string) =>
