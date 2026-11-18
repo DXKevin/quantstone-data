@@ -86,6 +86,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE collector_key = 'tushare'"
             )
         )
+        connection.execute(
+            text(
+                "UPDATE datasets SET storage_policy = "
+                "json_set(storage_policy, '$.calendar_dataset_id', "
+                "'tushare.cn.stock.trade_cal') "
+                "WHERE id = 'tushare.cn.stock.daily' "
+                "AND storage_policy IS NOT NULL "
+                "AND json_extract(storage_policy, '$.calendar_dataset_id') IS NULL"
+            )
+        )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

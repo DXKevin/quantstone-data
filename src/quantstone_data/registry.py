@@ -170,6 +170,33 @@ def activate_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
         raise HTTPException(status_code=404, detail="dataset not found")
     if dataset.status == DatasetStatus.DEPRECATED.value:
         raise HTTPException(status_code=409, detail="deprecated dataset cannot be activated")
+    if dataset.storage_policy and dataset.storage_policy.get("logical_partition_field"):
+        calendar_id = dataset.storage_policy.get("calendar_dataset_id")
+        calendar = session.get(Dataset, calendar_id) if calendar_id else None
+        if calendar is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"请先创建交易日历数据集：{calendar_id or '尚未配置 calendar_dataset_id'}",
+            )
+        if calendar.status != DatasetStatus.ACTIVE.value:
+            raise HTTPException(
+                status_code=409,
+                detail=f"请先启用交易日历数据集：{calendar_id}",
+            )
+        calendar_schema = next(
+            item
+            for item in calendar.schemas
+            if item.version == calendar.current_schema_version
+        )
+        calendar_fields = {field.name for field in calendar_schema.fields}
+        if not {"cal_date", "is_open"}.issubset(calendar_fields):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"数据集 {calendar_id} 不是有效的交易日历："
+                    "必须包含 cal_date 和 is_open 字段"
+                ),
+            )
     for binding in dataset.collection_bindings:
         operation = get_operation(binding["collector_key"], binding["operation"])
         if operation is None:

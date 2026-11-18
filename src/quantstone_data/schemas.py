@@ -31,9 +31,20 @@ class DatasetCollectionBinding(BaseModel):
 
 class DatasetStoragePolicy(BaseModel):
     logical_partition_field: str | None = None
+    calendar_dataset_id: str | None = Field(default=None, max_length=255)
     layout: str = Field(pattern=r"^(daily|yearly_with_delta|snapshot)$")
     write_strategy: str = Field(pattern=r"^(append|replace_partition|replace_snapshot)$")
     compaction: str | None = Field(default=None, pattern=r"^yearly$")
+
+    @model_validator(mode="after")
+    def validate_calendar_dependency(self) -> "DatasetStoragePolicy":
+        if self.logical_partition_field and not self.calendar_dataset_id:
+            raise ValueError(
+                "日期分区数据集必须配置 calendar_dataset_id，请先创建交易日历数据集"
+            )
+        if not self.logical_partition_field and self.calendar_dataset_id:
+            raise ValueError("只有日期分区数据集才能配置 calendar_dataset_id")
+        return self
 
 
 class DatasetFieldCreate(BaseModel):

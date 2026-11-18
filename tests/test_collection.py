@@ -36,6 +36,44 @@ def dataset_payload(dataset_id: str = "demo.cn.stock.daily") -> dict:
     }
 
 
+def trade_calendar_payload() -> dict:
+    return {
+        "id": "tushare.cn.stock.trade_cal",
+        "provider": "tushare",
+        "region": "cn",
+        "instrument": "stock",
+        "dataset_name": "trade_cal",
+        "market": None,
+        "display_name": "A股交易日历",
+        "description": "TuShare trade_cal 上交所交易日历",
+        "collection_bindings": [{
+            "purpose": "initial",
+            "collector_key": "tushare_cn_stock",
+            "operation": "trade_cal_initial",
+        }],
+        "storage_policy": {
+            "logical_partition_field": None,
+            "calendar_dataset_id": None,
+            "layout": "snapshot",
+            "write_strategy": "replace_snapshot",
+            "compaction": None,
+        },
+        "primary_key": ["exchange", "cal_date"],
+        "time_field": "cal_date",
+        "fields": [
+            {"name": "exchange", "data_type": "string", "nullable": False, "description": "交易所"},
+            {"name": "cal_date", "data_type": "date", "nullable": False, "description": "日历日期"},
+            {"name": "is_open", "data_type": "int32", "nullable": False, "description": "是否交易"},
+            {
+                "name": "pretrade_date",
+                "data_type": "date",
+                "nullable": True,
+                "description": "上一交易日",
+            },
+        ],
+    }
+
+
 def create_client(tmp_path: Path) -> TestClient:
     app = create_app(
         f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
@@ -51,6 +89,42 @@ def create_dataset(client: TestClient, *, activate: bool = True) -> str:
     if activate:
         assert client.post(f"/api/v1/datasets/{dataset_id}/activate").status_code == 200
     return dataset_id
+
+
+def test_date_partition_requires_calendar_dataset_id(tmp_path: Path) -> None:
+    payload = dataset_payload()
+    payload["storage_policy"] = {
+        "logical_partition_field": "trade_date",
+        "layout": "daily",
+        "write_strategy": "replace_partition",
+        "compaction": None,
+    }
+
+    with create_client(tmp_path) as client:
+        response = client.post("/api/v1/datasets", json=payload)
+
+    assert response.status_code == 422
+    assert "calendar_dataset_id" in response.text
+
+
+def test_date_partition_prompts_to_create_missing_calendar(tmp_path: Path) -> None:
+    payload = dataset_payload()
+    payload["storage_policy"] = {
+        "logical_partition_field": "trade_date",
+        "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+        "layout": "daily",
+        "write_strategy": "replace_partition",
+        "compaction": None,
+    }
+
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=payload).status_code == 201
+        response = client.post(f"/api/v1/datasets/{payload['id']}/activate")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "请先创建交易日历数据集：tushare.cn.stock.trade_cal"
+    )
 
 
 def test_only_active_datasets_can_create_collection_jobs(tmp_path: Path) -> None:
@@ -250,6 +324,7 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         ],
         "storage_policy": {
             "logical_partition_field": "trade_date",
+            "calendar_dataset_id": "tushare.cn.stock.trade_cal",
             "layout": "yearly_with_delta",
             "write_strategy": "replace_partition",
             "compaction": "yearly",
@@ -278,19 +353,58 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         ],
     }
 
+    collected_dates: list[str] = []
+
     def fake_daily(_token: str, trade_date: str, _fields: list[str]) -> list[dict]:
+        collected_dates.append(trade_date)
         return [
             {"ts_code": "000001.SZ", "trade_date": trade_date, "close": 10.5},
             {"ts_code": "600000.SH", "trade_date": trade_date, "close": 12.3},
+        ]
+
+    def fake_trade_cal(_token, _start_date, _end_date, _fields):
+        return [
+            {
+                "exchange": "SSE",
+                "cal_date": "20261117",
+                "is_open": 0,
+                "pretrade_date": "20261116",
+            },
+            {
+                "exchange": "SSE",
+                "cal_date": "20261118",
+                "is_open": 1,
+                "pretrade_date": "20261116",
+            },
         ]
 
     monkeypatch.setattr(
         "quantstone_data.collectors.tushare_cn_stock.daily._call_daily",
         fake_daily,
     )
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.trade_cal._call_trade_cal",
+        fake_trade_cal,
+    )
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
 
     with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=trade_calendar_payload()).status_code == 201
+        activated = client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate")
+        assert activated.status_code == 200
+        calendar_job = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2026-11-17", "end_date": "2026-11-18"},
+            },
+        )
+        calendar_executed = client.post(
+            f"/api/v1/collection-jobs/{calendar_job.json()['id']}/execute"
+        )
+        assert calendar_executed.status_code == 200
         assert client.post("/api/v1/datasets", json=payload).status_code == 201
         assert client.post("/api/v1/datasets/tushare.cn.stock.daily/activate").status_code == 200
         created = client.post(
@@ -300,12 +414,12 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
                 "operation": "initial",
                 "input_method": "collector",
                 "parameters": {
-                    "start_date": "2026-11-18",
+                    "start_date": "2026-11-17",
                     "end_date": "2026-11-18",
                 },
             },
         )
-        assert created.json()["start_date"] == "2026-11-18"
+        assert created.json()["start_date"] == "2026-11-17"
         assert created.json()["end_date"] == "2026-11-18"
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
@@ -316,11 +430,12 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     assert executed.json()["status"] == "succeeded"
     assert runs.json()[0]["row_count"] == 2
     assert runs.json()[0]["status"] == "succeeded"
+    assert collected_dates == ["20261118"]
     assert catalog.json()[0]["partition_key"] == "2026-11-18"
     assert storage.status_code == 200
-    assert storage.json()["published_files"] == 1
-    assert storage.json()["published_partitions"] == 1
-    assert storage.json()["published_rows"] == 2
+    assert storage.json()["published_files"] == 2
+    assert storage.json()["published_partitions"] == 2
+    assert storage.json()["published_rows"] == 4
     assert storage.json()["missing_files"] == 0
     published = tmp_path / "data" / catalog.json()[0]["file_path"]
     assert published.suffix == ".parquet"

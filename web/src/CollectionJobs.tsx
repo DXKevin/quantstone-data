@@ -90,7 +90,13 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     setError(null);
     try {
       const result = await api.executeCollectionJob(job.id);
-      setNotice(result.status === "review_passed" ? "采集完成，暂存数据审核通过。" : "采集完成，但审核发现异常。" );
+      if (result.status === "review_failed") {
+        const report = await api.getCollectionReview(job.id);
+        setReview({ jobId: job.id, data: report });
+        setNotice("采集已停止：部分日期审核异常，具体原因已展开。");
+      } else {
+        setNotice(result.status === "succeeded" ? "采集、审核和发布均已完成。" : "采集完成，暂存数据审核通过。");
+      }
       await loadJobs();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "采集任务执行失败");
@@ -125,6 +131,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
 
   const stagedCount = jobs.filter((job) => job.status === "staged").length;
   const waitingCount = jobs.filter((job) => job.status === "awaiting_file").length;
+  const failedReviewRuns = review?.data.runs?.filter((run) => !run.passed) ?? [];
+  const topLevelErrors = review?.data.errors ?? [];
 
   return (
     <div className="page">
@@ -149,12 +157,23 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       {notice && <div className="notice-banner"><CheckCircle2 size={17} />{notice}</div>}
       {error && <div className="form-error"><AlertCircle size={17} />{error}</div>}
       {review && (
-        <section className="review-summary">
-          <div><strong>{review.data.passed ? "审核通过" : "审核异常"}</strong><span>任务 {review.jobId.slice(0, 8)}</span></div>
-          <div><span>审核器</span><code>{review.data.reviewer}</code></div>
-          <div><span>数据行数</span><strong>{review.data.row_count.toLocaleString()}</strong></div>
-          <div><span>异常数量</span><strong>{review.data.error_count}</strong></div>
-          <button type="button" className="toolbar-button" onClick={() => setReview(null)}>关闭</button>
+        <section className="review-report">
+          <div className="review-summary">
+            <div><strong>{review.data.passed ? "审核通过" : "审核异常"}</strong><span>任务 {review.jobId.slice(0, 8)}</span></div>
+            <div><span>审核器</span><code>{review.data.reviewer}</code></div>
+            <div><span>数据行数</span><strong>{review.data.row_count.toLocaleString()}</strong></div>
+            <div><span>异常数量</span><strong>{review.data.error_count}</strong></div>
+            <button type="button" className="toolbar-button" onClick={() => setReview(null)}>关闭</button>
+          </div>
+          {!review.data.passed && <div className="review-failures">
+            <strong>异常详情</strong>
+            {failedReviewRuns.map((run, index) => <div className="review-failure" key={`${run.partition_key ?? "run"}-${index}`}>
+              <header><code>{run.partition_key ?? "未分区"}</code><span>{run.row_count.toLocaleString()} 行 · {run.error_count} 项异常</span></header>
+              <ul>{(run.errors ?? []).map((item, errorIndex) => <li key={errorIndex}>{describeReviewError(item)}</li>)}</ul>
+            </div>)}
+            {!failedReviewRuns.length && topLevelErrors.length > 0 && <div className="review-failure"><ul>{topLevelErrors.map((item, index) => <li key={index}>{describeReviewError(item)}</li>)}</ul></div>}
+            {!failedReviewRuns.length && !topLevelErrors.length && <div className="review-failure">审核报告未记录规则明细，请查看运行日志。</div>}
+          </div>}
         </section>
       )}
       {!activeDatasets.length && (
@@ -183,7 +202,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                 <span><JobStatus status={job.status} /></span>
                 <span className="job-actions">
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}><RefreshCw size={14} />{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
-                  {(job.status === "review_passed" || job.status === "review_failed") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
+                  {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
                 </span>
               </div>
             ))}
@@ -327,6 +346,22 @@ function JobStatus({ status }: { status: CollectionJob["status"] }) {
 
 function datasetName(datasets: DatasetSummary[], id: string) {
   return datasets.find((dataset) => dataset.id === id)?.display_name ?? "未知数据集";
+}
+
+function describeReviewError(error: Record<string, unknown>) {
+  const rule = String(error.rule ?? "unknown");
+  if (rule === "not_empty") return "接口返回 0 行，该日期没有可审核的数据。";
+  if (rule === "partition_matches_trade_date") {
+    const expected = error.expected ? `期望 ${String(error.expected)}` : "";
+    const actual = Array.isArray(error.actual) ? `实际 ${error.actual.join("、")}` : error.actual ? `实际 ${String(error.actual)}` : "";
+    return `数据日期与目标分区不一致${expected || actual ? `（${[expected, actual].filter(Boolean).join("，")}）` : ""}。`;
+  }
+  if (rule === "required_fields") return `缺少必需字段：${String(error.missing ?? error.fields ?? "未记录")}`;
+  if (rule === "primary_key_not_null") return `主键存在空值：${String(error.fields ?? error.field ?? "未记录")}`;
+  if (rule === "primary_key_unique") return `主键存在重复记录：${String(error.count ?? "数量未记录")}`;
+  if (rule === "schema") return `字段结构不符合数据集契约：${String(error.message ?? "请检查字段名称和类型")}`;
+  const detail = error.message ?? error.detail;
+  return detail ? `${rule}：${String(detail)}` : `审核规则 ${rule} 未通过。`;
 }
 
 function formatBytes(value: number | null) {

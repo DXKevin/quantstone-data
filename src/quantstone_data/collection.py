@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
+import pyarrow.parquet as pq
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -37,12 +38,61 @@ def serialize_job(job: CollectionJob) -> CollectionJobRead:
     return CollectionJobRead.model_validate(job, from_attributes=True)
 
 
-def _date_batches(start_date, end_date):
-    current = start_date
-    while current <= end_date:
-        if current.weekday() < 5:
-            yield current
-        current += timedelta(days=1)
+def _trading_dates(
+    dataset: Dataset,
+    start_date: date,
+    end_date: date,
+    data_root: Path,
+    session: Session,
+) -> list[date]:
+    policy = dataset.storage_policy or {}
+    calendar_id = policy.get("calendar_dataset_id")
+    calendar = session.get(Dataset, calendar_id) if calendar_id else None
+    if calendar is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"请先创建交易日历数据集：{calendar_id or '尚未配置 calendar_dataset_id'}",
+        )
+    if calendar.status != DatasetStatus.ACTIVE.value:
+        raise HTTPException(status_code=409, detail=f"请先启用交易日历数据集：{calendar_id}")
+    catalog = session.scalar(
+        select(CatalogPartition)
+        .where(CatalogPartition.dataset_id == calendar_id)
+        .order_by(CatalogPartition.published_at.desc())
+        .limit(1)
+    )
+    if catalog is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"交易日历尚无已发布数据，请先采集交易日历：{calendar_id}",
+        )
+    calendar_path = data_root / catalog.file_path
+    if not calendar_path.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail=f"交易日历文件缺失，请重新发布交易日历：{calendar_id}",
+        )
+    table = pq.read_table(calendar_path, columns=["cal_date", "is_open"])
+    rows = table.to_pylist()
+    available_dates = [row["cal_date"] for row in rows]
+    if not available_dates or start_date < min(available_dates) or end_date > max(available_dates):
+        coverage = (
+            f"{min(available_dates)} 至 {max(available_dates)}"
+            if available_dates
+            else "无有效日期"
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"交易日历覆盖不足（当前 {coverage}），请先更新交易日历至 "
+                f"{start_date} 至 {end_date}"
+            ),
+        )
+    return sorted(
+        row["cal_date"]
+        for row in rows
+        if row["is_open"] == 1 and start_date <= row["cal_date"] <= end_date
+    )
 
 
 def _execute_daily_job(
@@ -88,7 +138,13 @@ def _execute_daily_job(
     ]
     reports: list[dict] = []
     token = load_token()
-    for trade_date in _date_batches(job.start_date, job.end_date):
+    for trade_date in _trading_dates(
+        dataset,
+        job.start_date,
+        job.end_date,
+        data_root,
+        session,
+    ):
         partition_key = trade_date.isoformat()
         run = session.scalar(
             select(CollectionRun).where(
@@ -191,7 +247,7 @@ def _execute_daily_job(
     report_path = data_root / "staging" / job.id / "review.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     aggregate = {
-        "reviewer": "tushare.daily",
+        "reviewer": job.dataset_id,
         "passed": bool(reports) and all(item["passed"] for item in reports),
         "row_count": sum(item["row_count"] for item in reports),
         "error_count": sum(item["error_count"] for item in reports),
@@ -365,12 +421,45 @@ def _execute_snapshot_job(
 
 
 @router.post("", response_model=CollectionJobRead, status_code=status.HTTP_201_CREATED)
-def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> CollectionJobRead:
+def create_collection_job(
+    payload: CollectionJobCreate,
+    request: Request,
+    session: SessionDep,
+) -> CollectionJobRead:
     dataset = session.get(Dataset, payload.dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="dataset not found")
     if dataset.status != DatasetStatus.ACTIVE.value:
         raise HTTPException(status_code=409, detail="only active datasets can be collected")
+    if dataset.storage_policy and dataset.storage_policy.get("logical_partition_field"):
+        calendar_id = dataset.storage_policy.get("calendar_dataset_id")
+        calendar = session.get(Dataset, calendar_id) if calendar_id else None
+        if calendar is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"请先创建交易日历数据集：{calendar_id or '尚未配置 calendar_dataset_id'}",
+            )
+        if calendar.status != DatasetStatus.ACTIVE.value:
+            raise HTTPException(
+                status_code=409,
+                detail=f"请先启用交易日历数据集：{calendar_id}",
+            )
+        calendar_catalog = session.scalar(
+            select(CatalogPartition)
+            .where(CatalogPartition.dataset_id == calendar_id)
+            .order_by(CatalogPartition.published_at.desc())
+            .limit(1)
+        )
+        if calendar_catalog is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"交易日历尚无已发布数据，请先采集交易日历：{calendar_id}",
+            )
+        if not (request.app.state.data_root / calendar_catalog.file_path).is_file():
+            raise HTTPException(
+                status_code=409,
+                detail=f"交易日历文件缺失，请重新发布交易日历：{calendar_id}",
+            )
 
     binding = next(
         (
@@ -579,7 +668,10 @@ def get_collection_review(job_id: str, request: Request, session: SessionDep) ->
     report_path = (request.app.state.data_root / job.staged_path).parent / "review.json"
     if not report_path.is_file():
         raise HTTPException(status_code=404, detail="review report not found")
-    return json.loads(report_path.read_text(encoding="utf-8"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    # 早期报告曾保存采集器接口名；审核器没有独立 ID，对外始终使用目标数据集 ID。
+    report["reviewer"] = job.dataset_id
+    return report
 
 
 @router.post("/{job_id}/file", response_model=CollectionJobRead)

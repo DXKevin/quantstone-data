@@ -161,10 +161,10 @@ function App() {
           />
         )}
         {area === "datasets" && view === "create" && (
-          <DatasetForm collectors={collectors} onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
+          <DatasetForm collectors={collectors} datasets={datasets} onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
         )}
         {area === "datasets" && view === "edit" && selected && (
-          <DatasetForm collectors={collectors} dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
+          <DatasetForm collectors={collectors} datasets={datasets} dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
         {area === "datasets" && view === "detail" && selected && (
           <DatasetDetailView
@@ -287,7 +287,7 @@ function DatasetList(props: {
   );
 }
 
-function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
+function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: DatasetSummary[]; dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
   const editing = Boolean(props.dataset);
   const [provider, setProvider] = useState(props.dataset?.provider ?? "");
   const [region, setRegion] = useState(props.dataset?.region ?? "cn");
@@ -306,6 +306,9 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
   const [storageLayout, setStorageLayout] = useState(props.dataset?.storage_policy?.layout ?? "");
   const [partitionField, setPartitionField] = useState(
     props.dataset?.storage_policy?.logical_partition_field ?? "",
+  );
+  const [calendarDatasetId, setCalendarDatasetId] = useState(
+    props.dataset?.storage_policy?.calendar_dataset_id ?? "",
   );
   const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
   const initialFields = props.dataset?.schema.fields.map((field, index) => ({
@@ -351,6 +354,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
     if (validFields.some((field) => !field.description.trim())) return setError("每个字段都需要填写说明。");
     const primaryKey = validFields.filter((field) => field.primary).map((field) => field.name);
     if (!primaryKey.length) return setError("请至少选择一个主键字段。");
+    if (partitionField.trim() && !calendarDatasetId) return setError("日期分区数据集必须绑定交易日历数据集。");
 
     const payload: DatasetCreatePayload = {
       id: datasetId,
@@ -370,6 +374,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
       storage_policy: storageLayout
         ? {
             logical_partition_field: partitionField || null,
+            calendar_dataset_id: partitionField ? calendarDatasetId || null : null,
             layout: storageLayout as "daily" | "yearly_with_delta" | "snapshot",
             write_strategy: storageLayout === "snapshot" ? "replace_snapshot" : "replace_partition",
             compaction: storageLayout === "yearly_with_delta" ? "yearly" : null,
@@ -455,6 +460,8 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
             <label className="input-field"><span>物理布局</span><select value={storageLayout} onChange={(event) => setStorageLayout(event.target.value)}><option value="">暂不配置</option><option value="daily">单日文件</option><option value="yearly_with_delta">年度主文件 + 日增量</option><option value="snapshot">完整快照</option></select></label>
             <label className="input-field"><span>逻辑分区字段</span><input value={partitionField} disabled={!storageLayout || storageLayout === "snapshot"} onChange={(event) => setPartitionField(event.target.value)} placeholder="trade_date" /></label>
           </div>
+          {partitionField && <label className="input-field calendar-binding"><span>交易日历数据集</span><select value={calendarDatasetId} onChange={(event) => setCalendarDatasetId(event.target.value)}><option value="">请选择交易日历数据集</option>{props.datasets.filter((item) => item.id !== datasetId && item.storage_policy?.layout === "snapshot").map((item) => <option key={item.id} value={item.id}>{item.display_name} · {item.id}</option>)}</select><small>采集计划只会生成日历中标记为交易日的日期；日历必须先启用并发布数据。</small></label>}
+          {partitionField && !props.datasets.some((item) => item.id !== datasetId && item.storage_policy?.layout === "snapshot") && <div className="calendar-warning">当前没有可绑定的交易日历，请先创建并启用交易日历数据集。</div>}
           {storageLayout === "yearly_with_delta" && <div className="operation-help">每日审核通过后立即发布为增量 Parquet，后续按年度合并；Catalog 仍逐日记录覆盖。</div>}
         </div>
       </section>
@@ -528,7 +535,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
 
       <section className="detail-grid">
         <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
-        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
+        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
       <section className="panel fields-detail">

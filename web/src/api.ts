@@ -13,6 +13,7 @@ export type CollectionJobStatus =
 
 export interface DatasetStoragePolicy {
   logical_partition_field: string | null;
+  calendar_dataset_id: string | null;
   layout: "daily" | "yearly_with_delta" | "snapshot";
   write_strategy: "append" | "replace_partition" | "replace_snapshot";
   compaction: "yearly" | null;
@@ -154,7 +155,15 @@ export interface CollectionReview {
   passed: boolean;
   row_count: number;
   error_count: number;
-  errors: Array<Record<string, unknown>>;
+  errors?: Array<Record<string, unknown>>;
+  runs?: Array<{
+    reviewer: string;
+    passed: boolean;
+    row_count: number;
+    error_count: number;
+    errors: Array<Record<string, unknown>>;
+    partition_key?: string;
+  }>;
 }
 
 export interface StorageOverview {
