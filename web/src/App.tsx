@@ -199,7 +199,7 @@ function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] })
       </section>
       {collectors.map((collector) => (
         <section className="panel collector-card" key={collector.key}>
-          <div className="card-title"><div><h2>{collector.name}</h2><code>{collector.key}</code></div><span>{collector.operations.length} 个操作</span></div>
+          <div className="card-title"><div><h2 className="collector-title"><code>{collector.key}</code><span>&lt;{collector.name}&gt;</span></h2></div><span>{collector.operations.length} 个操作</span></div>
           <p>{collector.description}</p>
           <div className="collector-compact-table">
             <div className="collector-compact-row collector-compact-head"><span>输出数据集</span><span>更新方式</span><span>操作及各自参数</span></div>

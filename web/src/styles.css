@@ -167,6 +167,9 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .range-toggle { display: flex; align-items: center; gap: 7px; margin-top: 16px; color: #56625c; font-size: 11px; }
 .collector-card { margin-bottom: 14px; padding: 16px 18px; }
 .collector-card > p { margin: 5px 0 12px; color: #68746e; font-size: 11px; }
+.collector-title { display: flex !important; align-items: baseline; gap: 7px; }
+.collector-title code { color: var(--ink); font-size: 14px; }
+.collector-title span { color: var(--muted); font-size: 12px; font-weight: 500; }
 .collector-compact-table { border: 1px solid var(--line); }
 .collector-compact-row { display: grid; grid-template-columns: minmax(260px, 1.2fr) 85px minmax(400px, 2fr); gap: 12px; align-items: center; min-height: 48px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10px; }
 .collector-compact-row:first-child { border-top: 0; }
