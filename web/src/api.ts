@@ -4,6 +4,9 @@ export type CollectionPurpose = CollectionOperation;
 export type CollectionInputMethod = "collector" | "file_import";
 export type CollectionJobStatus =
   | "created"
+  | "running"
+  | "cancelling"
+  | "cancelled"
   | "awaiting_file"
   | "staged"
   | "review_passed"
@@ -150,6 +153,17 @@ export interface CollectionJobCreatePayload {
   parameters: Record<string, unknown>;
 }
 
+export interface CollectionProgress {
+  job_id: string;
+  status: CollectionJobStatus;
+  expected_total: number | null;
+  succeeded: number;
+  failed: number;
+  processed: number;
+  latest_partition: string | null;
+  percent: number | null;
+}
+
 export interface CollectionReview {
   reviewer: string;
   passed: boolean;
@@ -230,6 +244,12 @@ export const api = {
     }),
   executeCollectionJob: (jobId: string) =>
     request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/execute`, { method: "POST" }),
+  cancelCollectionJob: (jobId: string) =>
+    request<CollectionJob>(`/api/v1/collection-jobs/${jobId}/cancel`, { method: "POST" }),
+  deleteCollectionJob: (jobId: string) =>
+    request<void>(`/api/v1/collection-jobs/${jobId}`, { method: "DELETE" }),
+  getCollectionProgress: (jobId: string) =>
+    request<CollectionProgress>(`/api/v1/collection-jobs/${jobId}/progress`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   getStorageOverview: () => request<StorageOverview>("/api/v1/storage/overview"),

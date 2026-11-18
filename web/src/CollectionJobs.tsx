@@ -1,11 +1,13 @@
 import {
   AlertCircle,
   ArrowLeft,
+  Ban,
   CheckCircle2,
   Clock3,
   FileUp,
   Plus,
   RefreshCw,
+  Trash2,
   UploadCloud,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +19,7 @@ import {
   type CollectionJob,
   type CollectionJobCreatePayload,
   type CollectionOperation,
+  type CollectionProgress,
   type CollectionReview,
   type DatasetSummary,
 } from "./api";
@@ -35,6 +38,9 @@ const inputLabels: Record<CollectionInputMethod, string> = {
 
 const statusLabels = {
   created: "已创建",
+  running: "执行中",
+  cancelling: "正在取消",
+  cancelled: "已取消",
   awaiting_file: "等待文件",
   staged: "已进入临时区",
   review_passed: "审核通过",
@@ -50,27 +56,71 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
+  const jobsRef = useRef<CollectionJob[]>([]);
   const activeDatasets = useMemo(
     () => datasets.filter((dataset) => dataset.status === "active"),
     [datasets],
   );
 
-  const loadJobs = useCallback(async () => {
-    setLoading(true);
+  const loadJobs = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       setJobs(await api.listCollectionJobs());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载采集任务");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void loadJobs();
   }, [loadJobs]);
+
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
+  const hasRunning = jobs.some(
+    (job) => job.status === "running" || job.status === "cancelling",
+  ) || runningJobId !== null;
+
+  useEffect(() => {
+    if (!hasRunning) return;
+    let alive = true;
+
+    async function poll() {
+      const running = jobsRef.current.filter(
+        (job) => job.status === "running" || job.status === "cancelling",
+      );
+      const entries = await Promise.all(
+        running.map(async (job) => {
+          try {
+            return [job.id, await api.getCollectionProgress(job.id)] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (!alive) return;
+      setProgress((current) => {
+        const next = { ...current };
+        for (const entry of entries) if (entry) next[entry[0]] = entry[1];
+        return next;
+      });
+      await loadJobs(true);
+    }
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), 2500);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [hasRunning, loadJobs]);
 
   async function uploadExisting(job: CollectionJob, file: File) {
     setNotice(null);
@@ -111,6 +161,32 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       setReview({ jobId: job.id, data: await api.getCollectionReview(job.id) });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法读取审核报告");
+    }
+  }
+
+  async function cancelJob(job: CollectionJob) {
+    if (!window.confirm(`确定取消任务 ${job.id.slice(0, 8)}？已发布的分区会保留。`)) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.cancelCollectionJob(job.id);
+      setNotice("已请求取消，当前分区处理完后停止。");
+      await loadJobs();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "取消任务失败");
+    }
+  }
+
+  async function deleteJob(job: CollectionJob) {
+    if (!window.confirm(`确定删除任务记录 ${job.id.slice(0, 8)}？已发布的数据不会被删除。`)) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.deleteCollectionJob(job.id);
+      await loadJobs();
+      setNotice("任务记录已删除。");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除任务失败");
     }
   }
 
@@ -192,20 +268,29 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
         ) : (
           <div className="jobs-table">
             <div className="job-row job-head"><span>数据集 / 任务</span><span>任务目的</span><span>输入方式</span><span>日期范围</span><span>文件</span><span>状态</span><span>操作</span></div>
-            {jobs.map((job) => (
+            {jobs.map((job) => {
+              const jobProgress = progress[job.id];
+              const running = job.status === "running" || job.status === "cancelling";
+              return (
               <div className="job-row" key={job.id}>
                 <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)}</small></span>
                 <span>{operationLabels[job.operation]}</span>
                 <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key} · {job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
                 <span className="file-cell">{job.source_file_name ? <><strong>{job.source_file_name}</strong><small>{formatBytes(job.source_size_bytes)}</small></> : job.status === "awaiting_file" ? <UploadFileButton onFile={(file) => void uploadExisting(job, file)} /> : "—"}</span>
-                <span><JobStatus status={job.status} /></span>
+                <span className="job-status-cell">
+                  <JobStatus status={job.status} />
+                  {jobProgress && <small className="job-progress">{formatProgress(jobProgress)}</small>}
+                </span>
                 <span className="job-actions">
-                  {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}><RefreshCw size={14} />{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
+                  {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
+                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : "取消"}</button>}
                   {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
+                  {!running && <button type="button" className="mini-upload-button quiet-mini" onClick={() => void deleteJob(job)}><Trash2 size={14} />删除</button>}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -362,6 +447,18 @@ function describeReviewError(error: Record<string, unknown>) {
   if (rule === "schema") return `字段结构不符合数据集契约：${String(error.message ?? "请检查字段名称和类型")}`;
   const detail = error.message ?? error.detail;
   return detail ? `${rule}：${String(detail)}` : `审核规则 ${rule} 未通过。`;
+}
+
+function formatProgress(progress: CollectionProgress) {
+  const parts = [
+    progress.expected_total
+      ? `已发布 ${progress.succeeded} / ${progress.expected_total}`
+      : `已发布 ${progress.succeeded}`,
+  ];
+  if (progress.percent !== null) parts.push(`${progress.percent}%`);
+  if (progress.failed) parts.push(`失败 ${progress.failed}`);
+  if (progress.latest_partition) parts.push(`最新 ${progress.latest_partition}`);
+  return parts.join(" · ");
 }
 
 function formatBytes(value: number | null) {

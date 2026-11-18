@@ -9,8 +9,8 @@ from typing import Annotated
 from uuid import uuid4
 
 import pyarrow.parquet as pq
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from .collection_protocol import CollectionContext
@@ -34,6 +34,18 @@ from .schemas import DatasetStatus
 
 router = APIRouter(prefix="/collection-jobs", tags=["collection jobs"])
 SessionDep = Annotated[Session, Depends(get_session)]
+
+# 进程内记录正在执行的任务和取消请求；单进程部署下即可生效。
+_RUNNING_JOBS: set[str] = set()
+_CANCEL_REQUESTS: set[str] = set()
+
+TERMINAL_JOB_STATUSES = {
+    CollectionJobStatus.SUCCEEDED.value,
+    CollectionJobStatus.FAILED.value,
+    CollectionJobStatus.REVIEW_PASSED.value,
+    CollectionJobStatus.REVIEW_FAILED.value,
+    CollectionJobStatus.CANCELLED.value,
+}
 
 
 def serialize_job(job: CollectionJob) -> CollectionJobRead:
@@ -147,6 +159,17 @@ def _execute_daily_job(
         data_root,
         session,
     ):
+        if job.id in _CANCEL_REQUESTS:
+            job.status = CollectionJobStatus.CANCELLED.value
+            session.commit()
+            session.refresh(job)
+            log_event(
+                "collection_job_cancelled",
+                job_id=job.id,
+                dataset_id=job.dataset_id,
+            )
+            return serialize_job(job)
+
         partition_key = trade_date.isoformat()
         run = session.scalar(
             select(CollectionRun).where(
@@ -574,13 +597,32 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     schema = next(
         item for item in dataset.schemas if item.version == dataset.current_schema_version
     )
+    data_root: Path = request.app.state.data_root
+    job.status = CollectionJobStatus.RUNNING.value
+    session.commit()
+    _RUNNING_JOBS.add(job.id)
+    try:
+        return _run_collection(job, operation, dataset, schema, data_root, session)
+    finally:
+        _RUNNING_JOBS.discard(job.id)
+        _CANCEL_REQUESTS.discard(job.id)
+
+
+def _run_collection(
+    job: CollectionJob,
+    operation,
+    dataset: Dataset,
+    schema: DatasetSchemaVersion,
+    data_root: Path,
+    session: Session,
+) -> CollectionJobRead:
     if job.dataset_id == DAILY_DATASET_ID:
         return _execute_daily_job(
             job,
             operation,
             dataset,
             schema,
-            request.app.state.data_root,
+            data_root,
             session,
         )
     if dataset.storage_policy and dataset.storage_policy.get("layout") == "snapshot":
@@ -589,11 +631,11 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
             operation,
             dataset,
             schema,
-            request.app.state.data_root,
+            data_root,
             session,
         )
     fields = [field.source_name or field.name for field in schema.fields]
-    job_directory = request.app.state.data_root / "staging" / job.id
+    job_directory = data_root / "staging" / job.id
     target = job_directory / "stock_basic.parquet"
     report_path = job_directory / "review.json"
 
@@ -604,7 +646,7 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
             lambda: operation.function(target, fields, load_token()),
         )
         job.source_file_name = target.name
-        job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
+        job.staged_path = target.relative_to(data_root).as_posix()
         job.source_size_bytes = target.stat().st_size
         job.source_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
         job.status = CollectionJobStatus.STAGED.value
@@ -647,6 +689,123 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     return serialize_job(job)
+
+
+@router.post("/{job_id}/cancel", response_model=CollectionJobRead)
+def cancel_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead:
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    if job.status in TERMINAL_JOB_STATUSES:
+        raise HTTPException(status_code=409, detail="任务已结束，无法取消")
+
+    if job.id in _RUNNING_JOBS:
+        _CANCEL_REQUESTS.add(job.id)
+        job.status = CollectionJobStatus.CANCELLING.value
+        log_event(
+            "collection_job_cancel_requested",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+        )
+    else:
+        job.status = CollectionJobStatus.CANCELLED.value
+        log_event(
+            "collection_job_cancelled",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+        )
+    session.commit()
+    session.refresh(job)
+    return serialize_job(job)
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_collection_job(
+    job_id: str,
+    request: Request,
+    session: SessionDep,
+) -> Response:
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    if job.id in _RUNNING_JOBS or job.status in {
+        CollectionJobStatus.RUNNING.value,
+        CollectionJobStatus.CANCELLING.value,
+    }:
+        raise HTTPException(status_code=409, detail="请先取消正在执行的任务")
+
+    dataset_id = job.dataset_id
+    session.execute(delete(CollectionRun).where(CollectionRun.job_id == job_id))
+    session.delete(job)
+    session.commit()
+    shutil.rmtree(request.app.state.data_root / "staging" / job_id, ignore_errors=True)
+    log_event(
+        "collection_job_deleted",
+        job_id=job_id,
+        dataset_id=dataset_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{job_id}/progress")
+def collection_job_progress(
+    job_id: str,
+    request: Request,
+    session: SessionDep,
+) -> dict:
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+
+    counts = dict(
+        session.execute(
+            select(CollectionRun.status, func.count(CollectionRun.id))
+            .where(CollectionRun.job_id == job_id)
+            .group_by(CollectionRun.status)
+        ).all()
+    )
+    latest_partition = session.scalar(
+        select(func.max(CollectionRun.partition_key)).where(
+            CollectionRun.job_id == job_id,
+            CollectionRun.status == "succeeded",
+        )
+    )
+    expected_total: int | None = None
+    dataset = session.get(Dataset, job.dataset_id)
+    if (
+        dataset is not None
+        and dataset.storage_policy
+        and dataset.storage_policy.get("logical_partition_field")
+        and job.start_date is not None
+        and job.end_date is not None
+    ):
+        try:
+            expected_total = len(
+                _trading_dates(
+                    dataset,
+                    job.start_date,
+                    job.end_date,
+                    request.app.state.data_root,
+                    session,
+                )
+            )
+        except HTTPException:
+            expected_total = None
+
+    succeeded = counts.get("succeeded", 0)
+    failed = counts.get("failed", 0)
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "expected_total": expected_total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "processed": succeeded + failed,
+        "latest_partition": latest_partition,
+        "percent": (
+            round(succeeded * 100 / expected_total, 1) if expected_total else None
+        ),
+    }
 
 
 @router.get("", response_model=list[CollectionJobRead])

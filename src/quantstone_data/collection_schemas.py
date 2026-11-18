@@ -19,6 +19,9 @@ class InputMethod(StrEnum):
 
 class CollectionJobStatus(StrEnum):
     CREATED = "created"
+    RUNNING = "running"
+    CANCELLING = "cancelling"
+    CANCELLED = "cancelled"
     AWAITING_FILE = "awaiting_file"
     STAGED = "staged"
     REVIEW_PASSED = "review_passed"
