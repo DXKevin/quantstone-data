@@ -13,9 +13,12 @@ from .stock_basic import (
 from .stock_basic import (
     collect_initial as collect_stock_list_initial,
 )
+from .trade_cal import collect_incremental as collect_trade_cal_incremental
+from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
 STOCK_LIST_DATASET_ID = "tushare.cn.stock.stock_basic"
+TRADE_CAL_DATASET_ID = "tushare.cn.stock.trade_cal"
 
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
@@ -62,6 +65,24 @@ OPERATIONS = (
         parameters=INCREMENTAL_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_incremental,
+    ),
+    CollectorOperation(
+        key="trade_cal_initial",
+        name="交易日历首次采集",
+        description="按日期范围采集 TuShare 上交所交易日历并生成完整快照。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(TRADE_CAL_DATASET_ID,),
+        function=collect_trade_cal_initial,
+    ),
+    CollectorOperation(
+        key="trade_cal_incremental",
+        name="交易日历增量更新",
+        description="重新生成 TuShare 上交所交易日历完整快照。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(TRADE_CAL_DATASET_ID,),
+        function=collect_trade_cal_incremental,
     ),
 )
 

@@ -171,6 +171,99 @@ def _execute_daily_job(
     return serialize_job(job)
 
 
+def _execute_snapshot_job(
+    job: CollectionJob,
+    operation,
+    dataset: Dataset,
+    schema: DatasetSchemaVersion,
+    data_root: Path,
+    session: Session,
+) -> CollectionJobRead:
+    if not dataset.storage_policy:
+        raise HTTPException(status_code=409, detail="dataset has no storage policy")
+    run = session.scalar(
+        select(CollectionRun).where(
+            CollectionRun.job_id == job.id,
+            CollectionRun.partition_key == "snapshot",
+        )
+    )
+    if run is None:
+        run = CollectionRun(
+            id=str(uuid4()),
+            job_id=job.id,
+            partition_key="snapshot",
+            status="fetching",
+        )
+        session.add(run)
+        session.flush()
+    fields = [
+        {
+            "name": field.name,
+            "source_name": field.source_name,
+            "data_type": field.data_type,
+            "nullable": field.nullable,
+        }
+        for field in schema.fields
+    ]
+    run_directory = data_root / "staging" / job.id / run.id
+    report_path = data_root / "staging" / job.id / "review.json"
+    try:
+        result = operation.function(
+            CollectionContext(run.id, run_directory, load_token()),
+            job.parameters,
+            fields,
+        )
+        if set(result.outputs) != set(operation.datasets):
+            raise CollectionError("collector outputs do not match operation declaration")
+        artifacts = result.outputs[job.dataset_id]
+        if len(artifacts) != 1:
+            raise CollectionError("snapshot collection must produce exactly one artifact")
+        artifact = artifacts[0]
+        report = review_dataset(
+            job.dataset_id,
+            ReviewContext(artifact.path, schema),
+        ).as_dict()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        run.staged_path = artifact.path.relative_to(data_root).as_posix()
+        run.row_count = artifact.row_count
+        if not report["passed"]:
+            run.status = "review_failed"
+            job.status = CollectionJobStatus.REVIEW_FAILED.value
+        else:
+            publish_partition(
+                session,
+                data_root=data_root,
+                dataset_id=job.dataset_id,
+                storage_policy=dataset.storage_policy,
+                partition_key="snapshot",
+                artifact_path=artifact.path,
+                row_count=artifact.row_count,
+                run=run,
+            )
+            job.status = CollectionJobStatus.SUCCEEDED.value
+            shutil.rmtree(run_directory, ignore_errors=True)
+        job.staged_path = report_path.relative_to(data_root).as_posix()
+        session.commit()
+        session.refresh(job)
+        return serialize_job(job)
+    except CollectionError as error:
+        run.status = "failed"
+        run.error = str(error)
+        job.status = CollectionJobStatus.FAILED.value
+        session.commit()
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except Exception as error:
+        run.status = "failed"
+        run.error = str(error)
+        job.status = CollectionJobStatus.FAILED.value
+        session.commit()
+        raise
+
+
 @router.post("", response_model=CollectionJobRead, status_code=status.HTTP_201_CREATED)
 def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> CollectionJobRead:
     dataset = session.get(Dataset, payload.dataset_id)
@@ -270,6 +363,15 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     )
     if job.dataset_id == DAILY_DATASET_ID:
         return _execute_daily_job(
+            job,
+            operation,
+            dataset,
+            schema,
+            request.app.state.data_root,
+            session,
+        )
+    if dataset.storage_policy and dataset.storage_policy.get("layout") == "snapshot":
+        return _execute_snapshot_job(
             job,
             operation,
             dataset,

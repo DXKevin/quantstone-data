@@ -38,6 +38,7 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
     assert set(REVIEWERS) == {
         "tushare.cn.stock.daily",
         "tushare.cn.stock.stock_basic",
+        "tushare.cn.stock.trade_cal",
     }
 
 

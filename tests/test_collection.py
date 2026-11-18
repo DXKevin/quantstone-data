@@ -218,9 +218,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         assert created.json()["collector_operation"] == "stock_list_initial"
 
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
-        review_response = client.get(
-            f"/api/v1/collection-jobs/{created.json()['id']}/review"
-        )
+        review_response = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/review")
 
     assert executed.status_code == 200
     body = executed.json()
@@ -311,9 +309,7 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         assert created.json()["end_date"] == "2026-11-18"
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
-        catalog = client.get(
-            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily"
-        )
+        catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily")
 
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
@@ -323,3 +319,80 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     published = tmp_path / "data" / catalog.json()[0]["file_path"]
     assert published.suffix == ".parquet"
     assert published.is_file()
+
+
+def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
+    payload = {
+        "id": "tushare.cn.stock.trade_cal",
+        "provider": "tushare",
+        "region": "cn",
+        "instrument": "stock",
+        "dataset_name": "trade_cal",
+        "market": None,
+        "display_name": "A股交易日历",
+        "description": "TuShare trade_cal 上交所交易日历",
+        "collection_bindings": [
+            {
+                "purpose": "initial",
+                "collector_key": "tushare_cn_stock",
+                "operation": "trade_cal_initial",
+            }
+        ],
+        "storage_policy": {
+            "logical_partition_field": None,
+            "layout": "snapshot",
+            "write_strategy": "replace_snapshot",
+            "compaction": None,
+        },
+        "primary_key": ["exchange", "cal_date"],
+        "time_field": "cal_date",
+        "fields": [
+            {"name": "exchange", "data_type": "string", "nullable": False, "description": "交易所"},
+            {"name": "cal_date", "data_type": "date", "nullable": False, "description": "日历日期"},
+            {"name": "is_open", "data_type": "int32", "nullable": False, "description": "是否交易"},
+            {
+                "name": "pretrade_date",
+                "data_type": "date",
+                "nullable": True,
+                "description": "上一交易日",
+            },
+        ],
+    }
+
+    def fake_trade_cal(_token, start_date, _end_date, _fields):
+        return [
+            {
+                "exchange": "SSE",
+                "cal_date": start_date.strftime("%Y%m%d"),
+                "is_open": 1,
+                "pretrade_date": None,
+            }
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.trade_cal._call_trade_cal",
+        fake_trade_cal,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=payload).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code == 200
+        )
+        created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+            },
+        )
+        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.trade_cal")
+
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "succeeded"
+    assert catalog.json()[0]["partition_key"] == "snapshot"
+    assert (tmp_path / "data" / catalog.json()[0]["file_path"]).is_file()
