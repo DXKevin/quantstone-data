@@ -1,10 +1,13 @@
 import { AlertCircle, RefreshCw, Search, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent, UIEvent } from "react";
 import { api, type DatasetDetail, type DatasetRows } from "./api";
 
 const PREVIEW_LIMIT = 20;
 const QUERY_LIMIT = 100_000;
+const ROW_HEIGHT = 34;
+const VIEWPORT_HEIGHT = 520;
+const OVERSCAN_ROWS = 8;
 
 export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) {
   const [preview, setPreview] = useState<DatasetRows | null>(null);
@@ -81,15 +84,48 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
       ) : !error && (!preview || preview.rows.length === 0) ? (
         <div className="preview-state"><strong>{preview?.filtered ? "没有匹配数据" : "尚无已发布数据"}</strong><span>{preview?.filtered ? "请调整主键筛选条件。" : "采集并通过审核、发布后会在这里显示。"}</span></div>
       ) : !error && preview ? (
-        <div className="preview-table-wrap">
-          <table className="preview-table">
-            <thead><tr>{preview.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
-            <tbody>{preview.rows.map((row, index) => <tr key={index}>{preview.columns.map((column) => <td key={column}>{formatCell(row[column])}</td>)}</tr>)}</tbody>
-          </table>
-        </div>
+        <VirtualPreviewTable preview={preview} />
       ) : null}
     </section>
   );
+}
+
+function VirtualPreviewTable({ preview }: { preview: DatasetRows }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const visibleRows = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT);
+  const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
+  const end = Math.min(preview.rows.length, start + visibleRows + OVERSCAN_ROWS * 2);
+  const topSpace = start * ROW_HEIGHT;
+  const bottomSpace = Math.max(0, (preview.rows.length - end) * ROW_HEIGHT);
+
+  useEffect(() => {
+    setScrollTop(0);
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+  }, [preview.rows]);
+
+  function trackScroll(event: UIEvent<HTMLDivElement>) {
+    setScrollTop(event.currentTarget.scrollTop);
+  }
+
+  return (
+    <div className="preview-table-wrap" ref={viewportRef} onScroll={trackScroll}>
+      <table className="preview-table">
+        <thead><tr>{preview.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+        <tbody>
+          {topSpace > 0 && <SpacerRow height={topSpace} columns={preview.columns.length} />}
+          {preview.rows.slice(start, end).map((row, index) => (
+            <tr key={start + index}>{preview.columns.map((column) => <td key={column}>{formatCell(row[column])}</td>)}</tr>
+          ))}
+          {bottomSpace > 0 && <SpacerRow height={bottomSpace} columns={preview.columns.length} />}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SpacerRow({ height, columns }: { height: number; columns: number }) {
+  return <tr className="preview-spacer" aria-hidden="true"><td colSpan={columns} style={{ height }} /></tr>;
 }
 
 function formatCell(value: unknown) {

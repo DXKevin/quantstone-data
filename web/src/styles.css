@@ -149,12 +149,13 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .preview-error span { display: grid; gap: 2px; }
 .preview-state { min-height: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; margin-top: 14px; border: 1px dashed var(--line); color: var(--muted); font-size: 11px; }
 .preview-state .loader { width: 18px; height: 18px; }
-.preview-table-wrap { margin-top: 14px; overflow: auto; border: 1px solid var(--line); }
-.preview-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
-.preview-table th, .preview-table td { max-width: 260px; padding: 8px 11px; border-right: 1px solid #e8edea; border-bottom: 1px solid #e8edea; overflow: hidden; text-align: left; text-overflow: ellipsis; }
-.preview-table th { position: sticky; top: 0; background: #f4f7f5; color: #65716b; font-size: 10px; font-weight: 600; }
+.preview-table-wrap { max-height: 520px; margin-top: 14px; overflow: auto; border: 1px solid var(--line); contain: layout paint; }
+.preview-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; white-space: nowrap; }
+.preview-table th, .preview-table td { box-sizing: border-box; height: 34px; max-width: 260px; padding: 0 11px; border-right: 1px solid #e8edea; border-bottom: 1px solid #e8edea; overflow: hidden; text-align: left; text-overflow: ellipsis; }
+.preview-table th { position: sticky; z-index: 1; top: 0; background: #f4f7f5; color: #65716b; font-size: 10px; font-weight: 600; }
 .preview-table tbody tr:last-child td { border-bottom: 0; }
 .preview-table th:last-child, .preview-table td:last-child { border-right: 0; }
+.preview-table .preview-spacer td { height: auto; padding: 0; border: 0; }
 .schema-table { margin-top: 14px; }
 .schema-row { display: grid; grid-template-columns: 55px 1.2fr .8fr 2fr 1.2fr; gap: 15px; align-items: center; min-height: 50px; padding: 0 10px; border-bottom: 1px solid #e7ebe8; font-size: 11px; }
 .schema-head { min-height: 34px; background: #f7f9f7; color: var(--muted); font-size: 10px; }
