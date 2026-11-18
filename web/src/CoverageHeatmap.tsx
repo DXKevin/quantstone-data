@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CoverageResponse } from "./api";
 
 const RANGES = [30, 90, 250];
@@ -18,6 +18,7 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
   const [data, setData] = useState<CoverageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (range: number) => {
     setLoading(true);
@@ -36,6 +37,15 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
   }, [days, load]);
 
   const months = useMemo(() => groups(data?.dates ?? []), [data]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollLeft = container.scrollWidth;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [data, days]);
 
   return (
     <section className="panel coverage-panel">
@@ -75,10 +85,10 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
       ) : !data || !data.datasets.length ? (
         <div className="state-box empty-state"><strong>没有可展示的日分区数据集</strong><p>只有绑定了交易日历的数据集才会出现在热力图里。</p></div>
       ) : (
-        <div className="coverage-scroll">
+        <div className="coverage-scroll" ref={scrollRef}>
           <div
             className="coverage-grid"
-            style={{ gridTemplateColumns: `180px repeat(${data.dates.length}, 13px)` }}
+            style={{ gridTemplateColumns: `max-content repeat(${data.dates.length}, 13px)` }}
           >
             <div className="coverage-corner" />
             {months.map((month) => (
