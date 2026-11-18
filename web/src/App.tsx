@@ -287,6 +287,10 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
     }
     return values;
   });
+  const [storageLayout, setStorageLayout] = useState(props.dataset?.storage_policy?.layout ?? "");
+  const [partitionField, setPartitionField] = useState(
+    props.dataset?.storage_policy?.logical_partition_field ?? "",
+  );
   const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
   const initialFields = props.dataset?.schema.fields.map((field, index) => ({
     key: index + 1,
@@ -347,6 +351,14 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
           const [collector_key, operation] = value.split("::");
           return { purpose, collector_key, operation };
         }),
+      storage_policy: storageLayout
+        ? {
+            logical_partition_field: partitionField || null,
+            layout: storageLayout as "daily" | "yearly_with_delta" | "snapshot",
+            write_strategy: storageLayout === "snapshot" ? "replace_snapshot" : "replace_partition",
+            compaction: storageLayout === "yearly_with_delta" ? "yearly" : null,
+          }
+        : null,
       primary_key: primaryKey,
       time_field: timeField || null,
       fields: validFields.map((field) => ({
@@ -366,6 +378,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
             display_name: payload.display_name,
             description: payload.description,
             collection_bindings: payload.collection_bindings,
+            storage_policy: payload.storage_policy,
             primary_key: payload.primary_key,
             time_field: payload.time_field,
             fields: payload.fields,
@@ -419,8 +432,19 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
         </div>
       </section>
 
+      <section className="form-section">
+        <div className="section-number">03</div><div className="section-intro"><h2>存储策略</h2><p>约定逻辑分区和正式 Parquet 文件的组织方式。</p></div>
+        <div className="form-content">
+          <div className="form-grid two-columns no-margin">
+            <label className="input-field"><span>物理布局</span><select value={storageLayout} onChange={(event) => setStorageLayout(event.target.value)}><option value="">暂不配置</option><option value="daily">单日文件</option><option value="yearly_with_delta">年度主文件 + 日增量</option><option value="snapshot">完整快照</option></select></label>
+            <label className="input-field"><span>逻辑分区字段</span><input value={partitionField} disabled={!storageLayout || storageLayout === "snapshot"} onChange={(event) => setPartitionField(event.target.value)} placeholder="trade_date" /></label>
+          </div>
+          {storageLayout === "yearly_with_delta" && <div className="operation-help">每日审核通过后立即发布为增量 Parquet，后续按年度合并；Catalog 仍逐日记录覆盖。</div>}
+        </div>
+      </section>
+
       <section className="form-section fields-section">
-        <div className="section-number">03</div><div className="section-intro"><h2>字段定义</h2><p>描述字段类型、语义、可空性与主键。</p></div>
+        <div className="section-number">04</div><div className="section-intro"><h2>字段定义</h2><p>描述字段类型、语义、可空性与主键。</p></div>
         <div className="form-content">
           <div className="fields-table">
             <div className="field-row field-head"><span>主键</span><span>字段名</span><span>数据类型</span><span>字段说明</span><span>原始字段</span><span>单位</span><span>可空</span><span /></div>
@@ -488,7 +512,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
 
       <section className="detail-grid">
         <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
-        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div>{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
+        <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
       <section className="panel fields-detail">

@@ -1,6 +1,7 @@
-import csv
 import json
 from pathlib import Path
+
+import pyarrow.parquet as pq
 
 from ......models import DatasetSchemaVersion
 
@@ -10,17 +11,13 @@ def review(source: Path, schema: DatasetSchemaVersion, report_path: Path) -> boo
     primary_key = schema.primary_key_fields
     errors: list[dict] = []
     seen_keys: set[tuple[str, ...]] = set()
-    row_count = 0
-
-    with source.open(encoding="utf-8", newline="") as input_file:
-        reader = csv.DictReader(input_file)
-        actual_fields = reader.fieldnames or []
-        missing = [field for field in expected_fields if field not in actual_fields]
-        if missing:
-            errors.append({"rule": "required_fields", "missing": missing})
-
-        for line_number, row in enumerate(reader, start=2):
-            row_count += 1
+    table = pq.read_table(source)
+    row_count = table.num_rows
+    missing = [field for field in expected_fields if field not in table.column_names]
+    if missing:
+        errors.append({"rule": "required_fields", "missing": missing})
+    else:
+        for line_number, row in enumerate(table.select(primary_key).to_pylist(), start=1):
             key = tuple((row.get(name) or "").strip() for name in primary_key)
             if any(not value for value in key):
                 errors.append({"rule": "primary_key_not_null", "line": line_number})

@@ -397,6 +397,25 @@ Parquet 不适合原地修改。发生历史修订时，可选策略包括：
 
 具体策略模型尚未最终确定，实现时应保持可扩展，不要先写死为单一方案。
 
+### 11.1 数据集存储策略
+
+数据集启用前应明确存储策略，至少包括逻辑分区字段、物理布局、写入策略和可选合并策略。
+采集器统一产生 staging Parquet，最终文件组织由 Storage Writer 决定。当前支持的策略模型：
+
+```text
+daily                单日 Parquet
+yearly_with_delta    年度主文件 + 日增量 Parquet
+snapshot             完整快照 Parquet
+```
+
+TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布局和
+`replace_partition` 写入。每日数据审核通过后立即发布为 delta，Catalog 逐日登记覆盖。
+年度合并尚未实现；实践表明，合并前需要把物理文件实体与逻辑分区记录分开建模，因为
+一个年度 Parquet 会同时承载多个逻辑分区，不能在每个分区上重复保存文件大小和校验和。
+
+供应商原始文件只作为运行期临时文件。完成 Parquet 转换并记录来源元数据后删除；失败时
+可短期保留并由清理策略回收。
+
 ## 12. 发布原则
 
 - 正式文件写入成功后，才更新 Catalog；
@@ -572,8 +591,14 @@ quantstone_data/
 - 采集任务列表与创建页面；
 - 手动文件选择、上传和 staging 状态展示；
 - 后端自动化测试和前端生产构建。
+- TuShare daily 按交易日生成 staging Parquet；
+- 日 K Schema、主键、交易日期和空数据审核；
+- 审核通过后发布到年度 delta 目录；
+- Collection Run 与 CatalogPartition 基础记录；
+- 数据集存储策略配置与前端展示。
 
-当前实现并不包含真实采集器、文件解析与校验、Catalog、Parquet 写入或 SDK 数据读取。`STAGED` 只表示文件安全进入临时区，不表示数据已经入库完成。
+当前实现只对 TuShare daily 走通了基础 Parquet、审核、发布和 Catalog 闭环。年度合并、
+权威交易日历、通用 Planner、原子发布恢复和 SDK 读取仍未实现。
 
 ## 18. 前端产品约定
 

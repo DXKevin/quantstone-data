@@ -37,6 +37,7 @@ class Dataset(Base):
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     current_schema_version: Mapped[int] = mapped_column(Integer, default=1)
     collection_bindings: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    storage_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -113,3 +114,40 @@ class CollectionJob(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
+
+class CollectionRun(Base):
+    __tablename__ = "collection_runs"
+    __table_args__ = (UniqueConstraint("job_id", "partition_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("collection_jobs.id", ondelete="CASCADE"), index=True
+    )
+    partition_key: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    staged_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    published_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    row_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class CatalogPartition(Base):
+    __tablename__ = "catalog_partitions"
+    __table_args__ = (UniqueConstraint("dataset_id", "partition_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT"), index=True
+    )
+    partition_key: Mapped[str] = mapped_column(String(128), index=True)
+    file_path: Mapped[str] = mapped_column(String(1024))
+    row_count: Mapped[int] = mapped_column(BigInteger)
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    collection_run_id: Mapped[str] = mapped_column(String(36))
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

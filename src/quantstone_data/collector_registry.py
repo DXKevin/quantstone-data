@@ -1,5 +1,10 @@
 from dataclasses import dataclass
 
+from .datasets.tushare.cn.stock.daily.collector import (
+    collect_daily_incremental,
+    collect_daily_initial,
+)
+from .datasets.tushare.cn.stock.daily.definition import DATASET_ID as DAILY_DATASET_ID
 from .datasets.tushare.cn.stock.stock_basic.collector import (
     collect_incremental,
     collect_initial,
@@ -54,14 +59,41 @@ STOCK_LIST_INCREMENTAL = CollectorOperation(
     function=collect_incremental,
 )
 
+DATE_RANGE_PARAMETERS = (
+    CollectorParameter("start_date", "date", True, "采集开始日期"),
+    CollectorParameter("end_date", "date", True, "采集结束日期"),
+)
+
+DAILY_INITIAL = CollectorOperation(
+    key="daily_initial",
+    name="日 K 首次采集",
+    description="按交易日批次首次采集 TuShare daily 数据。",
+    purpose="initial",
+    parameters=DATE_RANGE_PARAMETERS,
+    datasets=(DAILY_DATASET_ID,),
+    function=collect_daily_initial,
+)
+
+DAILY_INCREMENTAL = CollectorOperation(
+    key="daily_incremental",
+    name="日 K 增量更新",
+    description="按交易日批次补充 TuShare daily 数据。",
+    purpose="incremental",
+    parameters=DATE_RANGE_PARAMETERS,
+    datasets=(DAILY_DATASET_ID,),
+    function=collect_daily_incremental,
+)
+
 COLLECTORS = {
-    "tushare": CollectorDefinition(
-        key="tushare",
-        name="TuShare 采集器",
-        description="通过 TuShare Pro API 采集数据，不同接口作为独立操作执行。",
+    "tushare_cn_stock": CollectorDefinition(
+        key="tushare_cn_stock",
+        name="TuShare A股采集器",
+        description="通过 TuShare Pro API 采集中国内地 A 股数据。",
         operations={
             STOCK_LIST_INITIAL.key: STOCK_LIST_INITIAL,
             STOCK_LIST_INCREMENTAL.key: STOCK_LIST_INCREMENTAL,
+            DAILY_INITIAL.key: DAILY_INITIAL,
+            DAILY_INCREMENTAL.key: DAILY_INCREMENTAL,
         },
     )
 }

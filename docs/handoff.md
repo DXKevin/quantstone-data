@@ -16,7 +16,7 @@
 
 ## 当前状态
 
-更新时间：2026-11-17  
+更新时间：2026-11-18
 当前工作 Agent：无，等待下一位 Agent 接手  
 工作分支：`main`  
 远程仓库：`git@github.com:DXKevin/quantstone-data.git`
@@ -49,7 +49,13 @@
 - 前端数据集表单、详情和采集任务清楚显示采集器绑定；
 - 数据集改为按任务目的绑定具体 operation；首次和增量可以调用不同函数；
 - operation 直接关联 Python 函数，对外模型不增加 handler 字段；
-- 后端现有 10 个测试通过；
+- 引入 PyArrow，数据集物理输出统一为 Parquet；
+- 实现采集器入口/出口基础协议：Context、Result 和 DatasetArtifact；
+- TuShare daily 支持按交易日采集、Parquet 转换和专用审核；
+- 实现 Collection Run、日增量发布和 CatalogPartition；
+- 数据集支持逻辑分区、布局、写入和合并策略；
+- 真实采集 2024-01-02 日 K 成功，共 5,329 行；
+- 后端现有 12 个测试通过；
 - 前端生产构建通过；
 - Ruff 检查通过。
 
@@ -62,6 +68,8 @@
 - 数据质量报告；
 - Parquet 文件写入；
 - Data Catalog；
+- 物理文件实体与逻辑分区的多对一 Catalog 模型；
+- 年度主文件合并；
 - 原子发布；
 - 数据读取 SDK；
 - 概览页和覆盖热力图。
@@ -72,11 +80,11 @@
 
 建议第一步包含：
 
-1. 建立 Collection Run 与 Dataset Output Run，支持一个操作产出多个数据集；
-2. 为采集任务增加由操作定义驱动的通用参数；
-3. 为供应商调用增加限流、重试和调用追溯记录；
-4. 将审核报告纳入数据库追溯模型并提供查询接口；
-5. 之后再实现发布、Catalog 和正式文件写入。
+1. 将物理 CatalogFile 与逻辑 CatalogPartition 分开，支持年度文件承载多个交易日；
+2. 实现年度 delta compaction；
+3. 引入权威 A 股交易日历，替换当前工作日临时规划；
+4. 为操作参数、限流、重试和来源追溯建立通用执行框架；
+5. 再扩展联合采集和 SDK 读取。
 
 不要在这一阶段接入 TuShare 密钥、百度网盘账号或真实 L2 文件。
 
@@ -92,8 +100,35 @@
 - stock_basic 首版只采集当前上市状态 `L`；完整状态需要任务参数和限流调度；
 - 文件分区、历史修订和 Catalog 表结构仍属于待定设计；
 - 增量采集不能最终实现为“最大日期加一天”，必须由交易日历和 Catalog 缺口共同决定。
+- daily 当前按周一至周五生成批次，尚不能识别法定节假日，宽范围真实采集前必须接入交易日历；
+- daily 已发布日增量，但年度合并尚未实现；
 
 ## 最近一次交接记录
+
+### 2026-11-18 — Codex
+
+完成：
+
+- 以 `tushare.cn.stock.daily` 跑通单日真实采集闭环；
+- 新增 Parquet 协议、Collection Run、审核、delta 发布和 CatalogPartition；
+- 更新真实 daily 数据契约并配置 `yearly_with_delta` 存储策略；
+- 将旧 stock_basic 输出从 CSV 改为 Parquet。
+
+验证：
+
+- 真实采集 2024-01-02：5,329 行，Parquet 243,312 字节，审核和 Catalog 登记成功；
+- `pytest`：12 个测试通过；
+- `ruff check .`：通过；
+- `npm run build`：通过。
+
+下一步：
+
+- 拆分物理文件和逻辑分区 Catalog，并实现年度合并与权威交易日历。
+
+遗留问题：
+
+- 当前 Planner 只排除周末，尚未排除 A 股节假日；
+- 跨多个交易日执行会受到 TuShare 账号限频，需要调度与重试。
 
 ### 2026-11-17 — Codex
 

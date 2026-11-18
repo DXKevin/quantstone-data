@@ -39,6 +39,8 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             connection.execute(
                 text("ALTER TABLE datasets ADD COLUMN collection_bindings JSON DEFAULT '[]'")
             )
+        if "storage_policy" not in dataset_columns:
+            connection.execute(text("ALTER TABLE datasets ADD COLUMN storage_policy JSON"))
         if "collector_operation" not in job_columns:
             connection.execute(
                 text("ALTER TABLE collection_jobs ADD COLUMN collector_operation VARCHAR(128)")
@@ -46,9 +48,9 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
         connection.execute(
             text(
                 "UPDATE datasets SET collection_bindings = "
-                "'[ {\"purpose\":\"initial\",\"collector_key\":\"tushare\","
+                "'[ {\"purpose\":\"initial\",\"collector_key\":\"tushare_cn_stock\","
                 "\"operation\":\"stock_list_initial\"},"
-                "{\"purpose\":\"incremental\",\"collector_key\":\"tushare\","
+                "{\"purpose\":\"incremental\",\"collector_key\":\"tushare_cn_stock\","
                 "\"operation\":\"stock_list_incremental\"} ]' "
                 "WHERE id = 'tushare.cn.stock.stock_basic' "
                 "AND (collection_bindings IS NULL OR collection_bindings = '[]')"
@@ -56,7 +58,7 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
         )
         connection.execute(
             text(
-                "UPDATE collection_jobs SET collector_key = 'tushare', "
+                "UPDATE collection_jobs SET collector_key = 'tushare_cn_stock', "
                 "collector_operation = CASE "
                 "WHEN operation = 'incremental' THEN 'stock_list_incremental' "
                 "ELSE 'stock_list_initial' END "
@@ -64,6 +66,20 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "AND input_method = 'collector' "
                 "AND (collector_operation IS NULL "
                 "OR collector_operation IN ('stock_basic', 'tushare.stock_basic'))"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE datasets SET collection_bindings = "
+                "REPLACE(collection_bindings, '\"collector_key\": \"tushare\"', "
+                "'\"collector_key\": \"tushare_cn_stock\"') "
+                "WHERE collection_bindings LIKE '%\"collector_key\": \"tushare\"%'"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE collection_jobs SET collector_key = 'tushare_cn_stock' "
+                "WHERE collector_key = 'tushare'"
             )
         )
 

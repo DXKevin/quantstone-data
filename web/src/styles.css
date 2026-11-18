@@ -158,6 +158,8 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .job-status-created { background: #e9eff7; color: #42668f; }
 .job-status-review_passed { background: #e5f5ed; color: #087851; }
 .job-status-review_failed { background: #fff0e8; color: #a44e20; }
+.job-status-succeeded { background: #dcf4e7; color: #087851; }
+.job-status-failed { background: #fde8e8; color: #a33b3b; }
 .job-actions { display: flex; gap: 6px; }
 .review-summary { display: grid; grid-template-columns: 1.5fr 1.2fr .7fr .7fr auto; gap: 18px; align-items: center; margin: -8px 0 18px; padding: 14px 16px; border: 1px solid #bcdaca; background: #f2faf6; font-size: 11px; }
 .review-summary div { display: flex; flex-direction: column; gap: 3px; }

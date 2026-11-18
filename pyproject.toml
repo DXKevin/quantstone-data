@@ -12,6 +12,7 @@ license = { file = "LICENSE" }
 dependencies = [
   "fastapi>=0.115,<1",
   "python-multipart>=0.0.20,<1",
+  "pyarrow>=18,<24",
   "sqlalchemy>=2.0,<3",
   "uvicorn[standard]>=0.34,<1",
 ]

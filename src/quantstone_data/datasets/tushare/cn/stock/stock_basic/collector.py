@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import csv
 import json
 import os
 from collections.abc import Iterable
 from pathlib import Path
 from urllib.request import Request, urlopen
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .definition import DEFAULT_LIST_STATUSES
 
@@ -64,10 +66,9 @@ def collect(
         rows.extend(call_api(token, list_status, fields))
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("x", encoding="utf-8", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+    schema = pa.schema([pa.field(name, pa.string()) for name in fields])
+    normalized = [{name: row.get(name) for name in fields} for row in rows]
+    pq.write_table(pa.Table.from_pylist(normalized, schema=schema), target, compression="zstd")
     return len(rows)
 
 

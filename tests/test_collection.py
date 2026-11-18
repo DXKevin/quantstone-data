@@ -156,12 +156,12 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         "collection_bindings": [
             {
                 "purpose": "initial",
-                "collector_key": "tushare",
+                "collector_key": "tushare_cn_stock",
                 "operation": "stock_list_initial",
             },
             {
                 "purpose": "incremental",
-                "collector_key": "tushare",
+                "collector_key": "tushare_cn_stock",
                 "operation": "stock_list_incremental",
             },
         ],
@@ -214,7 +214,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             },
         )
         assert created.status_code == 201
-        assert created.json()["collector_key"] == "tushare"
+        assert created.json()["collector_key"] == "tushare_cn_stock"
         assert created.json()["collector_operation"] == "stock_list_initial"
 
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
@@ -228,6 +228,94 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert review_response.status_code == 200
     assert review_response.json()["row_count"] == 1
     staged_file = tmp_path / "data" / body["staged_path"]
-    assert "000001.SZ" in staged_file.read_text(encoding="utf-8")
+    assert staged_file.suffix == ".parquet"
     report = staged_file.with_name("review.json").read_text(encoding="utf-8")
     assert '"passed": true' in report
+
+
+def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:
+    payload = {
+        "id": "tushare.cn.stock.daily",
+        "provider": "tushare",
+        "region": "cn",
+        "instrument": "stock",
+        "dataset_name": "daily",
+        "market": None,
+        "display_name": "A股日K",
+        "description": "TuShare daily 接口",
+        "collection_bindings": [
+            {
+                "purpose": "initial",
+                "collector_key": "tushare_cn_stock",
+                "operation": "daily_initial",
+            }
+        ],
+        "storage_policy": {
+            "logical_partition_field": "trade_date",
+            "layout": "yearly_with_delta",
+            "write_strategy": "replace_partition",
+            "compaction": "yearly",
+        },
+        "primary_key": ["ts_code", "trade_date"],
+        "time_field": "trade_date",
+        "fields": [
+            {
+                "name": "ts_code",
+                "data_type": "string",
+                "nullable": False,
+                "description": "TS代码",
+            },
+            {
+                "name": "trade_date",
+                "data_type": "date",
+                "nullable": False,
+                "description": "交易日期",
+            },
+            {
+                "name": "close",
+                "data_type": "float64",
+                "nullable": False,
+                "description": "收盘价",
+            },
+        ],
+    }
+
+    def fake_daily(_token: str, trade_date: str, _fields: list[str]) -> list[dict]:
+        return [
+            {"ts_code": "000001.SZ", "trade_date": trade_date, "close": 10.5},
+            {"ts_code": "600000.SH", "trade_date": trade_date, "close": 12.3},
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.datasets.tushare.cn.stock.daily.collector._call_daily",
+        fake_daily,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=payload).status_code == 201
+        assert client.post("/api/v1/datasets/tushare.cn.stock.daily/activate").status_code == 200
+        created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.daily",
+                "operation": "initial",
+                "input_method": "collector",
+                "start_date": "2026-11-18",
+                "end_date": "2026-11-18",
+            },
+        )
+        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily"
+        )
+
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "succeeded"
+    assert runs.json()[0]["row_count"] == 2
+    assert runs.json()[0]["status"] == "succeeded"
+    assert catalog.json()[0]["partition_key"] == "2026-11-18"
+    published = tmp_path / "data" / catalog.json()[0]["file_path"]
+    assert published.suffix == ".parquet"
+    assert published.is_file()

@@ -22,6 +22,8 @@ class CollectionJobStatus(StrEnum):
     STAGED = "staged"
     REVIEW_PASSED = "review_passed"
     REVIEW_FAILED = "review_failed"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
 
 
 class CollectionJobCreate(BaseModel):

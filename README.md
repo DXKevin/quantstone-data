@@ -80,9 +80,11 @@ POST   /api/v1/datasets/{dataset_id}/activate
 DELETE /api/v1/datasets/{dataset_id}
 GET    /api/v1/collectors
 GET    /api/v1/collectors/{collector_key}/operations/{operation_key}
+GET    /api/v1/catalog/partitions?dataset_id=...
 POST   /api/v1/collection-jobs
 GET    /api/v1/collection-jobs
 GET    /api/v1/collection-jobs/{job_id}
+GET    /api/v1/collection-jobs/{job_id}/runs
 POST   /api/v1/collection-jobs/{job_id}/execute
 POST   /api/v1/collection-jobs/{job_id}/file
 GET    /health
@@ -94,6 +96,9 @@ GET    /health
 或进程环境变量读取 `TUSHARE_TOKEN`，密钥文件不会提交到 Git。执行任务后，
 CSV 数据和 `review.json` 审核报告会保存在外部数据根目录的 staging 区；审核通过
 仍不代表已经发布为正式数据。
+
+`tushare.cn.stock.daily` 已走通第一个 Parquet 纵向闭环：按交易日建立 Run、写入
+staging Parquet、执行主键和分区审核、发布为日增量文件，并在 Catalog 登记逻辑分区。
 
 ## 项目状态
 

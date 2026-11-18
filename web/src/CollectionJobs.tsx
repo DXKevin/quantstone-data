@@ -37,6 +37,8 @@ const statusLabels = {
   staged: "已进入临时区",
   review_passed: "审核通过",
   review_failed: "审核异常",
+  succeeded: "已发布",
+  failed: "执行失败",
 };
 
 export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[] }) {
@@ -206,12 +208,15 @@ function CreateCollectionJob(props: {
   const [useDateRange, setUseDateRange] = useState(false);
   const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
   const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
+  const requiresDateRange =
+    inputMethod === "collector" &&
+    selectedDataset?.storage_policy?.logical_partition_field === "trade_date";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     if (!datasetId) return setError("没有可用的已启用数据集。");
-    if (useDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
+    if ((useDateRange || requiresDateRange) && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
     if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
 
@@ -219,8 +224,8 @@ function CreateCollectionJob(props: {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: useDateRange ? startDate : null,
-      end_date: useDateRange ? endDate : null,
+      start_date: useDateRange || requiresDateRange ? startDate : null,
+      end_date: useDateRange || requiresDateRange ? endDate : null,
       collector_key: null,
     };
 
@@ -261,8 +266,8 @@ function CreateCollectionJob(props: {
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>
-          {useDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
+          {!requiresDateRange && <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>}
+          {(useDateRange || requiresDateRange) && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
         </div>
       </section>
 

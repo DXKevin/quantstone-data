@@ -14,7 +14,7 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
 
     assert response.status_code == 200
     collector = response.json()[0]
-    assert collector["key"] == "tushare"
+    assert collector["key"] == "tushare_cn_stock"
     operation = collector["operations"][0]
     assert operation["key"] == "stock_list_initial"
     assert operation["purpose"] == "initial"

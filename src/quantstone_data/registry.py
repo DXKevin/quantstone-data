@@ -41,6 +41,7 @@ def serialize_dataset(dataset: Dataset) -> DatasetRead:
         display_name=dataset.display_name,
         description=dataset.description,
         collection_bindings=dataset.collection_bindings,
+        storage_policy=dataset.storage_policy,
         status=DatasetStatus(dataset.status),
         current_schema_version=dataset.current_schema_version,
         created_at=dataset.created_at,
@@ -74,6 +75,9 @@ def create_dataset(payload: DatasetCreate, session: SessionDep) -> DatasetRead:
         collection_bindings=[
             binding.model_dump(mode="json") for binding in payload.collection_bindings
         ],
+        storage_policy=(
+            payload.storage_policy.model_dump(mode="json") if payload.storage_policy else None
+        ),
     )
     schema = DatasetSchemaVersion(
         version=1,
@@ -132,6 +136,9 @@ def update_draft_dataset(
     dataset.collection_bindings = [
         binding.model_dump(mode="json") for binding in payload.collection_bindings
     ]
+    dataset.storage_policy = (
+        payload.storage_policy.model_dump(mode="json") if payload.storage_policy else None
+    )
     schema.primary_key = ",".join(payload.primary_key)
     schema.time_field = payload.time_field
     for field in list(schema.fields):

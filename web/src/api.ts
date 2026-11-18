@@ -7,7 +7,16 @@ export type CollectionJobStatus =
   | "awaiting_file"
   | "staged"
   | "review_passed"
-  | "review_failed";
+  | "review_failed"
+  | "succeeded"
+  | "failed";
+
+export interface DatasetStoragePolicy {
+  logical_partition_field: string | null;
+  layout: "daily" | "yearly_with_delta" | "snapshot";
+  write_strategy: "append" | "replace_partition" | "replace_snapshot";
+  compaction: "yearly" | null;
+}
 
 export interface DatasetSummary {
   id: string;
@@ -19,6 +28,7 @@ export interface DatasetSummary {
   status: DatasetStatus;
   current_schema_version: number;
   collection_bindings: DatasetCollectionBinding[];
+  storage_policy: DatasetStoragePolicy | null;
 }
 
 export interface DatasetField {
@@ -55,6 +65,7 @@ export interface DatasetCreatePayload {
   display_name: string;
   description: string | null;
   collection_bindings: DatasetCollectionBinding[];
+  storage_policy: DatasetStoragePolicy | null;
   primary_key: string[];
   time_field: string | null;
   fields: Array<{
@@ -72,6 +83,7 @@ export type DatasetUpdatePayload = Pick<
   | "display_name"
   | "description"
   | "collection_bindings"
+  | "storage_policy"
   | "primary_key"
   | "time_field"
   | "fields"

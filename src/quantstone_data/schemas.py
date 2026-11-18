@@ -27,6 +27,13 @@ class DatasetCollectionBinding(BaseModel):
     operation: str = Field(min_length=1, max_length=128)
 
 
+class DatasetStoragePolicy(BaseModel):
+    logical_partition_field: str | None = None
+    layout: str = Field(pattern=r"^(daily|yearly_with_delta|snapshot)$")
+    write_strategy: str = Field(pattern=r"^(append|replace_partition|replace_snapshot)$")
+    compaction: str | None = Field(default=None, pattern=r"^yearly$")
+
+
 class DatasetFieldCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*$")
     data_type: str = Field(min_length=1, max_length=64)
@@ -46,6 +53,7 @@ class DatasetCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
+    storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
@@ -80,6 +88,7 @@ class DatasetUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
+    storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
     time_field: str | None = None
     fields: list[DatasetFieldCreate] = Field(min_length=1)
@@ -132,6 +141,7 @@ class DatasetRead(BaseModel):
     display_name: str
     description: str | None
     collection_bindings: list[DatasetCollectionBinding]
+    storage_policy: DatasetStoragePolicy | None
     status: DatasetStatus
     current_schema_version: int
     created_at: datetime
@@ -151,3 +161,4 @@ class DatasetSummary(BaseModel):
     status: DatasetStatus
     current_schema_version: int
     collection_bindings: list[DatasetCollectionBinding]
+    storage_policy: DatasetStoragePolicy | None

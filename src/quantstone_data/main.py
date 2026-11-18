@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from .catalog import router as catalog_router
 from .collection import router as collection_router
 from .collectors_api import router as collectors_router
 from .database import (
@@ -33,6 +34,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
     app.state.data_root = resolved_data_root
     app.include_router(registry_router, prefix="/api/v1")
     app.include_router(collection_router, prefix="/api/v1")
+    app.include_router(catalog_router, prefix="/api/v1")
     app.include_router(collectors_router, prefix="/api/v1")
 
     @app.get("/health", tags=["system"])
