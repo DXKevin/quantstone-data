@@ -458,6 +458,16 @@ TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布�
 移动文件并更新 Catalog。发布代码按存储策略组织在 `publishing/`，不为每个数据集复制一套
 发布器。当前已拆出路径解析、Catalog 写入和发布服务；完整的跨文件系统原子恢复仍待实现。
 
+### 12.1 结构化日志
+
+应用日志写入 `<data_root>/logs/application.log`，采用 JSON Lines 和大小轮转。所有包含
+`job_id` 的记录同时写入 `<data_root>/logs/collection/<job_id>.log`，便于逐任务排查。
+采集、审核、发布、文件暂存、API 写请求和未处理异常都应记录明确的事件名称及必要上下文。
+Token、密码、Cookie、Authorization 等敏感字段在格式化阶段统一脱敏，禁止写入日志。
+
+日志用于详细运行诊断；数据库任务、Run 和 Catalog 记录用于业务状态与审计，两者不能互相
+替代。
+
 ## 13. 状态模型
 
 ### 13.1 数据集状态

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from ..logging_config import log_event
 from ..models import CatalogPartition, CollectionRun
 from .catalog_writer import upsert_partition
 from .path_resolver import resolve_partition_target
@@ -53,4 +54,15 @@ def publish_partition(
     run.published_path = relative_target
     run.staged_path = None
     run.status = "succeeded"
+    log_event(
+        "partition_published",
+        job_id=run.job_id,
+        run_id=run.id,
+        dataset_id=dataset_id,
+        partition_key=partition_key,
+        file_path=relative_target,
+        row_count=row_count,
+        size_bytes=target.stat().st_size,
+        replaced_path=previous_path,
+    )
     return catalog

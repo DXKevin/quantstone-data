@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import shutil
 from datetime import date, timedelta
 from pathlib import Path
@@ -21,6 +22,7 @@ from .collector_registry import get_operation, validate_operation_parameters
 from .collectors.tushare_cn_stock.definition import DAILY_DATASET_ID
 from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
 from .database import get_session
+from .logging_config import log_event
 from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset, DatasetSchemaVersion
 from .publishing import publish_partition
 from .reviewer_registry import review_dataset
@@ -109,6 +111,15 @@ def _execute_daily_job(
         run_directory = data_root / "staging" / job.id / run.id
         context = CollectionContext(run.id, run_directory, token)
         try:
+            log_event(
+                "collection_run_started",
+                job_id=job.id,
+                run_id=run.id,
+                dataset_id=job.dataset_id,
+                collector=job.collector_key,
+                operation=job.collector_operation,
+                partition_key=partition_key,
+            )
             result = operation.function(
                 context,
                 {"trade_date": partition_key},
@@ -117,6 +128,14 @@ def _execute_daily_job(
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
             artifact = result.outputs[job.dataset_id][0]
+            log_event(
+                "collection_artifact_staged",
+                job_id=job.id,
+                run_id=run.id,
+                dataset_id=job.dataset_id,
+                partition_key=partition_key,
+                row_count=artifact.row_count,
+            )
             report = review_dataset(
                 job.dataset_id,
                 ReviewContext(artifact.path, schema, trade_date),
@@ -125,6 +144,15 @@ def _execute_daily_job(
             reports.append(report)
             run.staged_path = artifact.path.relative_to(data_root).as_posix()
             run.row_count = artifact.row_count
+            log_event(
+                "review_completed",
+                job_id=job.id,
+                run_id=run.id,
+                dataset_id=job.dataset_id,
+                partition_key=partition_key,
+                passed=report["passed"],
+                error_count=report["error_count"],
+            )
             if not report["passed"]:
                 run.status = "review_failed"
                 job.status = CollectionJobStatus.REVIEW_FAILED.value
@@ -148,6 +176,16 @@ def _execute_daily_job(
             run.error = str(error)
             job.status = CollectionJobStatus.FAILED.value
             session.commit()
+            log_event(
+                "collection_run_failed",
+                level=logging.ERROR,
+                exc_info=True,
+                job_id=job.id,
+                run_id=run.id,
+                dataset_id=job.dataset_id,
+                partition_key=partition_key,
+                error=str(error),
+            )
             raise
 
     report_path = data_root / "staging" / job.id / "review.json"
@@ -168,6 +206,14 @@ def _execute_daily_job(
     job.staged_path = report_path.relative_to(data_root).as_posix()
     session.commit()
     session.refresh(job)
+    log_event(
+        "collection_job_completed",
+        job_id=job.id,
+        dataset_id=job.dataset_id,
+        status=job.status,
+        row_count=aggregate["row_count"],
+        error_count=aggregate["error_count"],
+    )
     return serialize_job(job)
 
 
@@ -208,6 +254,15 @@ def _execute_snapshot_job(
     run_directory = data_root / "staging" / job.id / run.id
     report_path = data_root / "staging" / job.id / "review.json"
     try:
+        log_event(
+            "collection_run_started",
+            job_id=job.id,
+            run_id=run.id,
+            dataset_id=job.dataset_id,
+            collector=job.collector_key,
+            operation=job.collector_operation,
+            partition_key="snapshot",
+        )
         result = operation.function(
             CollectionContext(run.id, run_directory, load_token()),
             job.parameters,
@@ -219,6 +274,14 @@ def _execute_snapshot_job(
         if len(artifacts) != 1:
             raise CollectionError("snapshot collection must produce exactly one artifact")
         artifact = artifacts[0]
+        log_event(
+            "collection_artifact_staged",
+            job_id=job.id,
+            run_id=run.id,
+            dataset_id=job.dataset_id,
+            partition_key="snapshot",
+            row_count=artifact.row_count,
+        )
         report = review_dataset(
             job.dataset_id,
             ReviewContext(artifact.path, schema),
@@ -230,6 +293,15 @@ def _execute_snapshot_job(
         )
         run.staged_path = artifact.path.relative_to(data_root).as_posix()
         run.row_count = artifact.row_count
+        log_event(
+            "review_completed",
+            job_id=job.id,
+            run_id=run.id,
+            dataset_id=job.dataset_id,
+            partition_key="snapshot",
+            passed=report["passed"],
+            error_count=report["error_count"],
+        )
         if not report["passed"]:
             run.status = "review_failed"
             job.status = CollectionJobStatus.REVIEW_FAILED.value
@@ -249,18 +321,46 @@ def _execute_snapshot_job(
         job.staged_path = report_path.relative_to(data_root).as_posix()
         session.commit()
         session.refresh(job)
+        log_event(
+            "collection_job_completed",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+            status=job.status,
+            row_count=report["row_count"],
+            error_count=report["error_count"],
+        )
         return serialize_job(job)
     except CollectionError as error:
         run.status = "failed"
         run.error = str(error)
         job.status = CollectionJobStatus.FAILED.value
         session.commit()
+        log_event(
+            "collection_run_failed",
+            level=logging.ERROR,
+            exc_info=True,
+            job_id=job.id,
+            run_id=run.id,
+            dataset_id=job.dataset_id,
+            partition_key="snapshot",
+            error=str(error),
+        )
         raise HTTPException(status_code=502, detail=str(error)) from error
     except Exception as error:
         run.status = "failed"
         run.error = str(error)
         job.status = CollectionJobStatus.FAILED.value
         session.commit()
+        log_event(
+            "collection_run_failed",
+            level=logging.ERROR,
+            exc_info=True,
+            job_id=job.id,
+            run_id=run.id,
+            dataset_id=job.dataset_id,
+            partition_key="snapshot",
+            error=str(error),
+        )
         raise
 
 
@@ -331,6 +431,15 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
     session.add(job)
     session.commit()
     session.refresh(job)
+    log_event(
+        "collection_job_created",
+        job_id=job.id,
+        dataset_id=job.dataset_id,
+        operation=job.operation,
+        input_method=job.input_method,
+        collector=job.collector_key,
+        collector_operation=job.collector_operation,
+    )
     return serialize_job(job)
 
 
@@ -351,6 +460,15 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
         raise HTTPException(status_code=409, detail="dataset has no executable collector")
     if len(operation.datasets) > 1:
         raise HTTPException(status_code=501, detail="joint collection execution is not implemented")
+
+    log_event(
+        "collection_job_started",
+        job_id=job.id,
+        dataset_id=job.dataset_id,
+        operation=job.operation,
+        collector=job.collector_key,
+        collector_operation=job.collector_operation,
+    )
 
     dataset = session.scalar(
         select(Dataset)
@@ -409,8 +527,24 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
             job.status = CollectionJobStatus.REVIEW_FAILED.value
         session.commit()
         session.refresh(job)
+        log_event(
+            "review_completed",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+            passed=passed,
+            error_count=report["error_count"],
+            row_count=report["row_count"],
+        )
     except (CollectionError, OSError) as error:
         session.rollback()
+        log_event(
+            "collection_job_failed",
+            level=logging.ERROR,
+            exc_info=True,
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+            error=str(error),
+        )
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     return serialize_job(job)
@@ -493,6 +627,14 @@ async def stage_import_file(
         job.status = CollectionJobStatus.STAGED.value
         session.commit()
         session.refresh(job)
+        log_event(
+            "file_staged",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+            file_name=file_name,
+            size_bytes=size,
+            sha256=digest.hexdigest(),
+        )
     except FileExistsError as error:
         raise HTTPException(status_code=409, detail="staging file already exists") from error
     except HTTPException:
