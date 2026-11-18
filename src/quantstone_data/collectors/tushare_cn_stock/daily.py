@@ -9,7 +9,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
-from .stock_basic import API_URL, CollectionError
+from .stock_basic import API_URL, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.daily"
 
@@ -57,7 +57,7 @@ def _call_daily(token: str, trade_date: str, fields: list[str]) -> list[dict]:
     with urlopen(request, timeout=60) as response:  # noqa: S310
         body = json.load(response)
     if body.get("code") != 0:
-        raise CollectionError(body.get("msg") or "TuShare daily 接口调用失败")
+        raise_api_error(body, "TuShare daily 接口调用失败")
     data = body.get("data") or {}
     returned_fields = data.get("fields") or []
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]

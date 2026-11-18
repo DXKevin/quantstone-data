@@ -3,6 +3,14 @@ from pathlib import Path
 from typing import Any
 
 
+class RateLimitExceeded(RuntimeError):
+    """供应商返回限流错误；由执行框架等待后重试。"""
+
+    def __init__(self, message: str, retry_after: float = 60.0) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 @dataclass(frozen=True)
 class CollectionContext:
     run_id: str

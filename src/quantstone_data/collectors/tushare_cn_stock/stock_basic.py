@@ -4,17 +4,33 @@ import json
 import os
 from collections.abc import Iterable
 from pathlib import Path
+from typing import NoReturn
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ...collection_protocol import RateLimitExceeded
+
 API_URL = "https://api.tushare.pro"
 DEFAULT_LIST_STATUSES = ("L",)
+RATE_LIMIT_CODES = {40203, -40203}
+RATE_LIMIT_KEYWORDS = ("每分钟", "每小时", "频率", "超过限制", "访问次数")
+DEFAULT_RETRY_AFTER = 60.0
 
 
 class CollectionError(RuntimeError):
     pass
+
+
+def raise_api_error(body: dict, fallback: str) -> NoReturn:
+    """把 TuShare 错误响应转换为异常；限流错误单独标记以便重试。"""
+    message = body.get("msg") or fallback
+    if body.get("code") in RATE_LIMIT_CODES or any(
+        keyword in message for keyword in RATE_LIMIT_KEYWORDS
+    ):
+        raise RateLimitExceeded(message, retry_after=DEFAULT_RETRY_AFTER)
+    raise CollectionError(message)
 
 
 def load_token(project_root: Path | None = None) -> str:
@@ -48,7 +64,7 @@ def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
     with urlopen(request, timeout=60) as response:  # noqa: S310
         body = json.load(response)
     if body.get("code") != 0:
-        raise CollectionError(body.get("msg") or "TuShare 接口调用失败")
+        raise_api_error(body, "TuShare 接口调用失败")
     data = body.get("data") or {}
     returned_fields = data.get("fields") or []
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]

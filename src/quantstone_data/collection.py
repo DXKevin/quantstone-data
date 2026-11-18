@@ -3,6 +3,7 @@ import json
 import logging
 import shutil
 from datetime import date, timedelta
+from functools import partial
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -23,6 +24,7 @@ from .collector_registry import get_operation, validate_operation_parameters
 from .collectors.tushare_cn_stock.definition import DAILY_DATASET_ID
 from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
 from .database import get_session
+from .execution import run_operation
 from .logging_config import log_event
 from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset, DatasetSchemaVersion
 from .publishing import publish_partition
@@ -176,10 +178,10 @@ def _execute_daily_job(
                 operation=job.collector_operation,
                 partition_key=partition_key,
             )
-            result = operation.function(
-                context,
-                {"trade_date": partition_key},
-                fields,
+            result = run_operation(
+                job.collector_key or "unknown",
+                operation,
+                partial(operation.function, context, {"trade_date": partition_key}, fields),
             )
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
@@ -319,10 +321,14 @@ def _execute_snapshot_job(
             operation=job.collector_operation,
             partition_key="snapshot",
         )
-        result = operation.function(
-            CollectionContext(run.id, run_directory, load_token()),
-            job.parameters,
-            fields,
+        result = run_operation(
+            job.collector_key or "unknown",
+            operation,
+            lambda: operation.function(
+                CollectionContext(run.id, run_directory, load_token()),
+                job.parameters,
+                fields,
+            ),
         )
         if set(result.outputs) != set(operation.datasets):
             raise CollectionError("collector outputs do not match operation declaration")
@@ -592,7 +598,11 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     report_path = job_directory / "review.json"
 
     try:
-        row_count = operation.function(target, fields, load_token())
+        row_count = run_operation(
+            job.collector_key or "unknown",
+            operation,
+            lambda: operation.function(target, fields, load_token()),
+        )
         job.source_file_name = target.name
         job.staged_path = target.relative_to(request.app.state.data_root).as_posix()
         job.source_size_bytes = target.stat().st_size

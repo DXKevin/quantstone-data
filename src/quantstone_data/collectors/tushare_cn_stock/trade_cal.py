@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
-from .stock_basic import API_URL, CollectionError
+from .stock_basic import API_URL, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.trade_cal"
 FULL_HISTORY_START = date(1990, 1, 1)
@@ -33,7 +33,7 @@ def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[s
     with urlopen(request, timeout=60) as response:  # noqa: S310
         body = json.load(response)
     if body.get("code") != 0:
-        raise CollectionError(body.get("msg") or "TuShare trade_cal 接口调用失败")
+        raise_api_error(body, "TuShare trade_cal 接口调用失败")
     data = body.get("data") or {}
     returned_fields = data.get("fields") or []
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]

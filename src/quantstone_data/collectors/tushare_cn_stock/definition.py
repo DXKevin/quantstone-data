@@ -2,6 +2,7 @@ from ...collector_types import (
     CollectorDefinition,
     CollectorOperation,
     CollectorParameter,
+    RateLimit,
 )
 from .daily import (
     collect_daily_incremental,
@@ -28,6 +29,9 @@ DATE_RANGE_PARAMETERS = (
 INCREMENTAL_PARAMETERS = (
     CollectorParameter("end_date", "date", False, "可选的更新截止日期，默认当天"),
 )
+
+# TuShare daily 按账号限制每分钟 50 次；首次与增量共用同一窗口。
+DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
 
 OPERATIONS = (
     CollectorOperation(
@@ -56,6 +60,7 @@ OPERATIONS = (
         parameters=DATE_RANGE_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_initial,
+        rate_limit=DAILY_RATE_LIMIT,
     ),
     CollectorOperation(
         key="daily_incremental",
@@ -65,6 +70,7 @@ OPERATIONS = (
         parameters=INCREMENTAL_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_incremental,
+        rate_limit=DAILY_RATE_LIMIT,
     ),
     CollectorOperation(
         key="trade_cal_initial",

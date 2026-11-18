@@ -347,7 +347,8 @@ purpose + collector_key + operation + parameters
 ```
 
 其中 `parameters` 是数据集级默认参数；采集任务提供本次运行参数，系统合并后按照
-operation 参数定义校验。凭证、限流和重试不属于数据集绑定关系，由采集器内部处理。
+operation 参数定义校验。凭证、限流和重试不属于数据集绑定关系：凭证由采集器自行读取，
+限流与重试策略由 operation 注册声明，由执行框架统一执行。
 
 当前实现已经提供代码采集器注册表，并在数据集契约中按任务目的保存操作绑定。TuShare
 股票列表目前分别注册 `stock_list_initial` 和 `stock_list_incremental` 两个具体入口。首版只采集 TuShare 默认的当前上市状态 `L`，
@@ -375,6 +376,29 @@ collectors/tushare_cn_stock/
 
 数据集契约保存在 Registry 数据库中；代码不再重复保存一套数据集定义。采集器目录名由
 采集能力决定，一个采集器可通过多个 operation 输出多个数据集。
+
+### 9.2 执行框架：限流与重试
+
+所有采集调用都经过统一的执行入口，不在各采集器里手写 `sleep` 或重试循环：
+
+```text
+operation 声明 RateLimit + RetryPolicy
+        ↓
+run_operation：限流等待 → 调用 → 限流/网络错误按退避重试
+```
+
+- 限流按滑动窗口计算：任意 `period_seconds` 内最多放行 `calls` 次；达到上限时等待最早
+  一次调用离开窗口，而不是让任务失败。
+- 相同 `scope` 的操作共享同一个窗口。TuShare `daily` 的首次采集与增量更新都使用
+  `scope = "daily"`，合计不超过账号限制（当前为每分钟 50 次）。
+- 供应商返回限流错误时，采集器抛出可重试异常，执行框架按 `RetryPolicy` 指数退避，
+  单次等待受 `max_delay_seconds` 约束；其他错误立即失败，不做无效重试。
+- 每次限流等待和重试调度都写入结构化日志（`rate_limit_wait`、`operation_retry_scheduled`），
+  便于排查长任务耗时。
+- 限流器是进程内状态，多进程部署时必须改为共享限流，否则每个进程各自计算额度。
+
+任务仍同步执行，长日期范围会占用一次 HTTP 请求。分区成功即发布并写入 Catalog，因此
+任务中断后新任务从 Catalog 水位继续，不会重复采集已发布分区。
 
 ## 10. 标准化与质量校验
 
