@@ -6,6 +6,7 @@ import hashlib
 import os
 from datetime import date
 from pathlib import Path
+from uuid import uuid4
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -103,8 +104,8 @@ def compact_year(
         return {"dataset_id": dataset_id, "year": year, "status": "empty", "partitions": 0}
 
     target_rel = f"datasets/{dataset_id}/annual/{year}.parquet"
-    sources = sorted({item.file_path for item in partitions} - {target_rel})
-    if not sources:
+    sources = sorted({item.file_path for item in partitions})
+    if sources == [target_rel]:
         return {
             "dataset_id": dataset_id,
             "year": year,
@@ -113,20 +114,74 @@ def compact_year(
             "files": 1,
         }
 
-    tables = []
+    missing_sources = [path for path in sources if not (data_root / path).is_file()]
+    if missing_sources:
+        return {
+            "dataset_id": dataset_id,
+            "year": year,
+            "status": "missing_files",
+            "partitions": len(partitions),
+            "missing_files": missing_sources,
+        }
+
+    partition_field = (dataset.storage_policy or {}).get("logical_partition_field")
+    if not partition_field:
+        raise ValueError("年度合并要求数据集配置 logical_partition_field")
+
+    expected_keys = {item.partition_key for item in partitions}
+    keys_by_source: dict[str, set[str]] = {}
+    for item in partitions:
+        keys_by_source.setdefault(item.file_path, set()).add(item.partition_key)
+
+    tables: list[pa.Table] = []
     for path in sources:
         source = data_root / path
-        if source.is_file():
-            tables.append(pq.read_table(source))
-    if not tables:
-        return {"dataset_id": dataset_id, "year": year, "status": "missing_files", "partitions": 0}
+        table = pq.read_table(source)
+        if partition_field not in table.column_names:
+            raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
+        wanted = keys_by_source[path]
+        values = table[partition_field].to_pylist()
+        normalized = [
+            value.isoformat() if hasattr(value, "isoformat") else str(value)
+            for value in values
+        ]
+        filtered = table.filter([value in wanted for value in normalized])
+        present = {value for value in normalized if value in wanted}
+        if present != wanted:
+            missing = sorted(wanted - present)
+            raise ValueError(f"文件 {path} 缺少 Catalog 分区：{', '.join(missing)}")
+        tables.append(filtered)
 
     merged = pa.concat_tables(tables)
+    merged_values = merged[partition_field].to_pylist()
+    merged_keys = {
+        value.isoformat() if hasattr(value, "isoformat") else str(value)
+        for value in merged_values
+    }
+    if merged_keys != expected_keys:
+        missing = sorted(expected_keys - merged_keys)
+        unexpected = sorted(merged_keys - expected_keys)
+        raise ValueError(
+            f"年度合并分区校验失败，缺少 {missing or '无'}，额外 {unexpected or '无'}"
+        )
+
     target = data_root / target_rel
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + ".tmp")
     pq.write_table(merged, temporary, compression="zstd")
-    os.replace(temporary, target)
+
+    revisions = data_root / "revisions" / dataset_id / f"{year:04d}"
+    revisions.mkdir(parents=True, exist_ok=True)
+    previous_annual: Path | None = None
+    if target.is_file():
+        previous_annual = revisions / f"{year}.before-{uuid4().hex}.parquet"
+        os.replace(target, previous_annual)
+    try:
+        os.replace(temporary, target)
+    except Exception:
+        if previous_annual is not None and previous_annual.is_file():
+            os.replace(previous_annual, target)
+        raise
 
     file_row = upsert_file(
         session,
@@ -140,12 +195,15 @@ def compact_year(
         item.file_id = file_row.id
         item.file_path = target_rel
 
-    revisions = data_root / "revisions" / dataset_id / f"{year:04d}"
-    revisions.mkdir(parents=True, exist_ok=True)
     for path in sources:
+        if path == target_rel:
+            continue
         source = data_root / path
         if source.is_file():
-            os.replace(source, revisions / source.name)
+            revision = revisions / source.name
+            if revision.exists():
+                revision = revisions / f"{source.stem}-{uuid4().hex}{source.suffix}"
+            os.replace(source, revision)
         stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
         if stale is not None:
             session.delete(stale)

@@ -4,6 +4,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from quantstone_data.main import create_app
 from quantstone_data.models import CatalogFile, CatalogPartition, Dataset
@@ -92,18 +93,24 @@ def write_partition(client: TestClient, partition_key: str, symbols: list[str]) 
         )
         session.add(file_row)
         session.flush()
-        session.add(
-            CatalogPartition(
-                dataset_id=DATASET_ID,
-                partition_key=partition_key,
-                file_path=relative,
-                file_id=file_row.id,
-                row_count=len(symbols),
-                size_bytes=target.stat().st_size,
-                sha256="0" * 64,
-                collection_run_id="run",
+        partition = session.scalar(
+            select(CatalogPartition).where(
+                CatalogPartition.dataset_id == DATASET_ID,
+                CatalogPartition.partition_key == partition_key,
             )
         )
+        if partition is None:
+            partition = CatalogPartition(
+                dataset_id=DATASET_ID,
+                partition_key=partition_key,
+                collection_run_id="run",
+            )
+            session.add(partition)
+        partition.file_path = relative
+        partition.file_id = file_row.id
+        partition.row_count = len(symbols)
+        partition.size_bytes = target.stat().st_size
+        partition.sha256 = "0" * 64
         session.commit()
 
 
@@ -158,3 +165,30 @@ def test_compaction_moves_replaced_files_to_revisions(tmp_path: Path) -> None:
         revisions = data_root / "revisions" / DATASET_ID / "2024"
 
     assert any(revisions.iterdir())
+
+
+def test_recompaction_preserves_annual_rows_and_replaces_repaired_day(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["ORIGINAL-02"])
+        write_partition(client, "2024-01-03", ["ORIGINAL-03"])
+        first = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        assert first.status_code == 200
+
+        write_partition(client, "2024-01-03", ["REPAIRED-03"])
+        second = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        rows = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"start": "2024-01-01", "end": "2024-01-31", "limit": 10},
+        )
+
+    assert second.status_code == 200, second.text
+    assert second.json()["status"] == "compacted"
+    assert second.json()["source_files"] == 2
+    assert second.json()["rows"] == 2
+    assert rows.status_code == 200
+    symbols = {item["trade_date"]: item["symbol"] for item in rows.json()["rows"]}
+    assert symbols == {
+        "2024-01-02": "ORIGINAL-02",
+        "2024-01-03": "REPAIRED-03",
+    }
