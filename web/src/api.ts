@@ -174,6 +174,26 @@ export interface CollectionRun {
   error: string | null;
 }
 
+export interface CoverageDetail {
+  row_count: number | null;
+  file_path: string | null;
+  error: string | null;
+}
+
+export interface CoverageDataset {
+  dataset_id: string;
+  display_name: string;
+  cells: Record<string, string>;
+  details: Record<string, CoverageDetail>;
+  summary: Record<string, number>;
+}
+
+export interface CoverageResponse {
+  today: string;
+  dates: string[];
+  datasets: CoverageDataset[];
+}
+
 export interface DatasetOverview {
   dataset_id: string;
   display_name: string;
@@ -266,6 +286,8 @@ export const api = {
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
+  getCoverage: (days: number) =>
+    request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

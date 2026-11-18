@@ -1,6 +1,7 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type DatasetOverview, type DatasetStatus } from "./api";
+import CoverageHeatmap from "./CoverageHeatmap";
 
 const statusLabels: Record<DatasetStatus, string> = {
   draft: "草稿",
@@ -57,6 +58,8 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
         </div>
         <button className="toolbar-button" onClick={() => void load()}><RefreshCw size={15} />刷新</button>
       </header>
+
+      <CoverageHeatmap onOpen={onOpen} />
 
       <section className="summary-strip">
         <div><span>数据集</span><strong>{totals.datasets}</strong></div>

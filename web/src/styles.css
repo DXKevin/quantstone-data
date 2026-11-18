@@ -343,3 +343,31 @@ body { font-size: 14px; }
 .coverage-bar { height: 6px; border-radius: 999px; background: #edf1ee; overflow: hidden; }
 .coverage-bar i { display: block; height: 100%; background: #17a673; border-radius: 999px; }
 .overview-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #5f6a64; font-size: 10.5px; }
+
+/* 覆盖热力图 */
+.coverage-panel { margin-bottom: 20px; }
+.coverage-tools { display: flex; align-items: center; gap: 10px; }
+.range-switch { display: flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.range-switch button { min-height: 30px; padding: 0 10px; border: 0; background: white; color: #5f6a64; font-size: 11px; cursor: pointer; }
+.range-switch button.active { background: var(--green); color: white; }
+.coverage-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 20px 0; color: #5f6a64; font-size: 11px; }
+.coverage-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.coverage-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.coverage-legend em { margin-left: auto; font-style: normal; color: #7b8781; font-size: 10.5px; }
+.coverage-scroll { overflow-x: auto; padding: 12px 20px 18px; }
+.coverage-grid { display: grid; gap: 2px; align-items: center; width: max-content; }
+.coverage-corner { position: sticky; left: 0; background: var(--panel); z-index: 2; }
+.coverage-month { color: #7b8781; font-size: 10px; padding-left: 2px; white-space: nowrap; }
+.coverage-name { position: sticky; left: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 10px; background: var(--panel); z-index: 2; }
+.coverage-name strong { font-size: 12px; }
+.coverage-name small { color: #7b8781; font-size: 10px; }
+.coverage-cell { width: 13px; height: 13px; border: 0; padding: 0; border-radius: 2px; cursor: pointer; }
+.coverage-cell:hover { outline: 2px solid #0d6b4c; outline-offset: 1px; }
+.cell-complete { background: #17a673; }
+.cell-missing { background: #e05252; }
+.cell-failed { background: #e8a33d; }
+.cell-abnormal { background: #8e44ad; }
+.cell-future { background: #e8ecea; }
+.cell-none { background: #f1f3f2; }
+
+.cell-pending { background: #c9d6cf; }
