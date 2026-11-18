@@ -148,6 +148,63 @@ def test_read_limit_does_not_open_unneeded_files(tmp_path: Path) -> None:
     assert response.json()["row_count"] == 1
 
 
+def test_unfiltered_read_is_always_a_twenty_row_preview(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(
+            client,
+            "2024-01-02",
+            [f"{index:06d}.SZ" for index in range(25)],
+        )
+
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"limit": 100_000},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["row_count"] == 20
+    assert body["matched_count"] is None
+    assert body["filtered"] is False
+    assert body["truncated"] is False
+
+
+def test_read_rows_filters_by_partial_primary_key_and_reports_truncation(
+    tmp_path: Path,
+) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        write_partition(client, "2024-01-03", ["000001.SZ", "600000.SH"])
+
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"symbol": "000001.SZ", "limit": 1},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["row_count"] == 1
+    assert body["matched_count"] == 2
+    assert body["filtered"] is True
+    assert body["truncated"] is True
+    assert body["rows"][0]["symbol"] == "000001.SZ"
+
+
+def test_read_rows_rejects_non_primary_key_filter(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ"])
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"close": "10.0"},
+        )
+
+    assert response.status_code == 422
+    assert "只能按主键字段筛选" in response.json()["detail"]
+
+
 def test_read_rows_fails_when_catalog_file_is_missing(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)

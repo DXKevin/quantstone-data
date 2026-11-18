@@ -237,6 +237,9 @@ export interface DatasetRows {
   dataset_id: string;
   files_read: number;
   row_count: number;
+  matched_count: number | null;
+  truncated: boolean;
+  filtered: boolean;
   columns: string[];
   rows: Array<Record<string, unknown>>;
 }
@@ -297,8 +300,13 @@ export const api = {
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   getCoverage: (days: number) =>
     request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),
-  readDatasetRows: (datasetId: string, limit = 20) =>
-    request<DatasetRows>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/rows?limit=${limit}`),
+  readDatasetRows: (datasetId: string, filters: Record<string, string> = {}, limit = 20) => {
+    const query = new URLSearchParams({ limit: String(limit) });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value.trim()) query.set(key, value.trim());
+    });
+    return request<DatasetRows>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/rows?${query}`);
+  },
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

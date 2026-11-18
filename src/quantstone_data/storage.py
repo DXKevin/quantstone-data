@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -38,12 +38,22 @@ def read_dataset_rows(
     start: date | None = None,
     end: date | None = None,
     limit: int = 1000,
+    primary_key_filters: dict[str, str] | None = None,
 ) -> dict:
     dataset = session.get(Dataset, dataset_id)
     if dataset is None:
         raise KeyError(dataset_id)
     policy = dataset.storage_policy or {}
     partition_field = policy.get("logical_partition_field")
+    schema_version = next(
+        item for item in dataset.schemas if item.version == dataset.current_schema_version
+    )
+    primary_keys = set(schema_version.primary_key_fields)
+    filters = primary_key_filters or {}
+    query_mode = bool(filters) or start is not None or end is not None
+    unknown_filters = set(filters) - primary_keys
+    if unknown_filters:
+        raise ValueError(f"只能按主键字段筛选：{', '.join(sorted(primary_keys))}")
 
     query = select(CatalogPartition).where(CatalogPartition.dataset_id == dataset_id)
     if start is not None:
@@ -63,10 +73,12 @@ def read_dataset_rows(
     rows: list[dict] = []
     columns: list[str] = []
     files_read = 0
+    matched_count = 0
     for path in sorted(by_file):
         file_path = data_root / path
+        parquet_filters: list[tuple[str, str, object]] = []
+        schema = pq.read_schema(file_path)
         if partition_field:
-            schema = pq.read_schema(file_path)
             if partition_field not in schema.names:
                 raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
             field_type = schema.field(partition_field).type
@@ -76,26 +88,51 @@ def read_dataset_rows(
                 if pa.types.is_date(field_type)
                 else wanted
             )
-            table = pq.read_table(
-                file_path,
-                filters=[(partition_field, "in", filter_values)],
+            parquet_filters.append((partition_field, "in", filter_values))
+        for field_name, raw_value in filters.items():
+            if field_name not in schema.names:
+                raise ValueError(f"文件 {path} 缺少主键字段 {field_name}")
+            parquet_filters.append(
+                (field_name, "=", _coerce_filter_value(raw_value, schema.field(field_name).type))
             )
-        else:
-            table = pq.read_table(file_path)
+        table = pq.read_table(file_path, filters=parquet_filters or None)
         files_read += 1
         columns = table.column_names
+        matched_count += table.num_rows
         remaining = limit - len(rows)
-        rows.extend(table.slice(0, remaining).to_pylist())
-        if len(rows) >= limit:
+        if remaining > 0:
+            rows.extend(table.slice(0, remaining).to_pylist())
+        if not query_mode and len(rows) >= limit:
             break
 
     return {
         "dataset_id": dataset_id,
         "files_read": files_read,
         "row_count": min(len(rows), limit),
+        "matched_count": matched_count if query_mode else None,
+        "truncated": bool(query_mode and matched_count > limit),
+        "filtered": query_mode,
         "columns": columns,
         "rows": rows[:limit],
     }
+
+
+def _coerce_filter_value(value: str, field_type: pa.DataType) -> object:
+    """把 URL 中的主键文本转换为 Parquet 字段类型。"""
+    if pa.types.is_date(field_type):
+        return date.fromisoformat(value)
+    if pa.types.is_timestamp(field_type):
+        return datetime.fromisoformat(value)
+    if pa.types.is_integer(field_type):
+        return int(value)
+    if pa.types.is_floating(field_type):
+        return float(value)
+    if pa.types.is_boolean(field_type):
+        normalized = value.strip().lower()
+        if normalized not in {"true", "false", "1", "0"}:
+            raise ValueError(f"布尔值必须是 true/false 或 1/0：{value}")
+        return normalized in {"true", "1"}
+    return value
 
 
 def compact_year(
