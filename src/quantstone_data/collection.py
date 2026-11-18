@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import shutil
+import threading
 from datetime import date, timedelta
 from functools import partial
 from pathlib import Path
@@ -38,6 +39,8 @@ SessionDep = Annotated[Session, Depends(get_session)]
 # 进程内记录正在执行的任务和取消请求；单进程部署下即可生效。
 _RUNNING_JOBS: set[str] = set()
 _CANCEL_REQUESTS: set[str] = set()
+_PUBLISHING_JOBS: set[str] = set()
+_JOB_STATE_LOCK = threading.Lock()
 
 TERMINAL_JOB_STATUSES = {
     CollectionJobStatus.SUCCEEDED.value,
@@ -105,6 +108,109 @@ def _mark_job_failed(session: Session, job_id: str, error: Exception) -> None:
         dataset_id=job.dataset_id,
         error=message,
     )
+
+
+def _finish_snapshot_cancellation(
+    session: Session,
+    job: CollectionJob,
+    run: CollectionRun,
+    run_directory: Path,
+    report_path: Path | None = None,
+) -> CollectionJobRead:
+    run.status = "cancelled"
+    run.staged_path = None
+    run.error = None
+    job.status = CollectionJobStatus.CANCELLED.value
+    job.staged_path = None
+    job.error = None
+    shutil.rmtree(run_directory, ignore_errors=True)
+    if report_path is not None:
+        report_path.unlink(missing_ok=True)
+    session.commit()
+    session.refresh(job)
+    log_event(
+        "collection_job_cancelled",
+        job_id=job.id,
+        dataset_id=job.dataset_id,
+    )
+    return serialize_job(job)
+
+
+def _cancel_snapshot_at_boundary(
+    session: Session,
+    job: CollectionJob,
+    run: CollectionRun,
+    run_directory: Path,
+    report_path: Path | None = None,
+) -> CollectionJobRead | None:
+    with _JOB_STATE_LOCK:
+        session.refresh(job)
+        if (
+            job.id not in _CANCEL_REQUESTS
+            and job.status != CollectionJobStatus.CANCELLING.value
+        ):
+            return None
+        return _finish_snapshot_cancellation(
+            session,
+            job,
+            run,
+            run_directory,
+            report_path,
+        )
+
+
+def _begin_snapshot_publish(
+    session: Session,
+    job: CollectionJob,
+    run: CollectionRun,
+    run_directory: Path,
+    report_path: Path,
+) -> CollectionJobRead | None:
+    """在同一临界区内确认未取消并进入不可取消的发布阶段。"""
+    with _JOB_STATE_LOCK:
+        session.refresh(job)
+        if (
+            job.id in _CANCEL_REQUESTS
+            or job.status == CollectionJobStatus.CANCELLING.value
+        ):
+            return _finish_snapshot_cancellation(
+                session,
+                job,
+                run,
+                run_directory,
+                report_path,
+            )
+        _PUBLISHING_JOBS.add(job.id)
+        return None
+
+
+def _finalize_snapshot_review_failure(
+    session: Session,
+    job: CollectionJob,
+    run: CollectionRun,
+    run_directory: Path,
+    report_path: Path,
+    data_root: Path,
+) -> CollectionJobRead | None:
+    """在同一临界区内处理取消请求或固化审核失败状态。"""
+    with _JOB_STATE_LOCK:
+        session.refresh(job)
+        if (
+            job.id in _CANCEL_REQUESTS
+            or job.status == CollectionJobStatus.CANCELLING.value
+        ):
+            return _finish_snapshot_cancellation(
+                session,
+                job,
+                run,
+                run_directory,
+                report_path,
+            )
+        run.status = "review_failed"
+        job.status = CollectionJobStatus.REVIEW_FAILED.value
+        job.staged_path = report_path.relative_to(data_root).as_posix()
+        session.commit()
+        return None
 
 
 def _trading_dates(
@@ -379,6 +485,9 @@ def _execute_snapshot_job(
         )
         session.add(run)
         session.flush()
+    run.status = "fetching"
+    run.error = None
+    session.commit()
     fields = [
         {
             "name": field.name,
@@ -409,6 +518,14 @@ def _execute_snapshot_job(
                 fields,
             ),
         )
+        cancelled = _cancel_snapshot_at_boundary(
+            session,
+            job,
+            run,
+            run_directory,
+        )
+        if cancelled is not None:
+            return cancelled
         if set(result.outputs) != set(operation.datasets):
             raise CollectionError("collector outputs do not match operation declaration")
         artifacts = result.outputs[job.dataset_id]
@@ -444,9 +561,26 @@ def _execute_snapshot_job(
             error_count=report["error_count"],
         )
         if not report["passed"]:
-            run.status = "review_failed"
-            job.status = CollectionJobStatus.REVIEW_FAILED.value
+            cancelled = _finalize_snapshot_review_failure(
+                session,
+                job,
+                run,
+                run_directory,
+                report_path,
+                data_root,
+            )
+            if cancelled is not None:
+                return cancelled
         else:
+            cancelled = _begin_snapshot_publish(
+                session,
+                job,
+                run,
+                run_directory,
+                report_path,
+            )
+            if cancelled is not None:
+                return cancelled
             publish_partition(
                 session,
                 data_root=data_root,
@@ -656,18 +790,24 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
         item for item in dataset.schemas if item.version == dataset.current_schema_version
     )
     data_root: Path = request.app.state.data_root
-    job.status = CollectionJobStatus.RUNNING.value
-    job.error = None
-    session.commit()
-    _RUNNING_JOBS.add(job.id)
+    with _JOB_STATE_LOCK:
+        session.refresh(job)
+        if job.status != CollectionJobStatus.CREATED.value:
+            raise HTTPException(status_code=409, detail="job has already been executed")
+        _RUNNING_JOBS.add(job.id)
+        job.status = CollectionJobStatus.RUNNING.value
+        job.error = None
+        session.commit()
     try:
         return _run_collection(job, operation, dataset, schema, data_root, session)
     except Exception as error:
         _mark_job_failed(session, job.id, error)
         raise
     finally:
-        _RUNNING_JOBS.discard(job.id)
-        _CANCEL_REQUESTS.discard(job.id)
+        with _JOB_STATE_LOCK:
+            _RUNNING_JOBS.discard(job.id)
+            _CANCEL_REQUESTS.discard(job.id)
+            _PUBLISHING_JOBS.discard(job.id)
 
 
 def _run_collection(
@@ -758,27 +898,31 @@ def cancel_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead
     job = session.get(CollectionJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="collection job not found")
-    if job.status in TERMINAL_JOB_STATUSES:
-        raise HTTPException(status_code=409, detail="任务已结束，无法取消")
+    with _JOB_STATE_LOCK:
+        session.refresh(job)
+        if job.status in TERMINAL_JOB_STATUSES:
+            raise HTTPException(status_code=409, detail="任务已结束，无法取消")
+        if job.id in _PUBLISHING_JOBS:
+            raise HTTPException(status_code=409, detail="任务正在发布，已无法安全取消")
 
-    if job.id in _RUNNING_JOBS:
-        # 先落库再登记取消请求，避免与执行线程写回 CANCELLED 的顺序竞争。
-        job.status = CollectionJobStatus.CANCELLING.value
+        if job.id in _RUNNING_JOBS:
+            # 先落库再登记取消请求，避免与执行线程写回 CANCELLED 的顺序竞争。
+            job.status = CollectionJobStatus.CANCELLING.value
+            session.commit()
+            _CANCEL_REQUESTS.add(job.id)
+            log_event(
+                "collection_job_cancel_requested",
+                job_id=job.id,
+                dataset_id=job.dataset_id,
+            )
+        else:
+            job.status = CollectionJobStatus.CANCELLED.value
+            log_event(
+                "collection_job_cancelled",
+                job_id=job.id,
+                dataset_id=job.dataset_id,
+            )
         session.commit()
-        _CANCEL_REQUESTS.add(job.id)
-        log_event(
-            "collection_job_cancel_requested",
-            job_id=job.id,
-            dataset_id=job.dataset_id,
-        )
-    else:
-        job.status = CollectionJobStatus.CANCELLED.value
-        log_event(
-            "collection_job_cancelled",
-            job_id=job.id,
-            dataset_id=job.dataset_id,
-        )
-    session.commit()
     session.refresh(job)
     return serialize_job(job)
 

@@ -1,4 +1,6 @@
 import hashlib
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -543,3 +545,60 @@ def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
     assert executed.json()["status"] == "succeeded"
     assert catalog.json()[0]["partition_key"] == "snapshot"
     assert (tmp_path / "data" / catalog.json()[0]["file_path"]).is_file()
+
+
+def test_snapshot_job_can_be_cancelled_before_publish(tmp_path: Path, monkeypatch) -> None:
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_trade_cal(_token, start_date, _end_date, _fields):
+        started.set()
+        assert release.wait(timeout=5)
+        return [
+            {
+                "exchange": "SSE",
+                "cal_date": start_date.strftime("%Y%m%d"),
+                "is_open": 1,
+                "pretrade_date": None,
+            }
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.trade_cal._call_trade_cal",
+        slow_trade_cal,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=trade_calendar_payload()).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code
+            == 200
+        )
+        created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+            },
+        )
+        job_id = created.json()["id"]
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(client.post, f"/api/v1/collection-jobs/{job_id}/execute")
+            assert started.wait(timeout=5)
+            cancelled = client.post(f"/api/v1/collection-jobs/{job_id}/cancel")
+            release.set()
+            executed = future.result(timeout=10)
+        runs = client.get(f"/api/v1/collection-jobs/{job_id}/runs")
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.trade_cal"
+        )
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelling"
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "cancelled"
+    assert runs.json()[0]["status"] == "cancelled"
+    assert catalog.json() == []

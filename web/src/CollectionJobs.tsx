@@ -53,6 +53,7 @@ const statusLabels = {
 const runStatusLabels: Record<string, string> = {
   fetching: "采集中",
   staged: "已暂存",
+  cancelled: "已取消",
   succeeded: "已发布",
   failed: "失败",
   review_failed: "审核异常",
