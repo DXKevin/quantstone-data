@@ -242,6 +242,13 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
                 "operation": "stock_list_incremental",
             },
         ],
+        "storage_policy": {
+            "logical_partition_field": None,
+            "calendar_dataset_id": None,
+            "layout": "snapshot",
+            "write_strategy": "replace_snapshot",
+            "compaction": None,
+        },
         "primary_key": ["ts_code"],
         "time_field": None,
         "fields": [
@@ -331,15 +338,20 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         retried_executed = client.post(
             f"/api/v1/collection-jobs/{retried.json()['id']}/execute"
         )
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.stock_basic"
+        )
+        preview = client.get(
+            "/api/v1/datasets/tushare.cn.stock.stock_basic/rows",
+            params={"ts_code": "000001.SZ"},
+        )
 
     assert executed.status_code == 200
     body = executed.json()
-    assert body["status"] == "review_passed"
+    assert body["status"] == "succeeded"
     assert review_response.status_code == 200
     assert review_response.json()["row_count"] == 1
-    staged_file = tmp_path / "data" / body["staged_path"]
-    assert staged_file.suffix == ".parquet"
-    report = staged_file.with_name("review.json").read_text(encoding="utf-8")
+    report = (tmp_path / "data" / body["staged_path"]).read_text(encoding="utf-8")
     assert '"passed": true' in report
     assert failed_executed.status_code == 502
     assert failed_record.json()["status"] == "failed"
@@ -351,6 +363,15 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert retried.json()["parameters"] == failed_created.json()["parameters"]
     assert retry_of_created.status_code == 409
     assert retried_executed.status_code == 200
+    assert retried_executed.json()["status"] == "succeeded"
+    assert len(catalog.json()) == 1
+    assert catalog.json()[0]["partition_key"] == "snapshot"
+    published = tmp_path / "data" / catalog.json()[0]["file_path"]
+    assert published.is_file()
+    assert published.suffix == ".parquet"
+    assert preview.status_code == 200
+    assert preview.json()["matched_count"] == 1
+    assert preview.json()["rows"][0]["name"] == "平安银行"
 
 
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:

@@ -94,6 +94,8 @@
 - 预览表格采用固定高度虚拟滚动，筛选结果可完整下载为 CSV 或 Parquet；
 - 失败、审核异常和已取消的采集器任务可以复制为新任务重试，并通过 `retry_of_job_id` 追溯；
 - 采集任务列表显示本地化创建时间，创建表单切换输入方式不再无条件重置任务目的；
+- `tushare.cn.stock.stock_basic` 已升级到统一 CollectionResult 协议并接入 snapshot 正式发布；
+- 旧股票信息数据集启动时自动补齐 snapshot 存储策略，审核通过后登记 Catalog 并可直接预览；
 
 尚未实现：
 
@@ -113,11 +115,10 @@
 
 建议第一步包含：
 
-1. 将 `tushare.cn.stock.stock_basic` 审核通过结果接入 snapshot 正式发布和 Catalog；
-2. 统一转换 daily 采集中的 `urllib.error.HTTPError`，上游 502 应向前端返回明确的 502 和中文原因，而不是本地 500；
-3. 排查 Windows `socket.socketpair()` 阻塞，恢复完整 pytest 验证；
-4. 用真实大筛选结果评估 100,000 行 JSON 的传输、解析和浏览器内存占用；
-5. 合并 daily 2025、2026 年数据，并根据 Catalog 缺口规划增量日期。
+1. 统一转换 daily 采集中的 `urllib.error.HTTPError`，上游 502 应向前端返回明确的 502 和中文原因，而不是本地 500；
+2. 排查 Windows `socket.socketpair()` 阻塞，恢复完整 pytest 验证；
+3. 用真实大筛选结果评估 100,000 行 JSON 的传输、解析和浏览器内存占用；
+4. 合并 daily 2025、2026 年数据，并根据 Catalog 缺口规划增量日期。
 
 不得把现有 TuShare Token、百度网盘账号或真实金融数据提交到 Git；本地 `.env` 只供运行使用。
 
@@ -165,6 +166,8 @@
 - 重试复制原任务已经解析完成的执行配置，兼容历史任务中的旧参数；前端创建后立即执行新任务；
 - 修复创建任务表单：切换为采集器输入时，如果当前任务目的受支持，不再重置第一步选择。
 - 采集任务列表在任务 ID 下方显示按浏览器本地时区格式化的创建时间。
+- stock_basic 采集器升级为统一 CollectionResult 协议，并复用通用 snapshot 审核、发布和 Catalog 流程；
+- SQLite 启动迁移为现有 stock_basic 数据集补齐 `snapshot + replace_snapshot` 存储策略。
 
 验证：
 
@@ -175,15 +178,17 @@
 - 真实服务验证：无筛选返回 20 行；按 `ts_code` 返回 695 行；按 `trade_date` 返回 5,329 行；非主键筛选返回 422。
 - 真实服务验证：同一 `ts_code` 的 CSV 与 Parquet 均导出 695 行，响应后临时文件剩余 0 个。
 - 真实服务验证：历史失败任务成功复制为新 `created` 任务，operation、参数和追溯 ID 均正确；验证任务随后删除。
+- 隔离数据库和模拟供应商验证：stock_basic 任务进入 `succeeded`，Catalog 生成 `snapshot` 分区，正式 Parquet 可按 `ts_code` 预览；
+- `pytest` 仍在 TestClient 初始化前被本机 `socket.socketpair()` 阻塞；Ruff、py_compile 和 diff check 通过。
 
 下一步：
 
-- 将股票信息审核通过结果接入正式 snapshot 发布，使其能够进入预览和 Catalog；
+- 统一处理 daily 上游 HTTP 错误，避免供应商 502 被暴露为本地 500；
 - 使用更大数据集继续观察 100,000 行 JSON 传输、解析和内存占用，再决定是否增加服务端分页。
 
 遗留问题：
 
-- 股票信息现有任务只有 staging 审核结果，尚未正式发布，因此预览会正确显示为空；
+- 本地现有 stock_basic 历史任务不会自动回放发布；需要在 TuShare 恢复后新建或重试任务生成首个正式 snapshot；
 - 虚拟滚动解决了 DOM 和布局卡顿，但 100,000 行仍会一次性传输并保存在浏览器内存中。
 
 ### 2026-11-18 — Codex

@@ -1,3 +1,4 @@
+import json
 import os
 from collections.abc import Generator
 from pathlib import Path
@@ -107,6 +108,24 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "UPDATE collection_jobs SET collector_key = 'tushare_cn_stock' "
                 "WHERE collector_key = 'tushare'"
             )
+        )
+        connection.execute(
+            text(
+                "UPDATE datasets SET storage_policy = json(:storage_policy) "
+                "WHERE id = 'tushare.cn.stock.stock_basic' "
+                "AND storage_policy IS NULL"
+            ),
+            {
+                "storage_policy": json.dumps(
+                    {
+                        "logical_partition_field": None,
+                        "calendar_dataset_id": None,
+                        "layout": "snapshot",
+                        "write_strategy": "replace_snapshot",
+                        "compaction": None,
+                    }
+                )
+            },
         )
         connection.execute(
             text(

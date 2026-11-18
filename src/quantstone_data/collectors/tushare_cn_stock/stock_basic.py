@@ -3,20 +3,27 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ...collection_protocol import RateLimitExceeded
+from ...collection_protocol import (
+    CollectionContext,
+    CollectionResult,
+    DatasetArtifact,
+    RateLimitExceeded,
+)
 
 API_URL = "https://api.tushare.pro"
 DEFAULT_LIST_STATUSES = ("L",)
 RATE_LIMIT_CODES = {40203, -40203}
 RATE_LIMIT_KEYWORDS = ("每分钟", "每小时", "频率", "超过限制", "访问次数")
 DEFAULT_RETRY_AFTER = 60.0
+DATASET_ID = "tushare.cn.stock.stock_basic"
 
 
 class CollectionError(RuntimeError):
@@ -70,26 +77,79 @@ def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]
 
 
+def _arrow_type(data_type: str) -> pa.DataType:
+    return {
+        "string": pa.string(),
+        "date": pa.date32(),
+        "int32": pa.int32(),
+        "int64": pa.int64(),
+        "float32": pa.float32(),
+        "float64": pa.float64(),
+        "boolean": pa.bool_(),
+        "timestamp": pa.timestamp("us"),
+    }[data_type]
+
+
+def _convert(value: Any, data_type: str) -> Any:
+    if value is None or value == "":
+        return None
+    if data_type == "date":
+        return datetime.strptime(str(value), "%Y%m%d").date()
+    if data_type in {"float32", "float64"}:
+        return float(value)
+    if data_type in {"int32", "int64"}:
+        return int(value)
+    if data_type == "boolean":
+        return bool(value)
+    return value
+
+
 def collect(
-    target: Path,
-    fields: list[str],
-    token: str,
+    context: CollectionContext,
+    field_contracts: list[dict],
     statuses: Iterable[str] = DEFAULT_LIST_STATUSES,
-) -> int:
+) -> CollectionResult:
+    source_fields = [item.get("source_name") or item["name"] for item in field_contracts]
     rows: list[dict] = []
     for list_status in statuses:
-        rows.extend(call_api(token, list_status, fields))
+        rows.extend(call_api(context.token, list_status, source_fields))
 
+    normalized = [
+        {
+            field["name"]: _convert(
+                row.get(field.get("source_name") or field["name"]), field["data_type"]
+            )
+            for field in field_contracts
+        }
+        for row in rows
+    ]
+    primary_sort = "ts_code" if any(item["name"] == "ts_code" for item in field_contracts) else None
+    if primary_sort:
+        normalized.sort(key=lambda row: row[primary_sort] or "")
+    schema = pa.schema(
+        [
+            pa.field(field["name"], _arrow_type(field["data_type"]), field["nullable"])
+            for field in field_contracts
+        ]
+    )
+    table = pa.Table.from_pylist(normalized, schema=schema)
+    target = context.staging_dir / "outputs" / "stock_basic.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
-    schema = pa.schema([pa.field(name, pa.string()) for name in fields])
-    normalized = [{name: row.get(name) for name in fields} for row in rows]
-    pq.write_table(pa.Table.from_pylist(normalized, schema=schema), target, compression="zstd")
-    return len(rows)
+    pq.write_table(table, target, compression="zstd")
+    artifact = DatasetArtifact(DATASET_ID, target, {}, table.num_rows)
+    return CollectionResult(
+        outputs={DATASET_ID: [artifact]},
+        provenance={"api": "stock_basic", "list_statuses": list(statuses)},
+    )
 
 
-def collect_initial(target: Path, fields: list[str], token: str) -> int:
-    return collect(target, fields, token)
+def collect_initial(
+    context: CollectionContext, _parameters: dict, field_contracts: list[dict]
+) -> CollectionResult:
+    return collect(context, field_contracts)
 
 
-def collect_incremental(target: Path, fields: list[str], token: str) -> int:
-    return collect(target, fields, token)
+def collect_incremental(
+    context: CollectionContext, _parameters: dict, field_contracts: list[dict]
+) -> CollectionResult:
+    return collect(context, field_contracts)

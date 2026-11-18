@@ -721,8 +721,9 @@ quantstone_data/
 - Collection Run 与 CatalogPartition 基础记录；
 - 数据集存储策略配置与前端展示。
 
-当前实现只对 TuShare daily 走通了基础 Parquet、审核、发布和 Catalog 闭环。年度合并、
-权威交易日历、通用 Planner、原子发布恢复和 SDK 读取仍未实现。
+当前 TuShare daily 已走通按交易日的 Parquet、审核、发布和 Catalog 闭环，trade_cal 与
+stock_basic 已走通 snapshot 覆盖发布闭环。daily 已支持权威交易日历规划和年度合并；通用
+Planner、原子发布恢复和 SDK 读取仍未实现。
 
 ## 18. 前端产品约定
 
