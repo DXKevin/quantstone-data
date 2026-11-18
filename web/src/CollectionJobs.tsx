@@ -82,8 +82,10 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   );
 
   const loadJobs = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setJobs(await api.listCollectionJobs());
     } catch (reason) {
@@ -168,22 +170,31 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       } else {
         setNotice(result.status === "succeeded" ? "采集、审核和发布均已完成。" : "采集完成，暂存数据审核通过。");
       }
-      await loadJobs();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "采集任务执行失败");
     } finally {
       setRunningJobId(null);
+      await Promise.all([
+        loadJobs(true),
+        loadRuns(job.id),
+        logs[job.id] ? loadLogs(job.id) : Promise.resolve(),
+      ]);
     }
   }
 
   async function retryJob(job: CollectionJob) {
+    let retriedJobId: string | null = null;
     setRetryingJobId(job.id);
     setNotice(null);
     setError(null);
     try {
       const retried = await api.retryCollectionJob(job.id);
+      retriedJobId = retried.id;
+      setRetryingJobId(null);
       setRunningJobId(retried.id);
-      await loadJobs();
+      setExpandedJobId(retried.id);
+      setDetailTab("runs");
+      await loadJobs(true);
       const result = await api.executeCollectionJob(retried.id);
       if (result.status === "review_failed") {
         const report = await api.getCollectionReview(retried.id);
@@ -197,7 +208,11 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     } finally {
       setRetryingJobId(null);
       setRunningJobId(null);
-      await loadJobs();
+      await Promise.all([
+        loadJobs(true),
+        loadRuns(retriedJobId ?? job.id),
+        retriedJobId && logs[retriedJobId] ? loadLogs(retriedJobId) : Promise.resolve(),
+      ]);
     }
   }
 
