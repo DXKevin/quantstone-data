@@ -56,6 +56,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
   const jobsRef = useRef<CollectionJob[]>([]);
@@ -165,7 +166,11 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   }
 
   async function cancelJob(job: CollectionJob) {
-    if (!window.confirm(`确定取消任务 ${job.id.slice(0, 8)}？已发布的分区会保留。`)) return;
+    if (confirming !== `${job.id}:cancel`) {
+      setConfirming(`${job.id}:cancel`);
+      return;
+    }
+    setConfirming(null);
     setError(null);
     setNotice(null);
     try {
@@ -178,7 +183,11 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   }
 
   async function deleteJob(job: CollectionJob) {
-    if (!window.confirm(`确定删除任务记录 ${job.id.slice(0, 8)}？已发布的数据不会被删除。`)) return;
+    if (confirming !== `${job.id}:delete`) {
+      setConfirming(`${job.id}:delete`);
+      return;
+    }
+    setConfirming(null);
     setError(null);
     setNotice(null);
     try {
@@ -284,9 +293,9 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                 </span>
                 <span className="job-actions">
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
-                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : "取消"}</button>}
+                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : "取消"}</button>}
                   {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
-                  {!running && <button type="button" className="mini-upload-button quiet-mini" onClick={() => void deleteJob(job)}><Trash2 size={14} />删除</button>}
+                  {!running && <button type="button" className={confirming === `${job.id}:delete` ? "mini-upload-button danger-mini" : "mini-upload-button quiet-mini"} onClick={() => void deleteJob(job)}><Trash2 size={14} />{confirming === `${job.id}:delete` ? "确认删除" : "删除"}</button>}
                 </span>
               </div>
               );
