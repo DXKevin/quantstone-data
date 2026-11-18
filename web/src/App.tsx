@@ -25,9 +25,10 @@ import {
   DatasetSummary,
 } from "./api";
 import CollectionJobs from "./CollectionJobs";
+import StoragePage from "./StoragePage";
 
 type View = "list" | "create" | "edit" | "detail";
-type Area = "datasets" | "collectors" | "collection";
+type Area = "datasets" | "collectors" | "collection" | "storage";
 
 interface FieldDraft {
   key: number;
@@ -133,7 +134,7 @@ function App() {
           <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
           <button className={area === "collectors" ? "nav-item active" : "nav-item"} onClick={() => setArea("collectors")}><Cable size={17} />采集器</button>
           <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
-          <button className="nav-item" disabled><FileCode2 size={17} />存储目录<span>稍后</span></button>
+          <button className={area === "storage" ? "nav-item active" : "nav-item"} onClick={() => setArea("storage")}><FileCode2 size={17} />数据存储</button>
         </nav>
         <div className="sidebar-bottom">
           <button className="nav-item" disabled><CircleHelp size={17} />帮助</button>
@@ -144,6 +145,7 @@ function App() {
 
       <main className="main-area">
         {area === "collection" && <CollectionJobs datasets={datasets} collectors={collectors} />}
+        {area === "storage" && <StoragePage datasets={datasets} />}
         {area === "collectors" && <CollectorCatalog collectors={collectors} />}
         {area === "datasets" && view === "list" && (
           <DatasetList

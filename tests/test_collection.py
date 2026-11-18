@@ -310,12 +310,18 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
         catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily")
+        storage = client.get("/api/v1/storage/overview")
 
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
     assert runs.json()[0]["row_count"] == 2
     assert runs.json()[0]["status"] == "succeeded"
     assert catalog.json()[0]["partition_key"] == "2026-11-18"
+    assert storage.status_code == 200
+    assert storage.json()["published_files"] == 1
+    assert storage.json()["published_partitions"] == 1
+    assert storage.json()["published_rows"] == 2
+    assert storage.json()["missing_files"] == 0
     published = tmp_path / "data" / catalog.json()[0]["file_path"]
     assert published.suffix == ".parquet"
     assert published.is_file()
