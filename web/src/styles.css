@@ -143,6 +143,8 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .preview-filter-fields input { height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--ink); font: inherit; }
 .preview-filter-actions { display: flex; gap: 8px; }
 .preview-filter-actions .primary-button, .preview-filter-actions .ghost-button { min-height: 34px; height: 34px; padding: 0 12px; }
+.preview-filter-actions select { height: 34px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--ink); font: inherit; }
+.preview-download-message { margin-top: 9px; color: var(--muted); font-size: 10.5px; }
 .preview-query-note { margin-top: 10px; padding: 9px 11px; border-left: 3px solid var(--green); background: #f1f8f4; color: #315d46; font-size: 11px; }
 .preview-query-note.warning { border-left-color: #c58a16; background: #fff8e8; color: #79540e; }
 .preview-error { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 10px 12px; border: 1px solid #e5bdbd; background: #fff4f4; color: #8f3030; font-size: 11px; }

@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pyarrow as pa
+import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -133,6 +134,114 @@ def _coerce_filter_value(value: str, field_type: pa.DataType) -> object:
             raise ValueError(f"布尔值必须是 true/false 或 1/0：{value}")
         return normalized in {"true", "1"}
     return value
+
+
+def export_dataset_rows(
+    session: Session,
+    data_root: Path,
+    dataset_id: str,
+    primary_key_filters: dict[str, str],
+    target: Path,
+    file_format: str,
+) -> dict:
+    """把主键筛选出的完整结果写为临时 CSV 或 Parquet 文件。"""
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise KeyError(dataset_id)
+    schema_version = next(
+        item for item in dataset.schemas if item.version == dataset.current_schema_version
+    )
+    primary_keys = set(schema_version.primary_key_fields)
+    if not primary_key_filters:
+        raise ValueError("下载前必须至少填写一个主键筛选条件")
+    unknown_filters = set(primary_key_filters) - primary_keys
+    if unknown_filters:
+        raise ValueError(f"只能按主键字段筛选：{', '.join(sorted(primary_keys))}")
+    if file_format not in {"csv", "parquet"}:
+        raise ValueError("下载格式只支持 csv 或 parquet")
+
+    partitions = list(
+        session.scalars(
+            select(CatalogPartition)
+            .where(CatalogPartition.dataset_id == dataset_id)
+            .order_by(CatalogPartition.partition_key)
+        )
+    )
+    by_file: dict[str, set[str]] = {}
+    for item in partitions:
+        by_file.setdefault(item.file_path, set()).add(item.partition_key)
+    if not by_file:
+        raise ValueError("数据集尚无已发布数据")
+    missing_files = sorted(path for path in by_file if not (data_root / path).is_file())
+    if missing_files:
+        raise MissingCatalogFilesError(missing_files)
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partition_field = (dataset.storage_policy or {}).get("logical_partition_field")
+    parquet_writer: pq.ParquetWriter | None = None
+    csv_writer: pacsv.CSVWriter | None = None
+    csv_sink: pa.OSFile | None = None
+    row_count = 0
+    files_read = 0
+    failed = False
+    try:
+        for path in sorted(by_file):
+            file_path = data_root / path
+            arrow_schema = pq.read_schema(file_path)
+            parquet_filters: list[tuple[str, str, object]] = []
+            if partition_field:
+                if partition_field not in arrow_schema.names:
+                    raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
+                field_type = arrow_schema.field(partition_field).type
+                wanted = sorted(by_file[path])
+                filter_values = (
+                    [date.fromisoformat(value) for value in wanted]
+                    if pa.types.is_date(field_type)
+                    else wanted
+                )
+                parquet_filters.append((partition_field, "in", filter_values))
+            for field_name, raw_value in primary_key_filters.items():
+                if field_name not in arrow_schema.names:
+                    raise ValueError(f"文件 {path} 缺少主键字段 {field_name}")
+                parquet_filters.append(
+                    (
+                        field_name,
+                        "=",
+                        _coerce_filter_value(raw_value, arrow_schema.field(field_name).type),
+                    )
+                )
+            table = pq.read_table(file_path, filters=parquet_filters)
+            files_read += 1
+            row_count += table.num_rows
+            if file_format == "parquet":
+                if parquet_writer is None:
+                    parquet_writer = pq.ParquetWriter(target, table.schema, compression="zstd")
+                parquet_writer.write_table(table)
+            else:
+                if csv_writer is None:
+                    csv_sink = pa.OSFile(str(target), "wb")
+                    csv_writer = pacsv.CSVWriter(csv_sink, table.schema)
+                csv_writer.write_table(table)
+    except Exception:
+        failed = True
+        raise
+    finally:
+        if parquet_writer is not None:
+            parquet_writer.close()
+        if csv_writer is not None:
+            csv_writer.close()
+        if csv_sink is not None:
+            csv_sink.close()
+        if failed:
+            target.unlink(missing_ok=True)
+
+    return {
+        "dataset_id": dataset_id,
+        "row_count": row_count,
+        "files_read": files_read,
+        "path": target,
+        "format": file_format,
+    }
 
 
 def compact_year(

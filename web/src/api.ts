@@ -307,6 +307,28 @@ export const api = {
     });
     return request<DatasetRows>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/rows?${query}`);
   },
+  downloadDatasetRows: async (datasetId: string, filters: Record<string, string>, format: "csv" | "parquet") => {
+    const query = new URLSearchParams({ format });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value.trim()) query.set(key, value.trim());
+    });
+    const response = await fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/download?${query}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.detail || `下载失败（${response.status}）`);
+    }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+    const filename = encodedName ? decodeURIComponent(encodedName) : plainName || `${datasetId}.${format}`;
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return Number(response.headers.get("X-Row-Count") ?? 0);
+  },
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, UIEvent } from "react";
 import { api, type DatasetDetail, type DatasetRows } from "./api";
@@ -14,6 +14,10 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>({});
+  const [downloadFormat, setDownloadFormat] = useState<"csv" | "parquet">("parquet");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
 
   const load = useCallback(async (requestedFilters: Record<string, string> = {}) => {
     setLoading(true);
@@ -27,6 +31,7 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
         activeFilters,
         Object.keys(activeFilters).length ? QUERY_LIMIT : PREVIEW_LIMIT,
       ));
+      setAppliedFilters(activeFilters);
     } catch (reason) {
       setPreview(null);
       setError(reason instanceof Error ? reason.message : "无法读取数据预览");
@@ -37,6 +42,8 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
 
   useEffect(() => {
     setFilters({});
+    setAppliedFilters({});
+    setDownloadMessage(null);
     void load({});
   }, [load]);
 
@@ -48,6 +55,19 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
   function clearFilters() {
     setFilters({});
     void load({});
+  }
+
+  async function downloadSelection() {
+    setDownloading(true);
+    setDownloadMessage(null);
+    try {
+      const rowCount = await api.downloadDatasetRows(dataset.id, appliedFilters, downloadFormat);
+      setDownloadMessage(`已生成 ${rowCount.toLocaleString()} 行 ${downloadFormat.toUpperCase()} 文件。`);
+    } catch (reason) {
+      setDownloadMessage(reason instanceof Error ? reason.message : "下载失败");
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
@@ -69,8 +89,15 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
         <div className="preview-filter-actions">
           <button type="submit" className="primary-button" disabled={loading}><Search size={14} />查询</button>
           <button type="button" className="ghost-button" onClick={clearFilters} disabled={loading}><X size={14} />清空</button>
+          <select value={downloadFormat} onChange={(event) => setDownloadFormat(event.target.value as "csv" | "parquet")} aria-label="下载格式">
+            <option value="parquet">Parquet</option>
+            <option value="csv">CSV</option>
+          </select>
+          <button type="button" className="ghost-button" onClick={() => void downloadSelection()} disabled={downloading || !preview?.filtered || Object.keys(appliedFilters).length === 0}><Download size={14} />{downloading ? "生成中…" : "下载结果"}</button>
         </div>
       </form>
+
+      {downloadMessage && <div className="preview-download-message">{downloadMessage}</div>}
 
       {preview?.filtered && <div className={preview.truncated ? "preview-query-note warning" : "preview-query-note"}>
         {preview.truncated

@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -203,6 +204,41 @@ def test_read_rows_rejects_non_primary_key_filter(tmp_path: Path) -> None:
 
     assert response.status_code == 422
     assert "只能按主键字段筛选" in response.json()["detail"]
+
+
+def test_download_exports_all_filtered_rows_as_csv_or_parquet(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        write_partition(client, "2024-01-03", ["000001.SZ", "600000.SH"])
+
+        csv_response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"symbol": "000001.SZ", "format": "csv"},
+        )
+        parquet_response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"symbol": "000001.SZ", "format": "parquet"},
+        )
+        unfiltered_response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"format": "csv"},
+        )
+
+    assert csv_response.status_code == 200
+    assert csv_response.headers["x-row-count"] == "2"
+    csv_table = pacsv.read_csv(pa.BufferReader(csv_response.content))
+    assert csv_table.num_rows == 2
+    assert set(csv_table["symbol"].to_pylist()) == {"000001.SZ"}
+
+    assert parquet_response.status_code == 200
+    assert parquet_response.headers["x-row-count"] == "2"
+    parquet_table = pq.read_table(pa.BufferReader(parquet_response.content))
+    assert parquet_table.num_rows == 2
+    assert set(parquet_table["symbol"].to_pylist()) == {"000001.SZ"}
+
+    assert unfiltered_response.status_code == 422
+    assert "至少填写一个主键" in unfiltered_response.json()["detail"]
 
 
 def test_read_rows_fails_when_catalog_file_is_missing(tmp_path: Path) -> None:
