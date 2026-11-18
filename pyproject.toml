@@ -29,6 +29,7 @@ packages = ["src/quantstone_data"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--basetemp=var/test-tmp"
 
 [tool.ruff]
 line-length = 100

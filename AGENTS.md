@@ -46,4 +46,5 @@ C:\Users\24495\Desktop\project\quantstone-data
 - 提交前运行 `pytest`、`ruff check .` 和 `npm run build`（涉及前端时）。
 - 不要删除或回退另一个 Agent 的修改，除非用户明确要求；
 - 不要把聊天记录当作唯一上下文，重要决定必须写入项目文档；
+- 安装依赖时将 `TEMP` 和 `TMP` 指向项目 `var/tmp`，不要让 pip 临时目录散落在项目根目录；
 - `docs/handoff.md` 只记录当前接力所需的信息，长期架构决定应写入 `docs/architecture-and-decisions.md`。
