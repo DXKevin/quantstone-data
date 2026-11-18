@@ -185,9 +185,6 @@ def build_coverage_cells(
     details: dict[str, dict] = {}
     for day in dates:
         key = day.isoformat()
-        if day > today:
-            cells[key] = "future"
-            continue
         partition = partitions.get(key)
         if partition is not None:
             if key in missing_files:
@@ -300,7 +297,7 @@ def dataset_coverage(
         )
         summary = {
             status: sum(1 for value in cells.values() if value == status)
-            for status in ("complete", "missing", "failed", "abnormal", "pending", "future")
+            for status in ("complete", "missing", "failed", "abnormal", "pending")
         }
         rows.append(
             {

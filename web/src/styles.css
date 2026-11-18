@@ -367,7 +367,6 @@ body { font-size: 14px; }
 .cell-missing { background: #e05252; }
 .cell-failed { background: #e8a33d; }
 .cell-abnormal { background: #8e44ad; }
-.cell-future { background: #e8ecea; }
 .cell-none { background: #f1f3f2; }
 
 .cell-pending { background: #c9d6cf; }

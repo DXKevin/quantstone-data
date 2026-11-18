@@ -18,7 +18,7 @@ def partition(key: str, rows: int = 100) -> SimpleNamespace:
 
 
 def test_coverage_cells_cover_all_states() -> None:
-    dates = [date(2026, 11, 16), date(2026, 11, 17), date(2026, 11, 18), date(2026, 11, 19)]
+    dates = [date(2026, 11, 16), date(2026, 11, 17), date(2026, 11, 18)]
     partitions = {
         "2026-11-16": partition("2026-11-16"),
         "2026-11-17": partition("2026-11-17"),
@@ -37,7 +37,6 @@ def test_coverage_cells_cover_all_states() -> None:
     assert cells["2026-11-16"] == "complete"
     assert cells["2026-11-17"] == "abnormal"
     assert cells["2026-11-18"] == "failed"
-    assert cells["2026-11-19"] == "future"
     assert details["2026-11-16"]["row_count"] == 100
     assert details["2026-11-18"]["error"] == "频率超限"
     assert cells.get("2026-11-20") is None

@@ -10,7 +10,6 @@ const statusLabels: Record<string, string> = {
   failed: "采集失败",
   abnormal: "文件异常",
   pending: "待采集",
-  future: "未来",
 };
 
 export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => void }) {
