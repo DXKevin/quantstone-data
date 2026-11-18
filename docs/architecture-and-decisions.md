@@ -353,19 +353,17 @@ operation 参数定义校验。凭证、限流和重试不属于数据集绑定�
 股票列表目前分别注册 `stock_list_initial` 和 `stock_list_incremental` 两个具体入口。首版只采集 TuShare 默认的当前上市状态 `L`，
 其他上市状态需要等通用任务参数和供应商限流调度完成后开放。
 
-数据集专用代码严格按照数据集 ID 的层级组织。例如：
+采集器实现归属于采集能力，放在对应采集器模块中，不再放入 `datasets/` 代码目录。例如：
 
 ```text
-datasets/tushare/cn/stock/stock_basic/
+collectors/tushare_cn_stock/
 ├── definition.py
-├── collector.py
-├── reviewer.py
-└── __init__.py
+├── daily.py
+└── stock_basic.py
 ```
 
-如果数据集 ID 带可选市场层，则继续追加目录，例如
-`datasets/tb_l2/cn/stock/l2_order/sh/`。一个数据集目录提供一个统一入口，内部文件可以
-继续拆分；分页、限流、重试和通用校验等跨数据集能力不放在该目录重复实现。
+数据集契约保存在 Registry 数据库中；代码不再重复保存一套数据集定义。采集器目录名由
+采集能力决定，一个采集器可通过多个 operation 输出多个数据集。
 
 ## 10. 标准化与质量校验
 
@@ -383,6 +381,19 @@ datasets/tushare/cn/stock/stock_basic/
 10. 生成 Validation Report。
 
 校验失败的数据应留在 staging 或 quarantine，不得对正式 SDK 查询可见。
+
+每个数据集默认只有一个审核器，系统直接以 `dataset_id` 查询审核器注册表，不保存额外的
+`reviewer_key`。审核器代码严格映射数据集 ID，例如：
+
+```text
+reviewers/tushare/cn/stock/daily/
+├── definition.py
+└── reviewer.py
+```
+
+字段存在性、主键、非空和分区日期等通用检查放在 `reviewers/checks.py` 复用；每个数据集
+审核器负责组合通用检查和自己的业务规则。审核器只读取 staging 文件并返回结构化报告，
+不移动正式文件，也不修改 Catalog。
 
 ## 11. 逻辑分区与物理文件
 
@@ -437,6 +448,10 @@ TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布�
 - 只有校验通过并成功登记 Catalog 的数据才算“已采集”；
 - 历史文件被替换时应保留修订或版本线索；
 - SDK 只能读取已发布数据。
+
+发布器与审核器分离。审核通过后，通用发布服务根据数据集的 `storage_policy` 选择目标路径，
+移动文件并更新 Catalog。发布代码按存储策略组织在 `publishing/`，不为每个数据集复制一套
+发布器。当前已拆出路径解析、Catalog 写入和发布服务；完整的跨文件系统原子恢复仍待实现。
 
 ## 13. 状态模型
 
@@ -540,6 +555,11 @@ quantstone-data/
 │   ├── architecture-and-decisions.md
 │   └── dataset-id.md
 ├── src/quantstone_data/
+│   ├── collectors/               # 按采集能力组织
+│   ├── reviewers/                # 按数据集 ID 组织
+│   ├── publishing/               # 按存储策略发布
+│   ├── collector_registry.py
+│   ├── reviewer_registry.py
 │   ├── database.py
 │   ├── collection.py
 │   ├── collection_schemas.py

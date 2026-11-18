@@ -9,9 +9,8 @@ from urllib.request import Request, urlopen
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .definition import DEFAULT_LIST_STATUSES
-
 API_URL = "https://api.tushare.pro"
+DEFAULT_LIST_STATUSES = ("L",)
 
 
 class CollectionError(RuntimeError):

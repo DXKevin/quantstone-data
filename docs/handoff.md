@@ -58,19 +58,25 @@
 - 实现 Collection Run、日增量发布和 CatalogPartition；
 - 数据集支持逻辑分区、布局、写入和合并策略；
 - 真实采集 2024-01-02 日 K 成功，共 5,329 行；
-- 后端现有 12 个测试通过；
+- 后端现有 13 个测试通过；
 - 前端生产构建通过；
-- Ruff 检查通过。
+- Ruff 检查通过；
+- 删除旧 `datasets/` 代码目录，数据集契约只保存在 Registry 数据库；
+- 采集实现归入 `collectors/tushare_cn_stock/`；
+- 审核器按数据集 ID 路径组织，并以 `dataset_id` 直接注册，不增加 reviewer ID；
+- 通用审核规则与数据集专属业务规则分离；
+- 发布流程拆为 `publishing` 服务、路径解析和 Catalog 写入模块；
+- 创建采集任务页面由 operation 参数定义动态生成表单。
 
 尚未实现：
 
 - 通用采集任务 Planner 和任务参数模型；
-- 通用采集器/审核器插件接口（当前只有 stock_basic 的最小代码注册表）；
+- 更多采集器/审核器实现（当前注册 TuShare stock_basic 和 daily）；
 - 联合采集运行及多数据集输出记录（注册模型已能识别，执行层尚未实现）；
 - staging 后续处理和 quarantine；
 - 数据质量报告；
-- Parquet 文件写入；
-- Data Catalog；
+- 通用手动文件解析、审核与发布；
+- 更完整的 Data Catalog；
 - 物理文件实体与逻辑分区的多对一 Catalog 模型；
 - 年度主文件合并；
 - 原子发布；
@@ -107,6 +113,31 @@
 - daily 已发布日增量，但年度合并尚未实现；
 
 ## 最近一次交接记录
+
+### 2026-11-18 — Codex
+
+完成：
+
+- 删除 `datasets/` 代码目录并迁移采集实现；
+- 建立按数据集 ID 注册的审核器结构和通用检查；
+- 将日 K 发布与 Catalog 更新抽取为通用发布模块；
+- 保持 TuShare daily 端到端闭环通过。
+
+验证：
+
+- `pytest`：13 个测试通过；
+- `ruff check .`：通过；
+- 前端生产构建：通过。
+
+下一步：
+
+- 为手动 Parquet 入库接入同一审核和发布流程；
+- 继续拆分物理 CatalogFile 与逻辑 CatalogPartition。
+
+遗留问题：
+
+- 当前发布仍缺少崩溃后的原子恢复机制；
+- stock_basic 审核通过后尚未接入正式发布。
 
 ### 2026-11-18 — Codex
 

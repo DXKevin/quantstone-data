@@ -195,7 +195,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         return [{"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"}]
 
     monkeypatch.setattr(
-        "quantstone_data.datasets.tushare.cn.stock.stock_basic.collector.call_api",
+        "quantstone_data.collectors.tushare_cn_stock.stock_basic.call_api",
         fake_call,
     )
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
@@ -287,7 +287,7 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         ]
 
     monkeypatch.setattr(
-        "quantstone_data.datasets.tushare.cn.stock.daily.collector._call_daily",
+        "quantstone_data.collectors.tushare_cn_stock.daily._call_daily",
         fake_daily,
     )
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")

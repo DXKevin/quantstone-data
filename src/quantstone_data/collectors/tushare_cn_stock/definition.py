@@ -3,20 +3,19 @@ from ...collector_types import (
     CollectorOperation,
     CollectorParameter,
 )
-from ...datasets.tushare.cn.stock.daily.collector import (
+from .daily import (
     collect_daily_incremental,
     collect_daily_initial,
 )
-from ...datasets.tushare.cn.stock.daily.definition import DATASET_ID as DAILY_DATASET_ID
-from ...datasets.tushare.cn.stock.stock_basic.collector import (
+from .stock_basic import (
     collect_incremental as collect_stock_list_incremental,
 )
-from ...datasets.tushare.cn.stock.stock_basic.collector import (
+from .stock_basic import (
     collect_initial as collect_stock_list_initial,
 )
-from ...datasets.tushare.cn.stock.stock_basic.definition import (
-    DATASET_ID as STOCK_LIST_DATASET_ID,
-)
+
+DAILY_DATASET_ID = "tushare.cn.stock.daily"
+STOCK_LIST_DATASET_ID = "tushare.cn.stock.stock_basic"
 
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),

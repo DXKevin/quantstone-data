@@ -1,6 +1,5 @@
 import hashlib
 import json
-import os
 import shutil
 from datetime import date, timedelta
 from pathlib import Path
@@ -19,15 +18,13 @@ from .collection_schemas import (
     InputMethod,
 )
 from .collector_registry import get_operation, validate_operation_parameters
+from .collectors.tushare_cn_stock.definition import DAILY_DATASET_ID
+from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
 from .database import get_session
-from .datasets.tushare.cn.stock.daily.definition import DATASET_ID as DAILY_DATASET_ID
-from .datasets.tushare.cn.stock.daily.reviewer import review_daily
-from .datasets.tushare.cn.stock.stock_basic import (
-    CollectionError,
-    load_token,
-    review,
-)
 from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset, DatasetSchemaVersion
+from .publishing import publish_partition
+from .reviewer_registry import review_dataset
+from .reviewer_types import ReviewContext
 from .schemas import DatasetStatus
 
 router = APIRouter(prefix="/collection-jobs", tags=["collection jobs"])
@@ -44,14 +41,6 @@ def _date_batches(start_date, end_date):
         if current.weekday() < 5:
             yield current
         current += timedelta(days=1)
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _execute_daily_job(
@@ -72,7 +61,10 @@ def _execute_daily_job(
         if latest_partition is None:
             raise HTTPException(
                 status_code=409,
-                detail="incremental collection requires an existing partition; run initial collection first",
+                detail=(
+                    "incremental collection requires an existing partition; "
+                    "run initial collection first"
+                ),
             )
         job.start_date = date.fromisoformat(latest_partition) + timedelta(days=1)
         configured_end = job.parameters.get("end_date")
@@ -125,7 +117,10 @@ def _execute_daily_job(
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
             artifact = result.outputs[job.dataset_id][0]
-            report = review_daily(artifact.path, schema, trade_date)
+            report = review_dataset(
+                job.dataset_id,
+                ReviewContext(artifact.path, schema, trade_date),
+            ).as_dict()
             report["partition_key"] = partition_key
             reports.append(report)
             run.staged_path = artifact.path.relative_to(data_root).as_posix()
@@ -136,42 +131,16 @@ def _execute_daily_job(
                 session.commit()
                 break
 
-            target = (
-                data_root
-                / "datasets"
-                / job.dataset_id
-                / "delta"
-                / str(trade_date.year)
-                / partition_key
-                / f"{run.id}.parquet"
-            )
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(artifact.path, target)
-            relative_target = target.relative_to(data_root).as_posix()
-            checksum = _sha256(target)
-            existing = session.scalar(
-                select(CatalogPartition).where(
-                    CatalogPartition.dataset_id == job.dataset_id,
-                    CatalogPartition.partition_key == partition_key,
-                )
-            )
-            if existing and existing.file_path != relative_target:
-                old_path = data_root / existing.file_path
-                old_path.unlink(missing_ok=True)
-            catalog = existing or CatalogPartition(
+            publish_partition(
+                session,
+                data_root=data_root,
                 dataset_id=job.dataset_id,
+                storage_policy=dataset.storage_policy,
                 partition_key=partition_key,
+                artifact_path=artifact.path,
+                row_count=artifact.row_count,
+                run=run,
             )
-            catalog.file_path = relative_target
-            catalog.row_count = artifact.row_count
-            catalog.size_bytes = target.stat().st_size
-            catalog.sha256 = checksum
-            catalog.collection_run_id = run.id
-            if existing is None:
-                session.add(catalog)
-            run.published_path = relative_target
-            run.staged_path = None
-            run.status = "succeeded"
             shutil.rmtree(run_directory, ignore_errors=True)
             session.commit()
         except Exception as error:
@@ -320,7 +289,15 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
         job.source_size_bytes = target.stat().st_size
         job.source_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
         job.status = CollectionJobStatus.STAGED.value
-        passed = review(target, schema, report_path)
+        report = review_dataset(
+            job.dataset_id,
+            ReviewContext(target, schema),
+        ).as_dict()
+        report_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        passed = report["passed"]
         job.status = (
             CollectionJobStatus.REVIEW_PASSED.value
             if passed

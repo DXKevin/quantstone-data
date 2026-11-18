@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
+from quantstone_data.reviewer_registry import REVIEWERS
 
 
 def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> None:
@@ -31,6 +32,13 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
             "description": "可选的更新截止日期，默认当天",
         }
     ]
+
+
+def test_reviewer_registry_uses_dataset_ids() -> None:
+    assert set(REVIEWERS) == {
+        "tushare.cn.stock.daily",
+        "tushare.cn.stock.stock_basic",
+    }
 
 
 def dataset_payload() -> dict:

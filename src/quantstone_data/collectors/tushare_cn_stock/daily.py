@@ -8,9 +8,10 @@ from urllib.request import Request, urlopen
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ......collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
-from ..stock_basic.collector import API_URL, CollectionError
-from .definition import DATASET_ID
+from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
+from .stock_basic import API_URL, CollectionError
+
+DATASET_ID = "tushare.cn.stock.daily"
 
 
 def _arrow_type(data_type: str) -> pa.DataType:
