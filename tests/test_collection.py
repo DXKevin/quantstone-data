@@ -1,6 +1,6 @@
 import hashlib
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import time
 from pathlib import Path
 from urllib.error import HTTPError
 
@@ -8,6 +8,18 @@ from fastapi.testclient import TestClient
 
 from quantstone_data.collectors.tushare_cn_stock.stock_basic import CollectionError
 from quantstone_data.main import create_app
+
+TERMINAL_STATUSES = {"cancelled", "failed", "review_failed", "review_passed", "succeeded"}
+
+
+def wait_for_job(client: TestClient, job_id: str, timeout: float = 5):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/v1/collection-jobs/{job_id}")
+        if response.json()["status"] in TERMINAL_STATUSES:
+            return response
+        time.sleep(0.01)
+    raise AssertionError(f"collection job {job_id} did not finish")
 
 
 def dataset_payload(dataset_id: str = "demo.cn.stock.daily") -> dict:
@@ -302,7 +314,8 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         assert created.json()["collector_key"] == "tushare_cn_stock"
         assert created.json()["collector_operation"] == "stock_list_initial"
 
-        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        executed = wait_for_job(client, created.json()["id"])
         review_response = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/review")
 
         def failing_call(_token: str, _list_status: str, _fields: list[str]) -> list[dict]:
@@ -320,12 +333,10 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
                 "input_method": "collector",
             },
         )
-        failed_executed = client.post(
+        failed_submitted = client.post(
             f"/api/v1/collection-jobs/{failed_created.json()['id']}/execute"
         )
-        failed_record = client.get(
-            f"/api/v1/collection-jobs/{failed_created.json()['id']}"
-        )
+        failed_record = wait_for_job(client, failed_created.json()["id"])
         retried = client.post(
             f"/api/v1/collection-jobs/{failed_created.json()['id']}/retry"
         )
@@ -336,9 +347,10 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             "quantstone_data.collectors.tushare_cn_stock.stock_basic.call_api",
             fake_call,
         )
-        retried_executed = client.post(
+        retried_submitted = client.post(
             f"/api/v1/collection-jobs/{retried.json()['id']}/execute"
         )
+        retried_executed = wait_for_job(client, retried.json()["id"])
         catalog = client.get(
             "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.stock_basic"
         )
@@ -347,6 +359,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             params={"ts_code": "000001.SZ"},
         )
 
+    assert submitted.status_code == 202
     assert executed.status_code == 200
     body = executed.json()
     assert body["status"] == "succeeded"
@@ -354,7 +367,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert review_response.json()["row_count"] == 1
     report = (tmp_path / "data" / body["staged_path"]).read_text(encoding="utf-8")
     assert '"passed": true' in report
-    assert failed_executed.status_code == 502
+    assert failed_submitted.status_code == 202
     assert failed_record.json()["status"] == "failed"
     assert failed_record.json()["error"] == "供应商暂时不可用"
     assert retried.status_code == 201
@@ -363,6 +376,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert retried.json()["operation"] == failed_created.json()["operation"]
     assert retried.json()["parameters"] == failed_created.json()["parameters"]
     assert retry_of_created.status_code == 409
+    assert retried_submitted.status_code == 202
     assert retried_executed.status_code == 200
     assert retried_executed.json()["status"] == "succeeded"
     assert len(catalog.json()) == 1
@@ -471,10 +485,12 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
                 "parameters": {"start_date": "2026-11-17", "end_date": "2026-11-18"},
             },
         )
-        calendar_executed = client.post(
+        calendar_submitted = client.post(
             f"/api/v1/collection-jobs/{calendar_job.json()['id']}/execute"
         )
-        assert calendar_executed.status_code == 200
+        assert calendar_submitted.status_code == 202
+        calendar_executed = wait_for_job(client, calendar_job.json()["id"])
+        assert calendar_executed.json()["status"] == "succeeded"
         assert client.post("/api/v1/datasets", json=payload).status_code == 201
         assert client.post("/api/v1/datasets/tushare.cn.stock.daily/activate").status_code == 200
         created = client.post(
@@ -491,7 +507,8 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         )
         assert created.json()["start_date"] == "2026-11-17"
         assert created.json()["end_date"] == "2026-11-18"
-        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        executed = wait_for_job(client, created.json()["id"])
         runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
         catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily")
         storage = client.get("/api/v1/storage/overview")
@@ -523,10 +540,11 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
             },
         )
         failed_job_id = failed_created.json()["id"]
-        failed_executed = client.post(f"/api/v1/collection-jobs/{failed_job_id}/execute")
-        failed_job = client.get(f"/api/v1/collection-jobs/{failed_job_id}")
+        failed_submitted = client.post(f"/api/v1/collection-jobs/{failed_job_id}/execute")
+        failed_job = wait_for_job(client, failed_job_id)
         failed_runs = client.get(f"/api/v1/collection-jobs/{failed_job_id}/runs")
 
+    assert submitted.status_code == 202
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
     assert runs.json()[0]["row_count"] == 2
@@ -542,8 +560,7 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     assert published.suffix == ".parquet"
     assert published.is_file()
     upstream_error = "上游数据服务暂时不可用（HTTP 502 Bad Gateway），采集器重试后仍失败"
-    assert failed_executed.status_code == 502
-    assert failed_executed.json()["detail"] == upstream_error
+    assert failed_submitted.status_code == 202
     assert failed_job.json()["status"] == "failed"
     assert failed_job.json()["error"] == upstream_error
     assert failed_runs.json()[0]["status"] == "failed"
@@ -618,9 +635,11 @@ def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
                 "parameters": {"start_date": "2026-01-01", "end_date": "2026-12-31"},
             },
         )
-        executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        executed = wait_for_job(client, created.json()["id"])
         catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.trade_cal")
 
+    assert submitted.status_code == 202
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
     assert catalog.json()[0]["partition_key"] == "snapshot"
@@ -665,12 +684,11 @@ def test_snapshot_job_can_be_cancelled_before_publish(tmp_path: Path, monkeypatc
             },
         )
         job_id = created.json()["id"]
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(client.post, f"/api/v1/collection-jobs/{job_id}/execute")
-            assert started.wait(timeout=5)
-            cancelled = client.post(f"/api/v1/collection-jobs/{job_id}/cancel")
-            release.set()
-            executed = future.result(timeout=10)
+        submitted = client.post(f"/api/v1/collection-jobs/{job_id}/execute")
+        assert started.wait(timeout=5)
+        cancelled = client.post(f"/api/v1/collection-jobs/{job_id}/cancel")
+        release.set()
+        executed = wait_for_job(client, job_id)
         runs = client.get(f"/api/v1/collection-jobs/{job_id}/runs")
         catalog = client.get(
             "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.trade_cal"
@@ -678,6 +696,7 @@ def test_snapshot_job_can_be_cancelled_before_publish(tmp_path: Path, monkeypatc
 
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelling"
+    assert submitted.status_code == 202
     assert executed.status_code == 200
     assert executed.json()["status"] == "cancelled"
     assert runs.json()[0]["status"] == "cancelled"

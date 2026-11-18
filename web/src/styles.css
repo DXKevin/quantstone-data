@@ -181,6 +181,7 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .job-status-awaiting_file { background: #fff3d9; color: #956400; }
 .job-status-staged { background: #e5f5ed; color: #087851; }
 .job-status-created { background: #e9eff7; color: #42668f; }
+.job-status-queued { background: #eef0fa; color: #565b98; }
 .job-status-review_passed { background: #e5f5ed; color: #087851; }
 .job-status-review_failed { background: #fff0e8; color: #a44e20; }
 .job-status-succeeded { background: #dcf4e7; color: #087851; }

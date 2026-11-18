@@ -39,6 +39,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 # 进程内记录正在执行的任务和取消请求；单进程部署下即可生效。
 _RUNNING_JOBS: set[str] = set()
+_QUEUED_JOBS: set[str] = set()
 _CANCEL_REQUESTS: set[str] = set()
 _PUBLISHING_JOBS: set[str] = set()
 _JOB_STATE_LOCK = threading.Lock()
@@ -71,6 +72,7 @@ def recover_interrupted_jobs(session: Session) -> int:
                 CollectionJob.status.in_(
                     (
                         CollectionJobStatus.RUNNING.value,
+                        CollectionJobStatus.QUEUED.value,
                         CollectionJobStatus.CANCELLING.value,
                     )
                 )
@@ -115,6 +117,7 @@ def _mark_job_failed(session: Session, job_id: str, error: Exception) -> None:
     message = _failure_message(error)
     if job.status in {
         CollectionJobStatus.CREATED.value,
+        CollectionJobStatus.QUEUED.value,
         CollectionJobStatus.RUNNING.value,
         CollectionJobStatus.CANCELLING.value,
         CollectionJobStatus.FAILED.value,
@@ -835,7 +838,78 @@ def retry_collection_job(
     return serialize_job(retried_job)
 
 
-@router.post("/{job_id}/execute", response_model=CollectionJobRead)
+def _execute_collection_job_background(job_id: str, session_factory, data_root: Path) -> None:
+    with session_factory() as session:
+        with _JOB_STATE_LOCK:
+            job = session.get(CollectionJob, job_id)
+            if job is None:
+                _QUEUED_JOBS.discard(job_id)
+                return
+            if job.status in {
+                CollectionJobStatus.CANCELLING.value,
+                CollectionJobStatus.CANCELLED.value,
+            }:
+                job.status = CollectionJobStatus.CANCELLED.value
+                session.commit()
+                _QUEUED_JOBS.discard(job_id)
+                _CANCEL_REQUESTS.discard(job_id)
+                log_event(
+                    "collection_job_cancelled",
+                    job_id=job.id,
+                    dataset_id=job.dataset_id,
+                )
+                return
+            if job.status != CollectionJobStatus.QUEUED.value:
+                _QUEUED_JOBS.discard(job_id)
+                return
+            _QUEUED_JOBS.discard(job_id)
+            _RUNNING_JOBS.add(job_id)
+            job.status = CollectionJobStatus.RUNNING.value
+            job.error = None
+            session.commit()
+
+        try:
+            operation = get_operation(job.collector_key or "", job.collector_operation or "")
+            if operation is None or job.dataset_id not in operation.datasets:
+                raise RuntimeError("dataset has no executable collector")
+            dataset = session.scalar(
+                select(Dataset)
+                .options(
+                    selectinload(Dataset.schemas).selectinload(DatasetSchemaVersion.fields)
+                )
+                .where(Dataset.id == job.dataset_id)
+            )
+            if dataset is None:
+                raise RuntimeError("dataset not found")
+            schema = next(
+                item
+                for item in dataset.schemas
+                if item.version == dataset.current_schema_version
+            )
+            log_event(
+                "collection_job_started",
+                job_id=job.id,
+                dataset_id=job.dataset_id,
+                operation=job.operation,
+                collector=job.collector_key,
+                collector_operation=job.collector_operation,
+            )
+            _run_collection(job, operation, dataset, schema, data_root, session)
+        except Exception as error:
+            _mark_job_failed(session, job_id, error)
+        finally:
+            with _JOB_STATE_LOCK:
+                _RUNNING_JOBS.discard(job_id)
+                _QUEUED_JOBS.discard(job_id)
+                _CANCEL_REQUESTS.discard(job_id)
+                _PUBLISHING_JOBS.discard(job_id)
+
+
+@router.post(
+    "/{job_id}/execute",
+    response_model=CollectionJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def execute_collection_job(job_id: str, request: Request, session: SessionDep) -> CollectionJobRead:
     job = session.get(CollectionJob, job_id)
     if job is None:
@@ -853,43 +927,39 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     if len(operation.datasets) > 1:
         raise HTTPException(status_code=501, detail="joint collection execution is not implemented")
 
-    log_event(
-        "collection_job_started",
-        job_id=job.id,
-        dataset_id=job.dataset_id,
-        operation=job.operation,
-        collector=job.collector_key,
-        collector_operation=job.collector_operation,
-    )
-
-    dataset = session.scalar(
-        select(Dataset)
-        .options(selectinload(Dataset.schemas).selectinload(DatasetSchemaVersion.fields))
-        .where(Dataset.id == job.dataset_id)
-    )
-    assert dataset is not None
-    schema = next(
-        item for item in dataset.schemas if item.version == dataset.current_schema_version
-    )
     data_root: Path = request.app.state.data_root
     with _JOB_STATE_LOCK:
         session.refresh(job)
         if job.status != CollectionJobStatus.CREATED.value:
             raise HTTPException(status_code=409, detail="job has already been executed")
-        _RUNNING_JOBS.add(job.id)
-        job.status = CollectionJobStatus.RUNNING.value
+        _QUEUED_JOBS.add(job.id)
+        job.status = CollectionJobStatus.QUEUED.value
         job.error = None
         session.commit()
-    try:
-        return _run_collection(job, operation, dataset, schema, data_root, session)
-    except Exception as error:
-        _mark_job_failed(session, job.id, error)
-        raise
-    finally:
-        with _JOB_STATE_LOCK:
-            _RUNNING_JOBS.discard(job.id)
-            _CANCEL_REQUESTS.discard(job.id)
-            _PUBLISHING_JOBS.discard(job.id)
+        try:
+            request.app.state.collection_executor.submit(
+                job.id,
+                partial(
+                    _execute_collection_job_background,
+                    job.id,
+                    request.app.state.session_factory,
+                    data_root,
+                ),
+            )
+        except RuntimeError as error:
+            _QUEUED_JOBS.discard(job.id)
+            job.status = CollectionJobStatus.CREATED.value
+            session.commit()
+            raise HTTPException(status_code=503, detail="后台任务执行器不可用") from error
+        log_event(
+            "collection_job_queued",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+            operation=job.operation,
+            collector=job.collector_key,
+            collector_operation=job.collector_operation,
+        )
+    return serialize_job(job)
 
 
 def _run_collection(
@@ -978,7 +1048,7 @@ def _run_collection(
 
 
 @router.post("/{job_id}/cancel", response_model=CollectionJobRead)
-def cancel_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead:
+def cancel_collection_job(job_id: str, request: Request, session: SessionDep) -> CollectionJobRead:
     job = session.get(CollectionJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="collection job not found")
@@ -989,7 +1059,24 @@ def cancel_collection_job(job_id: str, session: SessionDep) -> CollectionJobRead
         if job.id in _PUBLISHING_JOBS:
             raise HTTPException(status_code=409, detail="任务正在发布，已无法安全取消")
 
-        if job.id in _RUNNING_JOBS:
+        if job.id in _QUEUED_JOBS:
+            if request.app.state.collection_executor.cancel(job.id):
+                _QUEUED_JOBS.discard(job.id)
+                job.status = CollectionJobStatus.CANCELLED.value
+                log_event(
+                    "collection_job_cancelled",
+                    job_id=job.id,
+                    dataset_id=job.dataset_id,
+                )
+            else:
+                job.status = CollectionJobStatus.CANCELLING.value
+                _CANCEL_REQUESTS.add(job.id)
+                log_event(
+                    "collection_job_cancel_requested",
+                    job_id=job.id,
+                    dataset_id=job.dataset_id,
+                )
+        elif job.id in _RUNNING_JOBS:
             # 先落库再登记取消请求，避免与执行线程写回 CANCELLED 的顺序竞争。
             job.status = CollectionJobStatus.CANCELLING.value
             session.commit()
@@ -1020,7 +1107,8 @@ def delete_collection_job(
     job = session.get(CollectionJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="collection job not found")
-    if job.id in _RUNNING_JOBS or job.status in {
+    if job.id in _RUNNING_JOBS or job.id in _QUEUED_JOBS or job.status in {
+        CollectionJobStatus.QUEUED.value,
         CollectionJobStatus.RUNNING.value,
         CollectionJobStatus.CANCELLING.value,
     }:

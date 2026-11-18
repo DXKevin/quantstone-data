@@ -40,6 +40,7 @@ const inputLabels: Record<CollectionInputMethod, string> = {
 
 const statusLabels = {
   created: "已创建",
+  queued: "排队中",
   running: "执行中",
   cancelling: "正在取消",
   cancelled: "已取消",
@@ -104,7 +105,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   }, [jobs]);
 
   const hasRunning = jobs.some(
-    (job) => job.status === "running" || job.status === "cancelling",
+    (job) => job.status === "queued" || job.status === "running" || job.status === "cancelling",
   ) || runningJobId !== null;
 
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
 
     async function poll() {
       const running = jobsRef.current.filter(
-        (job) => job.status === "running" || job.status === "cancelling",
+        (job) => job.status === "queued" || job.status === "running" || job.status === "cancelling",
       );
       const entries = await Promise.all(
         running.map(async (job) => {
@@ -162,14 +163,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     setNotice(null);
     setError(null);
     try {
-      const result = await api.executeCollectionJob(job.id);
-      if (result.status === "review_failed") {
-        const report = await api.getCollectionReview(job.id);
-        setReview({ jobId: job.id, data: report });
-        setNotice("采集已停止：部分日期审核异常，具体原因已展开。");
-      } else {
-        setNotice(result.status === "succeeded" ? "采集、审核和发布均已完成。" : "采集完成，暂存数据审核通过。");
-      }
+      await api.executeCollectionJob(job.id);
+      setNotice("任务已提交后台执行，可以关闭页面或继续操作。");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "采集任务执行失败");
     } finally {
@@ -195,14 +190,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       setExpandedJobId(retried.id);
       setDetailTab("runs");
       await loadJobs(true);
-      const result = await api.executeCollectionJob(retried.id);
-      if (result.status === "review_failed") {
-        const report = await api.getCollectionReview(retried.id);
-        setReview({ jobId: retried.id, data: report });
-        setNotice("重试已停止：审核仍有异常，具体原因已展开。");
-      } else {
-        setNotice(result.status === "succeeded" ? "重试任务已采集、审核并发布。" : "重试任务执行完成。");
-      }
+      await api.executeCollectionJob(retried.id);
+      setNotice("重试任务已提交后台执行，并已切换到新任务。");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "重试任务失败");
     } finally {
@@ -268,8 +257,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     setError(null);
     setNotice(null);
     try {
-      await api.cancelCollectionJob(job.id);
-      setNotice("已请求取消，当前分区处理完后停止。");
+      const cancelled = await api.cancelCollectionJob(job.id);
+      setNotice(cancelled.status === "cancelled" ? "排队任务已取消。" : "已请求取消，当前分区处理完后停止。");
       await loadJobs();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "取消任务失败");
@@ -373,7 +362,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
             <div className="job-row job-head"><span>数据集 / 任务</span><span>任务目的</span><span>输入方式</span><span>日期范围</span><span>文件</span><span>状态</span><span>操作</span></div>
             {jobs.map((job) => {
               const jobProgress = progress[job.id];
-              const running = job.status === "running" || job.status === "cancelling";
+              const running = job.status === "queued" || job.status === "running" || job.status === "cancelling";
               const expanded = expandedJobId === job.id;
               const jobRuns = runs[job.id] ?? [];
               const jobLogs = logs[job.id] ?? [];
@@ -389,9 +378,9 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                   <JobStatus status={job.status} />
                 </span>
                 <span className="job-actions" onClick={(event) => event.stopPropagation()}>
-                  {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "采集中…" : "执行采集"}</button>}
+                  {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "提交中…" : "执行采集"}</button>}
                   {job.input_method === "collector" && (job.status === "failed" || job.status === "review_failed" || job.status === "cancelled") && <button type="button" className="mini-upload-button" disabled={retryingJobId === job.id} onClick={() => void retryJob(job)}><RefreshCw size={14} className={retryingJobId === job.id ? "spin" : ""} />{retryingJobId === job.id ? "重试中…" : "重试"}</button>}
-                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : "取消"}</button>}
+                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : job.status === "queued" ? "取消排队" : "取消"}</button>}
                   {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
                   {!running && <button type="button" className={confirming === `${job.id}:delete` ? "mini-upload-button danger-mini" : "mini-upload-button quiet-mini"} onClick={() => void deleteJob(job)}><Trash2 size={14} />{confirming === `${job.id}:delete` ? "确认删除" : "删除"}</button>}
                 </span>
@@ -634,6 +623,7 @@ function formatDateTime(value: string) {
 const logEventLabels: Record<string, string> = {
   collection_job_created: "任务已创建",
   collection_job_started: "任务开始执行",
+  collection_job_queued: "任务已进入后台队列",
   collection_run_started: "开始采集分区",
   collection_artifact_staged: "采集结果已暂存",
   review_completed: "数据审核完成",

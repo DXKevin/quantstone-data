@@ -19,6 +19,7 @@ class InputMethod(StrEnum):
 
 class CollectionJobStatus(StrEnum):
     CREATED = "created"
+    QUEUED = "queued"
     RUNNING = "running"
     CANCELLING = "cancelling"
     CANCELLED = "cancelled"

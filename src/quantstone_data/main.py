@@ -5,6 +5,7 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 
+from .background import BackgroundJobExecutor
 from .catalog import router as catalog_router
 from .collection import recover_interrupted_jobs
 from .collection import router as collection_router
@@ -37,10 +38,13 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
             recovered_jobs = recover_interrupted_jobs(session)
         if recovered_jobs:
             log_event("interrupted_jobs_recovered", count=recovered_jobs, level=30)
+        executor = BackgroundJobExecutor()
+        app.state.collection_executor = executor
         log_event("application_started", data_root=resolved_data_root)
         try:
             yield
         finally:
+            executor.shutdown()
             log_event("application_stopped")
 
     app = FastAPI(title="QuantStone Data", version="0.1.0", lifespan=lifespan)
