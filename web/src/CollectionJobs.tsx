@@ -204,12 +204,9 @@ function CreateCollectionJob(props: {
   const [datasetId, setDatasetId] = useState(props.datasets[0]?.id ?? "");
   const [operation, setOperation] = useState<CollectionOperation>("initial");
   const [inputMethod, setInputMethod] = useState<CollectionInputMethod>("file_import");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useDateRange, setUseDateRange] = useState(false);
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
   const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
   const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
@@ -224,8 +221,6 @@ function CreateCollectionJob(props: {
     const missingParameter = selectedCollectorOperation?.parameters.find((item) => item.required && !parameterValues[item.name]?.trim());
     if (inputMethod === "collector" && !selectedCollectorOperation) return setError("没有找到该任务目的绑定的采集器操作。");
     if (missingParameter) return setError(`请填写必填参数：${missingParameter.name}`);
-    if (useDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
-    if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
 
     const parameters = Object.fromEntries(
@@ -238,8 +233,8 @@ function CreateCollectionJob(props: {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: inputMethod === "file_import" && useDateRange ? startDate : null,
-      end_date: inputMethod === "file_import" && useDateRange ? endDate : null,
+      start_date: null,
+      end_date: null,
       collector_key: null,
       parameters,
     };
@@ -282,7 +277,6 @@ function CreateCollectionJob(props: {
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
           {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{selectedCollectorOperation.description}</span></div>{selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
-          {inputMethod === "file_import" && <><label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次文件对应明确的日期范围</label>{useDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}</>}
         </div>
       </section>
 
