@@ -96,6 +96,8 @@
 - 采集任务列表显示本地化创建时间，创建表单切换输入方式不再无条件重置任务目的；
 - `tushare.cn.stock.stock_basic` 已升级到统一 CollectionResult 协议并接入 snapshot 正式发布；
 - 旧股票信息数据集启动时自动补齐 snapshot 存储策略，审核通过后登记 Catalog 并可直接预览；
+- 采集任务详情新增“运行日志”页签，可查看采集、审核、发布、限流和重试事件，并在执行期间自动刷新；
+- 新增任务日志读取 API，默认返回最近 500 条；执行框架日志已携带 job_id，可正确进入任务日志文件；
 
 尚未实现：
 
@@ -168,6 +170,7 @@
 - stock_basic 采集器升级为统一 CollectionResult 协议，并复用通用 snapshot 审核、发布和 Catalog 流程；
 - SQLite 启动迁移为现有 stock_basic 数据集补齐 `snapshot + replace_snapshot` 存储策略。
 - daily、snapshot 和旧执行路径统一处理上游 HTTP、网络及限流异常；重试耗尽后返回中文 502，任务与运行记录保存相同错误原因。
+- 前端任务详情将分区“执行明细”与过程“运行日志”分开展示；日志接口从现有 JSON Lines 文件读取，不重复建立日志存储。
 
 验证：
 
@@ -180,6 +183,7 @@
 - 真实服务验证：历史失败任务成功复制为新 `created` 任务，operation、参数和追溯 ID 均正确；验证任务随后删除。
 - 隔离数据库和模拟供应商验证：stock_basic 任务进入 `succeeded`，Catalog 生成 `snapshot` 分区，正式 Parquet 可按 `ts_code` 预览；
 - `pytest` 仍在 TestClient 初始化前被本机 `socket.socketpair()` 阻塞；Ruff、py_compile 和 diff check 通过。
+- 任务日志读取与执行框架测试：6 项通过；前端 `npm run build`：通过。
 
 下一步：
 

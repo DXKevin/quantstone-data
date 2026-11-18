@@ -61,7 +61,13 @@ def test_operation_with_scope_shares_rate_limit_window(
 
 def test_run_operation_retries_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     pauses: list[float] = []
+    events: list[dict] = []
     monkeypatch.setattr(execution, "_sleep", pauses.append)
+    monkeypatch.setattr(
+        execution,
+        "log_event",
+        lambda event, **fields: events.append({"event": event, **fields}),
+    )
     calls = {"count": 0}
 
     def call() -> str:
@@ -74,9 +80,10 @@ def test_run_operation_retries_rate_limit(monkeypatch: pytest.MonkeyPatch) -> No
         retry=RetryPolicy(attempts=3, delay_seconds=1, max_delay_seconds=10)
     )
 
-    assert run_operation("demo", operation, call) == "ok"
+    assert run_operation("demo", operation, call, job_id="job-123") == "ok"
     assert calls["count"] == 3
     assert pauses == [3, 3]
+    assert [event["job_id"] for event in events] == ["job-123", "job-123"]
 
 
 def test_run_operation_gives_up_after_attempts(monkeypatch: pytest.MonkeyPatch) -> None:

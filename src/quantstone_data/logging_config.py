@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import deque
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -83,6 +84,23 @@ def configure_logging(data_root: Path) -> logging.Logger:
 
 def get_logger() -> logging.Logger:
     return logging.getLogger(LOGGER_NAME)
+
+
+def read_job_logs(data_root: Path, job_id: str, *, limit: int = 500) -> list[dict[str, Any]]:
+    """读取任务最近的结构化日志；忽略并发写入造成的不完整行。"""
+    target = data_root / "logs" / "collection" / f"{job_id}.log"
+    if not target.is_file():
+        return []
+    entries: deque[dict[str, Any]] = deque(maxlen=limit)
+    with target.open(encoding="utf-8") as source:
+        for line in source:
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict):
+                entries.append(item)
+    return list(entries)
 
 
 def log_event(

@@ -387,6 +387,7 @@ def _execute_daily_job(
                 job.collector_key or "unknown",
                 operation,
                 partial(operation.function, context, {"trade_date": partition_key}, fields),
+                job_id=job.id,
             )
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
@@ -543,6 +544,7 @@ def _execute_snapshot_job(
                 job.parameters,
                 fields,
             ),
+            job_id=job.id,
         )
         cancelled = _cancel_snapshot_at_boundary(
             session,
@@ -926,6 +928,7 @@ def _run_collection(
             job.collector_key or "unknown",
             operation,
             lambda: operation.function(target, fields, load_token()),
+            job_id=job.id,
         )
         job.source_file_name = target.name
         job.staged_path = target.relative_to(data_root).as_posix()

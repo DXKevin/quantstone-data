@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .database import get_session
-from .models import CatalogFile, CatalogPartition, CollectionRun
+from .logging_config import read_job_logs
+from .models import CatalogFile, CatalogPartition, CollectionJob, CollectionRun
 
 router = APIRouter(tags=["catalog"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -86,3 +87,18 @@ def list_collection_runs(job_id: str, session: SessionDep) -> list[dict]:
         }
         for item in items
     ]
+
+
+@router.get("/collection-jobs/{job_id}/logs")
+def list_collection_logs(
+    job_id: str,
+    request: Request,
+    session: SessionDep,
+    limit: int = Query(default=500, ge=1, le=2000),
+) -> dict:
+    if session.get(CollectionJob, job_id) is None:
+        raise HTTPException(status_code=404, detail="collection job not found")
+    return {
+        "job_id": job_id,
+        "entries": read_job_logs(request.app.state.data_root, job_id, limit=limit),
+    }

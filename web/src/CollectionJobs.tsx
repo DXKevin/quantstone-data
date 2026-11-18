@@ -18,6 +18,7 @@ import {
   type CollectorParameter,
   type CollectionJob,
   type CollectionJobCreatePayload,
+  type CollectionLogEntry,
   type CollectionOperation,
   type CollectionProgress,
   type CollectionReview,
@@ -70,6 +71,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
   const [confirming, setConfirming] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [runs, setRuns] = useState<Record<string, CollectionRun[]>>({});
+  const [logs, setLogs] = useState<Record<string, CollectionLogEntry[]>>({});
+  const [detailTab, setDetailTab] = useState<"runs" | "logs">("runs");
   const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
   const jobsRef = useRef<CollectionJob[]>([]);
@@ -127,7 +130,8 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       });
       await loadJobs(true);
       if (expandedJobId && running.some((job) => job.id === expandedJobId)) {
-        await loadRuns(expandedJobId);
+        if (detailTab === "logs") await loadLogs(expandedJobId);
+        else await loadRuns(expandedJobId);
       }
     }
 
@@ -137,7 +141,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
       alive = false;
       window.clearInterval(timer);
     };
-  }, [hasRunning, loadJobs, expandedJobId]);
+  }, [hasRunning, loadJobs, expandedJobId, detailTab]);
 
   async function uploadExisting(job: CollectionJob, file: File) {
     setNotice(null);
@@ -206,13 +210,29 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
     }
   }
 
+  async function loadLogs(jobId: string) {
+    try {
+      const data = await api.listCollectionLogs(jobId);
+      setLogs((current) => ({ ...current, [jobId]: data.entries }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法加载运行日志");
+    }
+  }
+
   async function toggleJob(job: CollectionJob) {
     if (expandedJobId === job.id) {
       setExpandedJobId(null);
       return;
     }
     setExpandedJobId(job.id);
+    setDetailTab("runs");
     if (!runs[job.id]) await loadRuns(job.id);
+  }
+
+  async function selectDetailTab(jobId: string, tab: "runs" | "logs") {
+    setDetailTab(tab);
+    if (tab === "logs" && !logs[jobId]) await loadLogs(jobId);
+    if (tab === "runs" && !runs[jobId]) await loadRuns(jobId);
   }
 
   async function showReview(job: CollectionJob) {
@@ -341,6 +361,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
               const running = job.status === "running" || job.status === "cancelling";
               const expanded = expandedJobId === job.id;
               const jobRuns = runs[job.id] ?? [];
+              const jobLogs = logs[job.id] ?? [];
               return (
               <div className="job-block" key={job.id}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
@@ -363,14 +384,16 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
               {expanded && (
                 <div className="job-detail">
                   <div className="job-detail-head">
-                    <div>
-                      <strong>执行明细</strong>
-                      <span>{jobProgress ? formatProgress(jobProgress) : "尚无运行记录"}</span>
+                    <div className="job-detail-tabs">
+                      <button type="button" className={detailTab === "runs" ? "active" : ""} onClick={() => void selectDetailTab(job.id, "runs")}>执行明细</button>
+                      <button type="button" className={detailTab === "logs" ? "active" : ""} onClick={() => void selectDetailTab(job.id, "logs")}>运行日志</button>
+                      {detailTab === "runs" && <span>{jobProgress ? formatProgress(jobProgress) : "尚无运行记录"}</span>}
+                      {detailTab === "logs" && <span>最近 {jobLogs.length} 条</span>}
                     </div>
-                    <button type="button" className="toolbar-button" onClick={() => void loadRuns(job.id)}><RefreshCw size={14} />刷新明细</button>
+                    <button type="button" className="toolbar-button" onClick={() => void (detailTab === "logs" ? loadLogs(job.id) : loadRuns(job.id))}><RefreshCw size={14} />刷新</button>
                   </div>
                   {job.error && <div className="job-error-banner"><AlertCircle size={15} /><span><strong>任务失败原因</strong>{job.error}</span></div>}
-                  {jobRuns.length ? (
+                  {detailTab === "runs" && (jobRuns.length ? (
                     <div className="run-table">
                       <div className="run-row run-head"><span>分区</span><span>状态</span><span>行数</span><span>文件</span><span>错误</span></div>
                       {[...jobRuns].reverse().map((run) => (
@@ -385,7 +408,18 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                     </div>
                   ) : (
                     <p className="job-detail-empty">还没有分区运行记录。</p>
-                  )}
+                  ))}
+                  {detailTab === "logs" && (jobLogs.length ? (
+                    <div className="job-log-list">
+                      {jobLogs.map((entry, index) => (
+                        <div className={`job-log-row log-level-${String(entry.level).toLowerCase()}`} key={`${entry.timestamp}-${index}`}>
+                          <time>{formatLogTime(entry.timestamp)}</time>
+                          <span className="job-log-level">{logLevelLabel(entry.level)}</span>
+                          <div><strong>{logEventLabel(entry.event)}</strong>{formatLogFields(entry) && <small>{formatLogFields(entry)}</small>}{typeof entry.exception === "string" && <pre>{entry.exception}</pre>}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="job-detail-empty">该任务还没有运行日志。</p>)}
                 </div>
               )}
               </div>
@@ -580,6 +614,63 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(normalized));
+}
+
+const logEventLabels: Record<string, string> = {
+  collection_job_created: "任务已创建",
+  collection_job_started: "任务开始执行",
+  collection_run_started: "开始采集分区",
+  collection_artifact_staged: "采集结果已暂存",
+  review_completed: "数据审核完成",
+  partition_published: "分区发布完成",
+  collection_job_completed: "任务执行完成",
+  collection_run_failed: "分区执行失败",
+  collection_job_failed: "任务执行失败",
+  collection_job_cancelled: "任务已取消",
+  collection_job_retried: "已创建重试任务",
+  rate_limit_wait: "等待供应商限流窗口",
+  operation_retry_scheduled: "供应商调用失败，准备重试",
+};
+
+const logFieldLabels: Record<string, string> = {
+  partition_key: "分区",
+  row_count: "行数",
+  error_count: "异常数",
+  passed: "审核通过",
+  attempt: "第几次",
+  max_attempts: "最多尝试",
+  pause_seconds: "等待秒数",
+  waited_seconds: "限流等待秒数",
+  status: "状态",
+  error: "错误",
+  file_path: "文件",
+  size_bytes: "字节",
+  operation: "操作",
+  collector: "采集器",
+};
+
+function logEventLabel(event: string) {
+  return logEventLabels[event] ?? event;
+}
+
+function logLevelLabel(level: string) {
+  return ({ INFO: "信息", WARNING: "警告", ERROR: "错误", CRITICAL: "严重" } as Record<string, string>)[level] ?? level;
+}
+
+function formatLogTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function formatLogFields(entry: CollectionLogEntry) {
+  return Object.entries(entry)
+    .filter(([key, value]) => !["timestamp", "level", "logger", "event", "job_id", "run_id", "dataset_id", "exception"].includes(key) && value !== null && value !== "")
+    .map(([key, value]) => `${logFieldLabels[key] ?? key}=${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+    .join(" · ");
 }
 
 function operationDescription(operation: CollectionOperation) {

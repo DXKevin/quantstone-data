@@ -176,6 +176,19 @@ export interface CollectionRun {
   error: string | null;
 }
 
+export interface CollectionLogEntry {
+  timestamp: string;
+  level: string;
+  event: string;
+  logger?: string;
+  [key: string]: unknown;
+}
+
+export interface CollectionLogs {
+  job_id: string;
+  entries: CollectionLogEntry[];
+}
+
 export interface CoverageDetail {
   row_count: number | null;
   file_path: string | null;
@@ -298,6 +311,8 @@ export const api = {
     request<CollectionProgress>(`/api/v1/collection-jobs/${jobId}/progress`),
   listCollectionRuns: (jobId: string) =>
     request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
+  listCollectionLogs: (jobId: string, limit = 500) =>
+    request<CollectionLogs>(`/api/v1/collection-jobs/${jobId}/logs?limit=${limit}`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),

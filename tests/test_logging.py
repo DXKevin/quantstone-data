@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from quantstone_data.logging_config import configure_logging, log_event
+from quantstone_data.logging_config import configure_logging, log_event, read_job_logs
 
 
 def test_structured_logs_are_routed_and_secrets_are_redacted(tmp_path: Path) -> None:
@@ -29,3 +29,5 @@ def test_structured_logs_are_routed_and_secrets_are_redacted(tmp_path: Path) -> 
     assert record["parameters"]["end_date"] == "2027-12-31"
     assert "must-not-appear" not in application
     assert json.loads(job_log)["dataset_id"] == "tushare.cn.stock.trade_cal"
+    assert read_job_logs(tmp_path, "job-123")[0]["event"] == "collector_called"
+    assert read_job_logs(tmp_path, "missing-job") == []

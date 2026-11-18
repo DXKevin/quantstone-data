@@ -83,6 +83,7 @@ def run_operation(
     call: Callable[[], Any],
     *,
     policy: RetryPolicy | None = None,
+    job_id: str | None = None,
 ) -> Any:
     """按采集器的限流与重试策略执行一次操作调用。"""
     limiter = _limiter_for(collector_key, operation)
@@ -100,6 +101,7 @@ def run_operation(
                     operation=operation.key,
                     scope=operation.rate_limit.scope or operation.key,
                     waited_seconds=round(waited, 2),
+                    job_id=job_id,
                 )
         try:
             return call()
@@ -119,6 +121,7 @@ def run_operation(
                 max_attempts=attempts,
                 pause_seconds=round(pause, 2),
                 error=str(error),
+                job_id=job_id,
             )
             _sleep(pause)
             delay = min(delay * 2, settings.max_delay_seconds)
