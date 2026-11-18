@@ -241,6 +241,13 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
+    start_date = payload.start_date
+    end_date = payload.end_date
+    if start_date is None and parameters.get("start_date"):
+        start_date = date.fromisoformat(str(parameters["start_date"]))
+    if end_date is None and start_date is not None and parameters.get("end_date"):
+        end_date = date.fromisoformat(str(parameters["end_date"]))
+
     job = CollectionJob(
         id=str(uuid4()),
         dataset_id=payload.dataset_id,
@@ -251,8 +258,8 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
             if payload.input_method is InputMethod.FILE_IMPORT
             else CollectionJobStatus.CREATED.value
         ),
-        start_date=payload.start_date,
-        end_date=payload.end_date,
+        start_date=start_date,
+        end_date=end_date,
         collector_key=(binding["collector_key"] if binding else None),
         collector_operation=(
             binding["operation"] if binding else None

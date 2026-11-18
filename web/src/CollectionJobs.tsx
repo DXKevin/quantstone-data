@@ -12,6 +12,8 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   api,
   type CollectionInputMethod,
+  type CollectorDefinition,
+  type CollectorParameter,
   type CollectionJob,
   type CollectionJobCreatePayload,
   type CollectionOperation,
@@ -41,7 +43,7 @@ const statusLabels = {
   failed: "执行失败",
 };
 
-export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[] }) {
+export default function CollectionJobs({ datasets, collectors }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[] }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
   const [view, setView] = useState<"list" | "create">("list");
   const [loading, setLoading] = useState(true);
@@ -110,6 +112,7 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
     return (
       <CreateCollectionJob
         datasets={activeDatasets}
+        collectors={collectors}
         onCancel={() => setView("list")}
         onComplete={async (message) => {
           setNotice(message);
@@ -194,6 +197,7 @@ export default function CollectionJobs({ datasets }: { datasets: DatasetSummary[
 
 function CreateCollectionJob(props: {
   datasets: DatasetSummary[];
+  collectors: CollectorDefinition[];
   onCancel: () => void;
   onComplete: (message: string) => Promise<void>;
 }) {
@@ -206,34 +210,38 @@ function CreateCollectionJob(props: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useDateRange, setUseDateRange] = useState(false);
+  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
   const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
   const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
-  const requiresDateRange =
-    inputMethod === "collector" &&
-    selectedDataset?.storage_policy?.logical_partition_field === "trade_date" &&
-    operation !== "incremental";
-  const usesAutomaticIncrementalRange =
-    inputMethod === "collector" &&
-    selectedDataset?.storage_policy?.logical_partition_field === "trade_date" &&
-    operation === "incremental";
-  const includesDateRange = requiresDateRange || (useDateRange && !usesAutomaticIncrementalRange);
+  const selectedBinding = selectedDataset?.collection_bindings.find((item) => item.purpose === operation);
+  const selectedCollector = props.collectors.find((item) => item.key === selectedBinding?.collector_key);
+  const selectedCollectorOperation = selectedCollector?.operations.find((item) => item.key === selectedBinding?.operation);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     if (!datasetId) return setError("没有可用的已启用数据集。");
-    if (includesDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
+    const missingParameter = selectedCollectorOperation?.parameters.find((item) => item.required && !parameterValues[item.name]?.trim());
+    if (inputMethod === "collector" && !selectedCollectorOperation) return setError("没有找到该任务目的绑定的采集器操作。");
+    if (missingParameter) return setError(`请填写必填参数：${missingParameter.name}`);
+    if (useDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
     if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
+
+    const parameters = Object.fromEntries(
+      (selectedCollectorOperation?.parameters ?? [])
+        .filter((item) => parameterValues[item.name] !== undefined && parameterValues[item.name] !== "")
+        .map((item) => [item.name, convertParameterValue(item, parameterValues[item.name])]),
+    );
 
     const payload: CollectionJobCreatePayload = {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: includesDateRange ? startDate : null,
-      end_date: includesDateRange ? endDate : null,
+      start_date: inputMethod === "file_import" && useDateRange ? startDate : null,
+      end_date: inputMethod === "file_import" && useDateRange ? endDate : null,
       collector_key: null,
-      parameters: usesAutomaticIncrementalRange && endDate ? { end_date: endDate } : {},
+      parameters,
     };
 
     setSubmitting(true);
@@ -273,9 +281,8 @@ function CreateCollectionJob(props: {
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          {!requiresDateRange && !usesAutomaticIncrementalRange && <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>}
-          {includesDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
-          {usesAutomaticIncrementalRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>更新截止日期（可选）</span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label><div className="operation-help">开始日期由数据集当前水位自动计算；不填截止日期时默认更新到当天。</div></div>}
+          {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{selectedCollectorOperation.description}</span></div>{selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
+          {inputMethod === "file_import" && <><label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次文件对应明确的日期范围</label>{useDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}</>}
         </div>
       </section>
 
@@ -293,6 +300,26 @@ function CreateCollectionJob(props: {
       </section>
     </form>
   );
+}
+
+function CollectorParameterInput(props: {
+  parameter: CollectorParameter;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { parameter } = props;
+  if (parameter.data_type === "boolean") {
+    return <label className="input-field"><span>{parameter.name}{parameter.required && <b>*</b>}</span><select value={props.value} onChange={(event) => props.onChange(event.target.value)}><option value="">请选择</option><option value="true">是</option><option value="false">否</option></select><small>{parameter.description}</small></label>;
+  }
+  const inputType = parameter.data_type === "date" ? "date" : ["int", "integer", "int32", "int64", "float", "float32", "float64", "number"].includes(parameter.data_type) ? "number" : "text";
+  return <label className="input-field"><span>{parameter.name}{parameter.required && <b>*</b>}</span><input type={inputType} value={props.value} onChange={(event) => props.onChange(event.target.value)} /><small>{parameter.description}</small></label>;
+}
+
+function convertParameterValue(parameter: CollectorParameter, value: string): unknown {
+  if (parameter.data_type === "boolean") return value === "true";
+  if (["int", "integer", "int32", "int64"].includes(parameter.data_type)) return Number.parseInt(value, 10);
+  if (["float", "float32", "float64", "number"].includes(parameter.data_type)) return Number.parseFloat(value);
+  return value;
 }
 
 function UploadFileButton({ onFile }: { onFile: (file: File) => void }) {

@@ -301,10 +301,14 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
                 "dataset_id": "tushare.cn.stock.daily",
                 "operation": "initial",
                 "input_method": "collector",
-                "start_date": "2026-11-18",
-                "end_date": "2026-11-18",
+                "parameters": {
+                    "start_date": "2026-11-18",
+                    "end_date": "2026-11-18",
+                },
             },
         )
+        assert created.json()["start_date"] == "2026-11-18"
+        assert created.json()["end_date"] == "2026-11-18"
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         runs = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/runs")
         catalog = client.get(

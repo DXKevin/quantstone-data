@@ -143,7 +143,7 @@ function App() {
       </aside>
 
       <main className="main-area">
-        {area === "collection" && <CollectionJobs datasets={datasets} />}
+        {area === "collection" && <CollectionJobs datasets={datasets} collectors={collectors} />}
         {area === "collectors" && <CollectorCatalog collectors={collectors} />}
         {area === "datasets" && view === "list" && (
           <DatasetList
