@@ -6,6 +6,7 @@ import {
   CircleHelp,
   Cable,
   Database,
+  LayoutGrid,
   Layers3,
   Pencil,
   Plus,
@@ -24,9 +25,10 @@ import {
   DatasetSummary,
 } from "./api";
 import CollectionJobs from "./CollectionJobs";
+import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "detail";
-type Area = "datasets" | "collectors" | "collection";
+type Area = "overview" | "datasets" | "collectors" | "collection";
 
 interface FieldDraft {
   key: number;
@@ -67,7 +69,7 @@ const purposeLabels: Record<CollectionPurpose, string> = {
 };
 
 function App() {
-  const [area, setArea] = useState<Area>("datasets");
+  const [area, setArea] = useState<Area>("overview");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [collectors, setCollectors] = useState<CollectorDefinition[]>([]);
@@ -129,6 +131,7 @@ function App() {
           <div><strong>QuantStone</strong><span>DATA</span></div>
         </div>
         <nav>
+          <button className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} />概览</button>
           <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
           <button className={area === "collectors" ? "nav-item active" : "nav-item"} onClick={() => setArea("collectors")}><Cable size={17} />采集器</button>
           <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
@@ -141,6 +144,7 @@ function App() {
       </aside>
 
       <main className="main-area">
+        {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); void openDataset(id); }} />}
         {area === "collection" && <CollectionJobs datasets={datasets} collectors={collectors} />}
         {area === "collectors" && <CollectorCatalog collectors={collectors} />}
         {area === "datasets" && view === "list" && (

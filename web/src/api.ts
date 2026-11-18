@@ -174,6 +174,28 @@ export interface CollectionRun {
   error: string | null;
 }
 
+export interface DatasetOverview {
+  dataset_id: string;
+  display_name: string;
+  status: DatasetStatus;
+  provider: string;
+  region: string;
+  instrument: string;
+  market: string | null;
+  layout: string | null;
+  calendar_dataset_id: string | null;
+  partitions: number;
+  files: number;
+  rows: number;
+  size_bytes: number;
+  first_partition: string | null;
+  latest_partition: string | null;
+  published_at: string | null;
+  missing_files: number;
+  expected_partitions: number | null;
+  coverage_percent: number | null;
+}
+
 export interface CollectionReview {
   reviewer: string;
   passed: boolean;
@@ -243,6 +265,7 @@ export const api = {
     request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
+  getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   uploadCollectionFile: async (jobId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

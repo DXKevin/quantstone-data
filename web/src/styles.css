@@ -326,3 +326,20 @@ body { font-size: 14px; }
 .run-status-fetching { background: #e9eff7; color: #42668f; }
 .job-detail-empty { margin: 0; color: #6a756f; font-size: 11.5px; }
 .job-block .job-row { border-bottom: 0; }
+
+/* 数据概览卡片 */
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.overview-card { display: grid; gap: 12px; padding: 18px 18px 16px; border: 1px solid var(--line); background: white; text-align: left; cursor: pointer; }
+.overview-card:hover { border-color: #b9d3c5; box-shadow: 0 2px 10px rgba(8,122,84,.08); }
+.overview-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.overview-card-head strong { font-size: 14px; }
+.overview-id { color: #4e655b; font-size: 11px; }
+.overview-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px 0; border-top: 1px solid #eef2ef; border-bottom: 1px solid #eef2ef; }
+.overview-metrics div { display: flex; flex-direction: column; gap: 4px; }
+.overview-metrics span { color: var(--muted); font-size: 10.5px; }
+.overview-metrics b { font-size: 15px; font-weight: 650; }
+.overview-coverage { display: grid; gap: 6px; }
+.coverage-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 10.5px; }
+.coverage-bar { height: 6px; border-radius: 999px; background: #edf1ee; overflow: hidden; }
+.coverage-bar i { display: block; height: 100%; background: #17a673; border-radius: 999px; }
+.overview-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #5f6a64; font-size: 10.5px; }
