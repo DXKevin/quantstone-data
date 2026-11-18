@@ -201,17 +201,32 @@ function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] })
         <section className="panel collector-card" key={collector.key}>
           <div className="card-title"><div><h2>{collector.name}</h2><code>{collector.key}</code></div><span>{collector.operations.length} 个操作</span></div>
           <p>{collector.description}</p>
-          {collector.operations.map((operation) => (
-            <div className="collector-operation" key={operation.key}>
-              <div><strong>{operation.name}</strong><code>{collector.key} · {operation.key}</code><span>{purposeLabels[operation.purpose]}</span><p>{operation.description}</p></div>
-              <div><span>运行参数</span><strong>{operation.parameters.length ? operation.parameters.map((item) => item.name).join("、") : "无"}</strong></div>
-              <div className="operation-outputs"><span>输出数据集 · {operation.joint ? "联合更新" : "独立更新"}</span>{operation.datasets.map((id) => <code key={id}>{id}</code>)}</div>
-            </div>
-          ))}
+          <div className="collector-compact-table">
+            <div className="collector-compact-row collector-compact-head"><span>输出数据集</span><span>更新方式</span><span>操作入口</span><span>参数</span></div>
+            {groupCollectorOperations(collector).map((group) => (
+              <div className="collector-compact-row" key={group.key}>
+                <div className="compact-datasets">{group.datasets.map((id) => <code key={id}>{id}</code>)}</div>
+                <span>{group.datasets.length > 1 ? "联合更新" : "独立更新"}</span>
+                <div className="compact-operations">{group.operations.map((operation) => <span className={`operation-chip purpose-${operation.purpose}`} title={operation.description} key={operation.key}><b>{purposeLabels[operation.purpose]}</b><code>{operation.key}</code></span>)}</div>
+                <span className="compact-parameters">{Array.from(new Set(group.operations.flatMap((operation) => operation.parameters.map((item) => item.name)))).join("、") || "无"}</span>
+              </div>
+            ))}
+          </div>
         </section>
       ))}
     </div>
   );
+}
+
+function groupCollectorOperations(collector: CollectorDefinition) {
+  const groups = new Map<string, { key: string; datasets: string[]; operations: CollectorDefinition["operations"] }>();
+  for (const operation of collector.operations) {
+    const key = [...operation.datasets].sort().join("|");
+    const current = groups.get(key) ?? { key, datasets: operation.datasets, operations: [] };
+    current.operations.push(operation);
+    groups.set(key, current);
+  }
+  return [...groups.values()];
 }
 
 function DatasetList(props: {
@@ -349,7 +364,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; dataset?: Datas
         .filter(([, value]) => value)
         .map(([purpose, value]) => {
           const [collector_key, operation] = value.split("::");
-          return { purpose, collector_key, operation };
+          return { purpose, collector_key, operation, parameters: {} };
         }),
       storage_policy: storageLayout
         ? {

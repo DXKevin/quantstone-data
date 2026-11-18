@@ -18,7 +18,7 @@ from .collection_schemas import (
     CollectionJobStatus,
     InputMethod,
 )
-from .collector_registry import get_operation
+from .collector_registry import get_operation, validate_operation_parameters
 from .database import get_session
 from .datasets.tushare.cn.stock.daily.definition import DATASET_ID as DAILY_DATASET_ID
 from .datasets.tushare.cn.stock.daily.reviewer import review_daily
@@ -208,6 +208,23 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
             detail="dataset does not support this collection purpose",
         )
 
+    parameters = dict(binding.get("parameters", {})) if binding else {}
+    parameters.update(payload.parameters)
+    if payload.start_date:
+        parameters["start_date"] = payload.start_date.isoformat()
+        parameters["end_date"] = payload.end_date.isoformat()
+    if binding:
+        operation_definition = get_operation(binding["collector_key"], binding["operation"])
+        assert operation_definition is not None
+        try:
+            validate_operation_parameters(
+                operation_definition,
+                parameters,
+                require_all=True,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
     job = CollectionJob(
         id=str(uuid4()),
         dataset_id=payload.dataset_id,
@@ -224,6 +241,7 @@ def create_collection_job(payload: CollectionJobCreate, session: SessionDep) -> 
         collector_operation=(
             binding["operation"] if binding else None
         ),
+        parameters=parameters,
     )
     session.add(job)
     session.commit()

@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -33,6 +34,7 @@ class CollectionJobCreate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     collector_key: str | None = Field(default=None, min_length=1, max_length=128)
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_plan(self) -> "CollectionJobCreate":
@@ -55,6 +57,7 @@ class CollectionJobRead(BaseModel):
     end_date: date | None
     collector_key: str | None
     collector_operation: str | None
+    parameters: dict[str, Any]
     source_file_name: str | None
     staged_path: str | None
     source_size_bytes: int | None

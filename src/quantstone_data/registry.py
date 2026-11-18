@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from .collector_registry import get_operation
+from .collector_registry import get_operation, validate_operation_parameters
 from .database import get_session
 from .models import Dataset, DatasetField, DatasetSchemaVersion
 from .schemas import (
@@ -176,6 +176,14 @@ def activate_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
             raise HTTPException(status_code=409, detail="collector operation is not registered")
         if operation.purpose != binding["purpose"]:
             raise HTTPException(status_code=409, detail="collector operation purpose mismatch")
+        try:
+            validate_operation_parameters(
+                operation,
+                binding.get("parameters", {}),
+                require_all=False,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         if dataset.id not in operation.datasets:
             raise HTTPException(
                 status_code=409,

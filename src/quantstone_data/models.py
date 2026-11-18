@@ -106,6 +106,7 @@ class CollectionJob(Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     collector_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     collector_operation: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    parameters: Mapped[dict] = mapped_column(JSON, default=dict)
     source_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     staged_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

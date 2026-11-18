@@ -110,6 +110,7 @@ export interface DatasetCollectionBinding {
   purpose: CollectionPurpose;
   collector_key: string;
   operation: string;
+  parameters: Record<string, unknown>;
 }
 
 export interface CollectorDefinition {
@@ -129,6 +130,7 @@ export interface CollectionJob {
   end_date: string | null;
   collector_key: string | null;
   collector_operation: string | null;
+  parameters: Record<string, unknown>;
   source_file_name: string | null;
   staged_path: string | null;
   source_size_bytes: number | null;
@@ -144,6 +146,7 @@ export interface CollectionJobCreatePayload {
   start_date: string | null;
   end_date: string | null;
   collector_key: string | null;
+  parameters: Record<string, unknown>;
 }
 
 export interface CollectionReview {

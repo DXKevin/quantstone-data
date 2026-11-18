@@ -49,6 +49,9 @@
 - 前端数据集表单、详情和采集任务清楚显示采集器绑定；
 - 数据集改为按任务目的绑定具体 operation；首次和增量可以调用不同函数；
 - operation 直接关联 Python 函数，对外模型不增加 handler 字段；
+- 每个采集器独立导出 CollectorDefinition，总注册表只显式汇总并在启动时校验；
+- 数据集采集绑定支持默认 parameters，任务运行参数合并后校验；
+- 前端采集器页面按输出数据集分组，首次和增量在同一紧凑行展示；
 - 引入 PyArrow，数据集物理输出统一为 Parquet；
 - 实现采集器入口/出口基础协议：Context、Result 和 DatasetArtifact；
 - TuShare daily 支持按交易日采集、Parquet 转换和专用审核；

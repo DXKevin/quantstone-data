@@ -227,6 +227,7 @@ function CreateCollectionJob(props: {
       start_date: useDateRange || requiresDateRange ? startDate : null,
       end_date: useDateRange || requiresDateRange ? endDate : null,
       collector_key: null,
+      parameters: {},
     };
 
     setSubmitting(true);

@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -25,6 +26,7 @@ class DatasetCollectionBinding(BaseModel):
     purpose: CollectionPurpose
     collector_key: str = Field(min_length=1, max_length=128)
     operation: str = Field(min_length=1, max_length=128)
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class DatasetStoragePolicy(BaseModel):
