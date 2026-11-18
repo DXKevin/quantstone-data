@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_session
 from .logging_config import log_event
-from .storage import compact_year, read_dataset_rows
+from .storage import MissingCatalogFilesError, compact_year, read_dataset_rows
 
 router = APIRouter(prefix="/datasets", tags=["storage"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -33,6 +33,11 @@ def read_rows(
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail="dataset not found") from error
+    except MissingCatalogFilesError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Catalog 文件缺失，读取已中止：{'；'.join(error.paths)}",
+        ) from error
 
 
 @router.post("/{dataset_id}/compact")

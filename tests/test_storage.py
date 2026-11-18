@@ -132,6 +132,39 @@ def test_read_rows_opens_each_file_once(tmp_path: Path) -> None:
     assert set(body["columns"]) == {"trade_date", "symbol", "close"}
 
 
+def test_read_limit_does_not_open_unneeded_files(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        write_partition(client, "2024-01-03", ["000001.SZ", "600000.SH"])
+
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"start": "2024-01-01", "end": "2024-01-31", "limit": 1},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["files_read"] == 1
+    assert response.json()["row_count"] == 1
+
+
+def test_read_rows_fails_when_catalog_file_is_missing(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ"])
+        with client.app.state.session_factory() as session:
+            partition = session.scalar(select(CatalogPartition))
+            assert partition is not None
+            missing_path = partition.file_path
+        (Path(client.app.state.data_root) / missing_path).unlink()
+
+        response = client.get(f"/api/v1/datasets/{DATASET_ID}/rows")
+
+    assert response.status_code == 409
+    assert "Catalog 文件缺失，读取已中止" in response.json()["detail"]
+    assert missing_path in response.json()["detail"]
+
+
 def test_compaction_merges_daily_files_into_one(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)

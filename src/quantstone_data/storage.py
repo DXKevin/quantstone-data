@@ -17,6 +17,12 @@ from .models import CatalogFile, CatalogPartition, Dataset
 from .publishing.catalog_writer import upsert_file
 
 
+class MissingCatalogFilesError(RuntimeError):
+    def __init__(self, paths: list[str]) -> None:
+        self.paths = paths
+        super().__init__("Catalog 指向的文件缺失：" + "；".join(paths))
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -50,29 +56,42 @@ def read_dataset_rows(
     for item in partitions:
         by_file.setdefault(item.file_path, set()).add(item.partition_key)
 
+    missing_files = sorted(path for path in by_file if not (data_root / path).is_file())
+    if missing_files:
+        raise MissingCatalogFilesError(missing_files)
+
     rows: list[dict] = []
     columns: list[str] = []
+    files_read = 0
     for path in sorted(by_file):
         file_path = data_root / path
-        if not file_path.is_file():
-            continue
-        table = pq.read_table(file_path)
+        if partition_field:
+            schema = pq.read_schema(file_path)
+            if partition_field not in schema.names:
+                raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
+            field_type = schema.field(partition_field).type
+            wanted = sorted(by_file[path])
+            filter_values = (
+                [date.fromisoformat(value) for value in wanted]
+                if pa.types.is_date(field_type)
+                else wanted
+            )
+            table = pq.read_table(
+                file_path,
+                filters=[(partition_field, "in", filter_values)],
+            )
+        else:
+            table = pq.read_table(file_path)
+        files_read += 1
         columns = table.column_names
-        if partition_field and partition_field in table.column_names:
-            wanted = by_file[path]
-            mask = [
-                str(value) in wanted
-                or (hasattr(value, "isoformat") and value.isoformat() in wanted)
-                for value in table[partition_field].to_pylist()
-            ]
-            table = table.filter(mask)
-        rows.extend(table.to_pylist())
+        remaining = limit - len(rows)
+        rows.extend(table.slice(0, remaining).to_pylist())
         if len(rows) >= limit:
             break
 
     return {
         "dataset_id": dataset_id,
-        "files_read": len(by_file),
+        "files_read": files_read,
         "row_count": min(len(rows), limit),
         "columns": columns,
         "rows": rows[:limit],
