@@ -202,13 +202,12 @@ function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] })
           <div className="card-title"><div><h2>{collector.name}</h2><code>{collector.key}</code></div><span>{collector.operations.length} 个操作</span></div>
           <p>{collector.description}</p>
           <div className="collector-compact-table">
-            <div className="collector-compact-row collector-compact-head"><span>输出数据集</span><span>更新方式</span><span>操作入口</span><span>参数</span></div>
+            <div className="collector-compact-row collector-compact-head"><span>输出数据集</span><span>更新方式</span><span>操作及各自参数</span></div>
             {groupCollectorOperations(collector).map((group) => (
               <div className="collector-compact-row" key={group.key}>
                 <div className="compact-datasets">{group.datasets.map((id) => <code key={id}>{id}</code>)}</div>
                 <span>{group.datasets.length > 1 ? "联合更新" : "独立更新"}</span>
-                <div className="compact-operations">{group.operations.map((operation) => <span className={`operation-chip purpose-${operation.purpose}`} title={operation.description} key={operation.key}><b>{purposeLabels[operation.purpose]}</b><code>{operation.key}</code></span>)}</div>
-                <span className="compact-parameters">{Array.from(new Set(group.operations.flatMap((operation) => operation.parameters.map((item) => item.name)))).join("、") || "无"}</span>
+                <div className="compact-operation-list">{group.operations.map((operation) => <div className="compact-operation-line" title={operation.description} key={operation.key}><span className={`operation-chip purpose-${operation.purpose}`}><b>{purposeLabels[operation.purpose]}</b><code>{operation.key}</code></span><span className="compact-parameters">{operation.parameters.length ? operation.parameters.map((item) => `${item.name}${item.required ? "*" : ""}`).join("、") : "无参数"}</span></div>)}</div>
               </div>
             ))}
           </div>

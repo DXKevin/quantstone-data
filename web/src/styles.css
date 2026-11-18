@@ -168,18 +168,19 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .collector-card { margin-bottom: 14px; padding: 16px 18px; }
 .collector-card > p { margin: 5px 0 12px; color: #68746e; font-size: 11px; }
 .collector-compact-table { border: 1px solid var(--line); }
-.collector-compact-row { display: grid; grid-template-columns: minmax(260px, 1.35fr) 85px minmax(300px, 1.6fr) minmax(120px, .7fr); gap: 12px; align-items: center; min-height: 48px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10px; }
+.collector-compact-row { display: grid; grid-template-columns: minmax(260px, 1.2fr) 85px minmax(400px, 2fr); gap: 12px; align-items: center; min-height: 48px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10px; }
 .collector-compact-row:first-child { border-top: 0; }
 .collector-compact-head { min-height: 30px; background: #f7f9f8; color: #7b8580; }
 .compact-datasets { display: flex; flex-direction: column; gap: 2px; }
 .compact-datasets code { color: #285c46; font-size: 10px; }
-.compact-operations { display: flex; flex-wrap: wrap; gap: 5px; }
+.compact-operation-list { display: flex; flex-direction: column; gap: 4px; }
+.compact-operation-line { display: grid; grid-template-columns: minmax(210px, auto) 1fr; gap: 8px; align-items: center; }
 .operation-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 6px; border: 1px solid #d9e1dd; border-radius: 4px; background: #fafcfb; }
 .operation-chip b { color: #4d5b54; font-size: 9px; }
 .operation-chip code { color: #246247; font-size: 9px; }
 .purpose-initial { border-color: #bdd7ca; background: #f1f8f4; }
 .purpose-incremental { border-color: #cbd8e7; background: #f3f7fb; }
-.compact-parameters { color: #627069; }
+.compact-parameters { color: #627069; font-size: 9px; }
 .binding-preview code { display: block; color: #285c46; font-size: 10px; }
 .binding-preview { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding: 12px 14px; border: 1px solid #cfe0d7; background: #f4faf7; font-size: 11px; }
 .binding-preview span { color: #68746e; }
