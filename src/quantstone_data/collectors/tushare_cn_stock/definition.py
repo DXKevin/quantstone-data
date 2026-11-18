@@ -23,6 +23,10 @@ DATE_RANGE_PARAMETERS = (
     CollectorParameter("end_date", "date", True, "采集结束日期"),
 )
 
+INCREMENTAL_PARAMETERS = (
+    CollectorParameter("end_date", "date", False, "可选的更新截止日期，默认当天"),
+)
+
 OPERATIONS = (
     CollectorOperation(
         key="stock_list_initial",
@@ -54,9 +58,9 @@ OPERATIONS = (
     CollectorOperation(
         key="daily_incremental",
         name="日 K 增量更新",
-        description="按交易日批次补充 TuShare daily 数据。",
+        description="从数据集当前水位之后开始补充 TuShare daily 数据。",
         purpose="incremental",
-        parameters=DATE_RANGE_PARAMETERS,
+        parameters=INCREMENTAL_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_incremental,
     ),

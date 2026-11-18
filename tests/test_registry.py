@@ -20,6 +20,17 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
     assert operation["purpose"] == "initial"
     assert operation["datasets"] == ["tushare.cn.stock.stock_basic"]
     assert operation["joint"] is False
+    daily_incremental = next(
+        item for item in collector["operations"] if item["key"] == "daily_incremental"
+    )
+    assert daily_incremental["parameters"] == [
+        {
+            "name": "end_date",
+            "data_type": "date",
+            "required": False,
+            "description": "可选的更新截止日期，默认当天",
+        }
+    ]
 
 
 def dataset_payload() -> dict:

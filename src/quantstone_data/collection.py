@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import shutil
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -62,6 +62,22 @@ def _execute_daily_job(
     data_root: Path,
     session: Session,
 ) -> CollectionJobRead:
+    if job.operation == "incremental" and job.start_date is None:
+        latest_partition = session.scalar(
+            select(CatalogPartition.partition_key)
+            .where(CatalogPartition.dataset_id == job.dataset_id)
+            .order_by(CatalogPartition.partition_key.desc())
+            .limit(1)
+        )
+        if latest_partition is None:
+            raise HTTPException(
+                status_code=409,
+                detail="incremental collection requires an existing partition; run initial collection first",
+            )
+        job.start_date = date.fromisoformat(latest_partition) + timedelta(days=1)
+        configured_end = job.parameters.get("end_date")
+        job.end_date = date.fromisoformat(configured_end) if configured_end else date.today()
+
     if job.start_date is None or job.end_date is None:
         raise HTTPException(status_code=422, detail="daily collection requires a date range")
     if not dataset.storage_policy:

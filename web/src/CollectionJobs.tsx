@@ -210,13 +210,19 @@ function CreateCollectionJob(props: {
   const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
   const requiresDateRange =
     inputMethod === "collector" &&
-    selectedDataset?.storage_policy?.logical_partition_field === "trade_date";
+    selectedDataset?.storage_policy?.logical_partition_field === "trade_date" &&
+    operation !== "incremental";
+  const usesAutomaticIncrementalRange =
+    inputMethod === "collector" &&
+    selectedDataset?.storage_policy?.logical_partition_field === "trade_date" &&
+    operation === "incremental";
+  const includesDateRange = requiresDateRange || (useDateRange && !usesAutomaticIncrementalRange);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     if (!datasetId) return setError("没有可用的已启用数据集。");
-    if ((useDateRange || requiresDateRange) && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
+    if (includesDateRange && (!startDate || !endDate)) return setError("请同时填写开始和结束日期。");
     if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
 
@@ -224,10 +230,10 @@ function CreateCollectionJob(props: {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: useDateRange || requiresDateRange ? startDate : null,
-      end_date: useDateRange || requiresDateRange ? endDate : null,
+      start_date: includesDateRange ? startDate : null,
+      end_date: includesDateRange ? endDate : null,
       collector_key: null,
-      parameters: {},
+      parameters: usesAutomaticIncrementalRange && endDate ? { end_date: endDate } : {},
     };
 
     setSubmitting(true);
@@ -267,8 +273,9 @@ function CreateCollectionJob(props: {
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          {!requiresDateRange && <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>}
-          {(useDateRange || requiresDateRange) && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
+          {!requiresDateRange && !usesAutomaticIncrementalRange && <label className="range-toggle"><input type="checkbox" checked={useDateRange} onChange={(event) => setUseDateRange(event.target.checked)} />本次任务需要指定日期范围</label>}
+          {includesDateRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
+          {usesAutomaticIncrementalRange && <div className="form-grid two-columns date-grid"><label className="input-field"><span>更新截止日期（可选）</span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label><div className="operation-help">开始日期由数据集当前水位自动计算；不填截止日期时默认更新到当天。</div></div>}
         </div>
       </section>
 
