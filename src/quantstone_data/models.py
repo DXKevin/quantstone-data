@@ -137,6 +137,22 @@ class CollectionRun(Base):
     )
 
 
+class CatalogFile(Base):
+    """物理 Parquet 文件；多个逻辑分区可以指向同一个文件。"""
+
+    __tablename__ = "catalog_files"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(1024), unique=True)
+    row_count: Mapped[int] = mapped_column(BigInteger)
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class CatalogPartition(Base):
     __tablename__ = "catalog_partitions"
     __table_args__ = (UniqueConstraint("dataset_id", "partition_key"),)
@@ -147,6 +163,9 @@ class CatalogPartition(Base):
     )
     partition_key: Mapped[str] = mapped_column(String(128), index=True)
     file_path: Mapped[str] = mapped_column(String(1024))
+    file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("catalog_files.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     row_count: Mapped[int] = mapped_column(BigInteger)
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     sha256: Mapped[str] = mapped_column(String(64))

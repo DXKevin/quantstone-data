@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .database import get_session
-from .models import CatalogPartition, CollectionRun
+from .models import CatalogFile, CatalogPartition, CollectionRun
 
 router = APIRouter(tags=["catalog"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -42,25 +42,26 @@ def list_catalog_partitions(
 @router.get("/storage/overview")
 def storage_overview(request: Request, session: SessionDep) -> dict:
     data_root = request.app.state.data_root
-    published = session.execute(
+    partition_count = session.scalar(select(func.count(CatalogPartition.id))) or 0
+    file_totals = session.execute(
         select(
-            func.count(CatalogPartition.id),
-            func.count(func.distinct(CatalogPartition.file_path)),
-            func.coalesce(func.sum(CatalogPartition.row_count), 0),
-            func.coalesce(func.sum(CatalogPartition.size_bytes), 0),
+            func.count(CatalogFile.id),
+            func.coalesce(func.sum(CatalogFile.row_count), 0),
+            func.coalesce(func.sum(CatalogFile.size_bytes), 0),
         )
     ).one()
     staged_runs = session.scalar(
         select(func.count(CollectionRun.id)).where(CollectionRun.staged_path.is_not(None))
     )
-    partitions = list(session.scalars(select(CatalogPartition)))
-    missing_files = sum(1 for item in partitions if not (data_root / item.file_path).is_file())
+    missing_files = sum(
+        1 for item in session.scalars(select(CatalogFile)) if not (data_root / item.path).is_file()
+    )
     return {
         "data_root": str(data_root),
-        "published_partitions": published[0],
-        "published_files": published[1],
-        "published_rows": published[2],
-        "published_bytes": published[3],
+        "published_partitions": partition_count,
+        "published_files": file_totals[0],
+        "published_rows": file_totals[1],
+        "published_bytes": file_totals[2],
         "staged_runs": staged_runs or 0,
         "missing_files": missing_files,
     }

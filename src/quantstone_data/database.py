@@ -97,6 +97,29 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             )
         )
 
+        partition_columns = {
+            row[1] for row in connection.execute(text("PRAGMA table_info(catalog_partitions)"))
+        }
+        if "file_id" not in partition_columns:
+            connection.execute(text("ALTER TABLE catalog_partitions ADD COLUMN file_id INTEGER"))
+        connection.execute(
+            text(
+                "INSERT OR IGNORE INTO catalog_files "
+                "(dataset_id, path, row_count, size_bytes, sha256, created_at) "
+                "SELECT dataset_id, file_path, SUM(row_count), SUM(size_bytes), "
+                "MAX(sha256), CURRENT_TIMESTAMP "
+                "FROM catalog_partitions GROUP BY dataset_id, file_path"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE catalog_partitions SET file_id = ("
+                "SELECT id FROM catalog_files "
+                "WHERE catalog_files.path = catalog_partitions.file_path"
+                ") WHERE file_id IS NULL"
+            )
+        )
+
 
 def get_session(request: Request) -> Generator[Session, None, None]:
     with request.app.state.session_factory() as session:

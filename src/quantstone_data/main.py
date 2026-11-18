@@ -18,6 +18,7 @@ from .database import (
 from .logging_config import configure_logging, log_event
 from .overview import router as overview_router
 from .registry import router as registry_router
+from .storage_api import router as storage_router
 
 
 def create_app(database_url: str | None = None, data_root: str | Path | None = None) -> FastAPI:
@@ -45,6 +46,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
     app.include_router(catalog_router, prefix="/api/v1")
     app.include_router(collectors_router, prefix="/api/v1")
     app.include_router(overview_router, prefix="/api/v1")
+    app.include_router(storage_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def log_http_request(request: Request, call_next):

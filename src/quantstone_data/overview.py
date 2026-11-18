@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .database import get_session
-from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset
+from .models import CatalogFile, CatalogPartition, CollectionJob, CollectionRun, Dataset
 
 router = APIRouter(prefix="/overview", tags=["overview"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -92,18 +92,26 @@ def dataset_overview(request: Request, session: SessionDep) -> list[dict]:
             select(
                 CatalogPartition.dataset_id,
                 func.count(CatalogPartition.id),
-                func.count(func.distinct(CatalogPartition.file_path)),
-                func.coalesce(func.sum(CatalogPartition.row_count), 0),
-                func.coalesce(func.sum(CatalogPartition.size_bytes), 0),
                 func.min(CatalogPartition.partition_key),
                 func.max(CatalogPartition.partition_key),
                 func.max(CatalogPartition.published_at),
             ).group_by(CatalogPartition.dataset_id)
         )
     }
+    file_aggregates = {
+        row[0]: row
+        for row in session.execute(
+            select(
+                CatalogFile.dataset_id,
+                func.count(CatalogFile.id),
+                func.coalesce(func.sum(CatalogFile.row_count), 0),
+                func.coalesce(func.sum(CatalogFile.size_bytes), 0),
+            ).group_by(CatalogFile.dataset_id)
+        )
+    }
     missing: dict[str, int] = {}
-    for item in session.scalars(select(CatalogPartition)):
-        if not (data_root / item.file_path).is_file():
+    for item in session.scalars(select(CatalogFile)):
+        if not (data_root / item.path).is_file():
             missing[item.dataset_id] = missing.get(item.dataset_id, 0) + 1
 
     calendars: dict[str, list[date]] = {}
@@ -126,12 +134,13 @@ def dataset_overview(request: Request, session: SessionDep) -> list[dict]:
         policy = dataset.storage_policy or {}
         row = aggregates.get(dataset.id)
         partitions = int(row[1]) if row else 0
-        files = int(row[2]) if row else 0
-        rows = int(row[3]) if row else 0
-        size_bytes = int(row[4]) if row else 0
-        first_partition = row[5] if row else None
-        latest_partition = row[6] if row else None
-        published_at = _serialize_timestamp(row[7]) if row else None
+        first_partition = row[2] if row else None
+        latest_partition = row[3] if row else None
+        published_at = _serialize_timestamp(row[4]) if row else None
+        file_row = file_aggregates.get(dataset.id)
+        files = int(file_row[1]) if file_row else 0
+        rows = int(file_row[2]) if file_row else 0
+        size_bytes = int(file_row[3]) if file_row else 0
 
         expected_partitions: int | None = None
         coverage_percent: float | None = None
