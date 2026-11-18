@@ -344,7 +344,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
               return (
               <div className="job-block" key={job.id}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
-                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · {expanded ? "点击收起明细" : "点击查看明细"}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}</span>
+                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · 创建于 {formatDateTime(job.created_at)}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}<small>{expanded ? "点击收起明细" : "点击查看明细"}</small></span>
                 <span>{operationLabels[job.operation]}</span>
                 <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key}</code>}{job.collector_operation && <code>{job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
@@ -567,6 +567,19 @@ function formatBytes(value: number | null) {
   if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`;
   if (value < 1024 ** 3) return `${(value / 1024 ** 2).toFixed(1)} MB`;
   return `${(value / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function formatDateTime(value: string) {
+  // SQLite 返回的 UTC 时间可能不带时区后缀，显式补 Z 后再转换为浏览器本地时间。
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(normalized));
 }
 
 function operationDescription(operation: CollectionOperation) {
