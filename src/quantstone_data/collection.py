@@ -47,9 +47,64 @@ TERMINAL_JOB_STATUSES = {
     CollectionJobStatus.CANCELLED.value,
 }
 
+INTERRUPTED_JOB_ERROR = "应用重启时任务仍处于执行状态，已标记为失败；请新建任务继续。"
+
 
 def serialize_job(job: CollectionJob) -> CollectionJobRead:
     return CollectionJobRead.model_validate(job, from_attributes=True)
+
+
+def recover_interrupted_jobs(session: Session) -> int:
+    """应用启动时结束上一次进程遗留的执行中任务。"""
+    jobs = list(
+        session.scalars(
+            select(CollectionJob).where(
+                CollectionJob.status.in_(
+                    (
+                        CollectionJobStatus.RUNNING.value,
+                        CollectionJobStatus.CANCELLING.value,
+                    )
+                )
+            )
+        )
+    )
+    for job in jobs:
+        job.status = CollectionJobStatus.FAILED.value
+        job.error = INTERRUPTED_JOB_ERROR
+    if jobs:
+        session.commit()
+    return len(jobs)
+
+
+def _failure_message(error: Exception) -> str:
+    if isinstance(error, HTTPException):
+        return str(error.detail)
+    return str(error) or error.__class__.__name__
+
+
+def _mark_job_failed(session: Session, job_id: str, error: Exception) -> None:
+    """确保所有执行路径最终都把异常持久化到任务记录。"""
+    session.rollback()
+    job = session.get(CollectionJob, job_id)
+    if job is None:
+        return
+    message = _failure_message(error)
+    if job.status in {
+        CollectionJobStatus.CREATED.value,
+        CollectionJobStatus.RUNNING.value,
+        CollectionJobStatus.CANCELLING.value,
+        CollectionJobStatus.FAILED.value,
+    }:
+        job.status = CollectionJobStatus.FAILED.value
+        job.error = message
+        session.commit()
+    log_event(
+        "collection_job_failed",
+        level=logging.ERROR,
+        job_id=job_id,
+        dataset_id=job.dataset_id,
+        error=message,
+    )
 
 
 def _trading_dates(
@@ -256,6 +311,7 @@ def _execute_daily_job(
             run.status = "failed"
             run.error = str(error)
             job.status = CollectionJobStatus.FAILED.value
+            job.error = str(error)
             session.commit()
             log_event(
                 "collection_run_failed",
@@ -419,6 +475,7 @@ def _execute_snapshot_job(
         run.status = "failed"
         run.error = str(error)
         job.status = CollectionJobStatus.FAILED.value
+        job.error = str(error)
         session.commit()
         log_event(
             "collection_run_failed",
@@ -435,6 +492,7 @@ def _execute_snapshot_job(
         run.status = "failed"
         run.error = str(error)
         job.status = CollectionJobStatus.FAILED.value
+        job.error = str(error)
         session.commit()
         log_event(
             "collection_run_failed",
@@ -599,10 +657,14 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     )
     data_root: Path = request.app.state.data_root
     job.status = CollectionJobStatus.RUNNING.value
+    job.error = None
     session.commit()
     _RUNNING_JOBS.add(job.id)
     try:
         return _run_collection(job, operation, dataset, schema, data_root, session)
+    except Exception as error:
+        _mark_job_failed(session, job.id, error)
+        raise
     finally:
         _RUNNING_JOBS.discard(job.id)
         _CANCEL_REQUESTS.discard(job.id)

@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
+from quantstone_data.models import CollectionJob
 
 DATASET_ID = "demo.cn.stock.daily"
 
@@ -90,3 +91,20 @@ def test_job_record_can_be_deleted(tmp_path: Path) -> None:
 
     assert deleted.status_code == 204
     assert missing.status_code == 404
+
+
+def test_startup_marks_interrupted_job_as_failed(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        job_id = create_import_job(client)
+        with client.app.state.session_factory() as session:
+            job = session.get(CollectionJob, job_id)
+            assert job is not None
+            job.status = "running"
+            session.commit()
+
+    with create_client(tmp_path) as restarted:
+        response = restarted.get(f"/api/v1/collection-jobs/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+    assert "应用重启" in response.json()["error"]

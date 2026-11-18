@@ -139,6 +139,7 @@ export interface CollectionJob {
   staged_path: string | null;
   source_size_bytes: number | null;
   source_sha256: string | null;
+  error: string | null;
   created_at: string;
   updated_at: string;
 }

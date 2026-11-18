@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from quantstone_data.collectors.tushare_cn_stock.stock_basic import CollectionError
 from quantstone_data.main import create_app
 
 
@@ -294,6 +295,28 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         executed = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         review_response = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/review")
 
+        def failing_call(_token: str, _list_status: str, _fields: list[str]) -> list[dict]:
+            raise CollectionError("供应商暂时不可用")
+
+        monkeypatch.setattr(
+            "quantstone_data.collectors.tushare_cn_stock.stock_basic.call_api",
+            failing_call,
+        )
+        failed_created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.stock_basic",
+                "operation": "incremental",
+                "input_method": "collector",
+            },
+        )
+        failed_executed = client.post(
+            f"/api/v1/collection-jobs/{failed_created.json()['id']}/execute"
+        )
+        failed_record = client.get(
+            f"/api/v1/collection-jobs/{failed_created.json()['id']}"
+        )
+
     assert executed.status_code == 200
     body = executed.json()
     assert body["status"] == "review_passed"
@@ -303,6 +326,9 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert staged_file.suffix == ".parquet"
     report = staged_file.with_name("review.json").read_text(encoding="utf-8")
     assert '"passed": true' in report
+    assert failed_executed.status_code == 502
+    assert failed_record.json()["status"] == "failed"
+    assert failed_record.json()["error"] == "供应商暂时不可用"
 
 
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:

@@ -341,6 +341,7 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
                     </div>
                     <button type="button" className="toolbar-button" onClick={() => void loadRuns(job.id)}><RefreshCw size={14} />刷新明细</button>
                   </div>
+                  {job.error && <div className="job-error-banner"><AlertCircle size={15} /><span><strong>任务失败原因</strong>{job.error}</span></div>}
                   {jobRuns.length ? (
                     <div className="run-table">
                       <div className="run-row run-head"><span>分区</span><span>状态</span><span>行数</span><span>文件</span><span>错误</span></div>

@@ -6,6 +6,7 @@ from time import perf_counter
 from fastapi import FastAPI, Request
 
 from .catalog import router as catalog_router
+from .collection import recover_interrupted_jobs
 from .collection import router as collection_router
 from .collectors_api import router as collectors_router
 from .database import (
@@ -32,6 +33,10 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         engine = session_factory.kw["bind"]
         Base.metadata.create_all(engine)
         upgrade_sqlite_schema(engine)
+        with session_factory() as session:
+            recovered_jobs = recover_interrupted_jobs(session)
+        if recovered_jobs:
+            log_event("interrupted_jobs_recovered", count=recovered_jobs, level=30)
         log_event("application_started", data_root=resolved_data_root)
         try:
             yield

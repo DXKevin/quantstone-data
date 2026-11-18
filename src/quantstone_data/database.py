@@ -49,6 +49,8 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             connection.execute(
                 text("ALTER TABLE collection_jobs ADD COLUMN parameters JSON DEFAULT '{}'")
             )
+        if "error" not in job_columns:
+            connection.execute(text("ALTER TABLE collection_jobs ADD COLUMN error TEXT"))
         connection.execute(
             text(
                 "UPDATE datasets SET collection_bindings = "

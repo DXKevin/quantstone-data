@@ -65,5 +65,6 @@ class CollectionJobRead(BaseModel):
     staged_path: str | None
     source_size_bytes: int | None
     source_sha256: str | None
+    error: str | None
     created_at: datetime
     updated_at: datetime

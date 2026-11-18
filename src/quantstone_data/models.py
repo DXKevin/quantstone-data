@@ -111,6 +111,7 @@ class CollectionJob(Base):
     staged_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     source_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
