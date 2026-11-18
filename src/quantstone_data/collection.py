@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Annotated
+from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
 import pyarrow.parquet as pq
@@ -14,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .collection_protocol import CollectionContext
+from .collection_protocol import CollectionContext, RateLimitExceeded
 from .collection_schemas import (
     CollectionJobCreate,
     CollectionJobRead,
@@ -88,6 +89,21 @@ def _failure_message(error: Exception) -> str:
     if isinstance(error, HTTPException):
         return str(error.detail)
     return str(error) or error.__class__.__name__
+
+
+def _upstream_failure_message(error: Exception) -> str:
+    if isinstance(error, HTTPError):
+        reason = f" {error.reason}" if error.reason else ""
+        return f"上游数据服务暂时不可用（HTTP {error.code}{reason}），采集器重试后仍失败"
+    if isinstance(error, URLError):
+        return f"无法连接上游数据服务，采集器重试后仍失败：{error.reason}"
+    if isinstance(error, RateLimitExceeded):
+        return f"上游数据服务限流，采集器重试后仍失败：{error}"
+    return str(error) or error.__class__.__name__
+
+
+def _is_upstream_failure(error: Exception) -> bool:
+    return isinstance(error, (CollectionError, URLError, RateLimitExceeded))
 
 
 def _mark_job_failed(session: Session, job_id: str, error: Exception) -> None:
@@ -419,10 +435,13 @@ def _execute_daily_job(
             shutil.rmtree(run_directory, ignore_errors=True)
             session.commit()
         except Exception as error:
+            message = (
+                _upstream_failure_message(error) if _is_upstream_failure(error) else str(error)
+            )
             run.status = "failed"
-            run.error = str(error)
+            run.error = message
             job.status = CollectionJobStatus.FAILED.value
-            job.error = str(error)
+            job.error = message
             session.commit()
             log_event(
                 "collection_run_failed",
@@ -432,8 +451,10 @@ def _execute_daily_job(
                 run_id=run.id,
                 dataset_id=job.dataset_id,
                 partition_key=partition_key,
-                error=str(error),
+                error=message,
             )
+            if _is_upstream_failure(error):
+                raise HTTPException(status_code=502, detail=message) from error
             raise
 
     report_path = data_root / "staging" / job.id / "review.json"
@@ -610,11 +631,12 @@ def _execute_snapshot_job(
             error_count=report["error_count"],
         )
         return serialize_job(job)
-    except CollectionError as error:
+    except (CollectionError, URLError, RateLimitExceeded) as error:
+        message = _upstream_failure_message(error)
         run.status = "failed"
-        run.error = str(error)
+        run.error = message
         job.status = CollectionJobStatus.FAILED.value
-        job.error = str(error)
+        job.error = message
         session.commit()
         log_event(
             "collection_run_failed",
@@ -624,9 +646,9 @@ def _execute_snapshot_job(
             run_id=run.id,
             dataset_id=job.dataset_id,
             partition_key="snapshot",
-            error=str(error),
+            error=message,
         )
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        raise HTTPException(status_code=502, detail=message) from error
     except Exception as error:
         run.status = "failed"
         run.error = str(error)
@@ -937,6 +959,7 @@ def _run_collection(
             row_count=report["row_count"],
         )
     except (CollectionError, OSError) as error:
+        message = _upstream_failure_message(error)
         session.rollback()
         log_event(
             "collection_job_failed",
@@ -944,9 +967,9 @@ def _run_collection(
             exc_info=True,
             job_id=job.id,
             dataset_id=job.dataset_id,
-            error=str(error),
+            error=message,
         )
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        raise HTTPException(status_code=502, detail=message) from error
 
     return serialize_job(job)
 

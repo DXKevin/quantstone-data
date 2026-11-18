@@ -2,6 +2,7 @@ import hashlib
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.error import HTTPError
 
 from fastapi.testclient import TestClient
 
@@ -495,6 +496,37 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
         catalog = client.get("/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.daily")
         storage = client.get("/api/v1/storage/overview")
 
+        def failing_daily(*_args):
+            raise HTTPError(
+                "https://api.tushare.pro",
+                502,
+                "Bad Gateway",
+                {},
+                None,
+            )
+
+        monkeypatch.setattr(
+            "quantstone_data.collectors.tushare_cn_stock.daily._call_daily",
+            failing_daily,
+        )
+        monkeypatch.setattr("quantstone_data.execution._sleep", lambda _seconds: None)
+        failed_created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.daily",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {
+                    "start_date": "2026-11-18",
+                    "end_date": "2026-11-18",
+                },
+            },
+        )
+        failed_job_id = failed_created.json()["id"]
+        failed_executed = client.post(f"/api/v1/collection-jobs/{failed_job_id}/execute")
+        failed_job = client.get(f"/api/v1/collection-jobs/{failed_job_id}")
+        failed_runs = client.get(f"/api/v1/collection-jobs/{failed_job_id}/runs")
+
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
     assert runs.json()[0]["row_count"] == 2
@@ -509,6 +541,13 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     published = tmp_path / "data" / catalog.json()[0]["file_path"]
     assert published.suffix == ".parquet"
     assert published.is_file()
+    upstream_error = "上游数据服务暂时不可用（HTTP 502 Bad Gateway），采集器重试后仍失败"
+    assert failed_executed.status_code == 502
+    assert failed_executed.json()["detail"] == upstream_error
+    assert failed_job.json()["status"] == "failed"
+    assert failed_job.json()["error"] == upstream_error
+    assert failed_runs.json()[0]["status"] == "failed"
+    assert failed_runs.json()[0]["error"] == upstream_error
 
 
 def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:

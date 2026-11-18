@@ -115,10 +115,9 @@
 
 建议第一步包含：
 
-1. 统一转换 daily 采集中的 `urllib.error.HTTPError`，上游 502 应向前端返回明确的 502 和中文原因，而不是本地 500；
-2. 排查 Windows `socket.socketpair()` 阻塞，恢复完整 pytest 验证；
-3. 用真实大筛选结果评估 100,000 行 JSON 的传输、解析和浏览器内存占用；
-4. 合并 daily 2025、2026 年数据，并根据 Catalog 缺口规划增量日期。
+1. 排查 Windows `socket.socketpair()` 阻塞，恢复完整 pytest 验证；
+2. 用真实大筛选结果评估 100,000 行 JSON 的传输、解析和浏览器内存占用；
+3. 合并 daily 2025、2026 年数据，并根据 Catalog 缺口规划增量日期。
 
 不得把现有 TuShare Token、百度网盘账号或真实金融数据提交到 Git；本地 `.env` 只供运行使用。
 
@@ -144,7 +143,7 @@
 - 取消请求和执行中集合只存在于进程内；服务重启后会把遗留的 `running` / `cancelling` 任务自动标记为失败；
 - 取消在分区边界生效，单个分区内无法中断；
 - 当前机器的 Python `socket.socketpair()` 会阻塞，导致基于 Starlette TestClient 的新增测试无法进入项目代码；需先排查本机网络/代理环境后运行完整 pytest；
-- TuShare `https://api.tushare.pro` 在本轮验证期间直接返回 Nginx 502；本机无代理环境变量，属于上游或本机网络链路问题；daily 重试会把该 `HTTPError` 暴露成接口 500，虽然任务已正确落库为失败，但需要统一转换为明确的 502 错误；
+- TuShare `https://api.tushare.pro` 在本轮验证期间直接返回 Nginx 502；本机无代理环境变量，属于上游或本机网络链路问题；系统现会在重试耗尽后返回中文 502，并把相同原因写入任务和运行记录；
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
@@ -168,6 +167,7 @@
 - 采集任务列表在任务 ID 下方显示按浏览器本地时区格式化的创建时间。
 - stock_basic 采集器升级为统一 CollectionResult 协议，并复用通用 snapshot 审核、发布和 Catalog 流程；
 - SQLite 启动迁移为现有 stock_basic 数据集补齐 `snapshot + replace_snapshot` 存储策略。
+- daily、snapshot 和旧执行路径统一处理上游 HTTP、网络及限流异常；重试耗尽后返回中文 502，任务与运行记录保存相同错误原因。
 
 验证：
 
@@ -183,7 +183,6 @@
 
 下一步：
 
-- 统一处理 daily 上游 HTTP 错误，避免供应商 502 被暴露为本地 500；
 - 使用更大数据集继续观察 100,000 行 JSON 传输、解析和内存占用，再决定是否增加服务端分页。
 
 遗留问题：
