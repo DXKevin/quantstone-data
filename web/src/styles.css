@@ -45,12 +45,12 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .primary-button, .secondary-button, .ghost-button, .danger-button { border-radius: 6px; min-height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-weight: 600; font-size: 13px; cursor: pointer; }
 .primary-button { border: 1px solid var(--green); background: var(--green); color: white; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
 .primary-button:hover { background: var(--green-dark); }
-.primary-button:disabled { opacity: .55; cursor: wait; }
+.primary-button:disabled { opacity: .55; cursor: not-allowed; }
 .secondary-button { border: 1px solid #cfd8d3; background: white; }
 .secondary-button:disabled { opacity: .5; cursor: not-allowed; }
 .ghost-button { border: 1px solid var(--line); background: transparent; }
 .danger-button { border: 1px solid #e4c7c7; background: #fff8f8; color: #a43c3c; }
-.danger-button:disabled { opacity: .55; cursor: wait; }
+.danger-button:disabled { opacity: .55; cursor: not-allowed; }
 .summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); background: var(--panel); margin-bottom: 20px; }
 .summary-strip > div { min-height: 91px; padding: 20px 22px; border-right: 1px solid var(--line); }
 .summary-strip > div:last-child { border: 0; }
