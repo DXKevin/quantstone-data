@@ -37,7 +37,7 @@ OPERATIONS = (
     CollectorOperation(
         key="stock_list_initial",
         name="股票列表首次采集",
-        description="首次调用 TuShare stock_basic 接口建立当前上市股票快照。",
+        description="分别获取上市、退市和暂停上市股票，建立完整股票列表快照。",
         purpose="initial",
         parameters=(),
         datasets=(STOCK_LIST_DATASET_ID,),
@@ -46,7 +46,7 @@ OPERATIONS = (
     CollectorOperation(
         key="stock_list_incremental",
         name="股票列表增量更新",
-        description="重新获取 TuShare stock_basic 当前快照，用于更新股票列表。",
+        description="重新获取上市、退市和暂停上市股票，替换完整股票列表快照。",
         purpose="incremental",
         parameters=(),
         datasets=(STOCK_LIST_DATASET_ID,),

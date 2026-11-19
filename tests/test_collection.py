@@ -305,10 +305,16 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         ],
     }
 
+    requested_statuses: list[str] = []
+
     def fake_call(_token: str, list_status: str, _fields: list[str]) -> list[dict]:
-        if list_status != "L":
-            return []
-        return [{"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"}]
+        requested_statuses.append(list_status)
+        rows = {
+            "L": {"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"},
+            "D": {"ts_code": "000003.SZ", "name": "退市样例", "list_status": "D"},
+            "P": {"ts_code": "000004.SZ", "name": "暂停样例", "list_status": "P"},
+        }
+        return [rows[list_status]]
 
     monkeypatch.setattr(
         "quantstone_data.collectors.tushare_cn_stock.stock_basic.call_api",
@@ -387,7 +393,8 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert body["status"] == "succeeded"
     assert readiness.json()["initial_required"] is False
     assert review_response.status_code == 200
-    assert review_response.json()["row_count"] == 1
+    assert review_response.json()["row_count"] == 3
+    assert requested_statuses[:3] == ["L", "D", "P"]
     report = (tmp_path / "data" / body["staged_path"]).read_text(encoding="utf-8")
     assert '"passed": true' in report
     assert failed_submitted.status_code == 202

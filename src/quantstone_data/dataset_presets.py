@@ -85,7 +85,7 @@ DATASET_PRESETS = (
             dataset_name="stock_basic",
             market=None,
             display_name="A股股票列表",
-            description="TuShare stock_basic 当前上市股票基础信息。",
+            description="TuShare stock_basic 全部股票基础信息，包含上市、退市和暂停上市状态。",
             collection_bindings=[
                 {
                     "purpose": "initial",

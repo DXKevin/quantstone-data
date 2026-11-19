@@ -20,7 +20,8 @@ from ...collection_protocol import (
 )
 
 DEFAULT_API_URL = "https://api.tushare.pro"
-DEFAULT_LIST_STATUSES = ("L",)
+# TuShare stock_basic 需要分别请求三种状态；空值不会稳定返回完整股票范围。
+DEFAULT_LIST_STATUSES = ("L", "D", "P")
 RATE_LIMIT_CODES = {40203, -40203}
 RATE_LIMIT_KEYWORDS = ("每分钟", "每小时", "频率", "超过限制", "访问次数")
 DEFAULT_RETRY_AFTER = 60.0
