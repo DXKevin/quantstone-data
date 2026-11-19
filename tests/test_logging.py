@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 from quantstone_data.logging_config import configure_logging, log_event, read_job_logs
@@ -31,3 +32,11 @@ def test_structured_logs_are_routed_and_secrets_are_redacted(tmp_path: Path) -> 
     assert json.loads(job_log)["dataset_id"] == "tushare.cn.stock.trade_cal"
     assert read_job_logs(tmp_path, "job-123")[0]["event"] == "collector_called"
     assert read_job_logs(tmp_path, "missing-job") == []
+
+    log_event("collection_failed", level=logging.ERROR, job_id="job-123")
+    for handler in logger.handlers:
+        handler.flush()
+    warnings = read_job_logs(tmp_path, "job-123", min_level="WARNING")
+    assert [item["event"] for item in warnings] == ["collection_failed"]
+    assert all(item["level"] == "ERROR" for item in warnings)
+    assert read_job_logs(tmp_path, "job-123", min_level="CRITICAL") == []

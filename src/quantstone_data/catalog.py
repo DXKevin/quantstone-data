@@ -95,10 +95,15 @@ def list_collection_logs(
     request: Request,
     session: SessionDep,
     limit: int = Query(default=500, ge=1, le=2000),
+    min_level: str | None = Query(
+        default=None, pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
+    ),
 ) -> dict:
     if session.get(CollectionJob, job_id) is None:
         raise HTTPException(status_code=404, detail="collection job not found")
     return {
         "job_id": job_id,
-        "entries": read_job_logs(request.app.state.data_root, job_id, limit=limit),
+        "entries": read_job_logs(
+            request.app.state.data_root, job_id, limit=limit, min_level=min_level
+        ),
     }

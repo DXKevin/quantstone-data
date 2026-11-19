@@ -81,6 +81,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   const [runs, setRuns] = useState<Record<string, CollectionRun[]>>({});
   const [logs, setLogs] = useState<Record<string, CollectionLogEntry[]>>({});
   const [detailTab, setDetailTab] = useState<"runs" | "logs">("runs");
+  const [logLevel, setLogLevel] = useState("ALL");
   const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
   const jobsRef = useRef<CollectionJob[]>([]);
@@ -228,9 +229,9 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     }
   }
 
-  async function loadLogs(jobId: string) {
+  async function loadLogs(jobId: string, level = logLevel) {
     try {
-      const data = await api.listCollectionLogs(jobId);
+      const data = await api.listCollectionLogs(jobId, 500, level === "ALL" ? undefined : level);
       setLogs((current) => ({ ...current, [jobId]: data.entries }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载运行日志");
@@ -265,6 +266,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   async function cancelJob(job: CollectionJob) {
     if (confirming !== `${job.id}:cancel`) {
       setConfirming(`${job.id}:cancel`);
+      setNotice("再次点击“确认取消”即可停止任务；已经发布的分区会保留。");
       return;
     }
     setConfirming(null);
@@ -411,6 +413,24 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                       <button type="button" className={detailTab === "logs" ? "active" : ""} onClick={() => void selectDetailTab(job.id, "logs")}>运行日志</button>
                       {detailTab === "runs" && <span>{jobProgress ? formatProgress(jobProgress) : "尚无运行记录"}</span>}
                       {detailTab === "logs" && <span>最近 {jobLogs.length} 条</span>}
+                      {detailTab === "logs" && (
+                        <label className="log-level-filter">
+                          <span>级别</span>
+                          <select
+                            value={logLevel}
+                            onChange={(event) => {
+                              const next = event.target.value;
+                              setLogLevel(next);
+                              void loadLogs(job.id, next);
+                            }}
+                          >
+                            <option value="ALL">全部</option>
+                            <option value="INFO">信息以上</option>
+                            <option value="WARNING">警告以上</option>
+                            <option value="ERROR">错误以上</option>
+                          </select>
+                        </label>
+                      )}
                     </div>
                     <button type="button" className="toolbar-button" onClick={() => void (detailTab === "logs" ? loadLogs(job.id) : loadRuns(job.id))}><RefreshCw size={14} />刷新</button>
                   </div>
@@ -682,7 +702,7 @@ function logEventLabel(event: string) {
 }
 
 function logLevelLabel(level: string) {
-  return ({ INFO: "信息", WARNING: "警告", ERROR: "错误", CRITICAL: "严重" } as Record<string, string>)[level] ?? level;
+  return ({ DEBUG: "调试", INFO: "信息", WARNING: "警告", ERROR: "错误", CRITICAL: "严重" } as Record<string, string>)[level] ?? level;
 }
 
 function formatLogTime(value: string) {

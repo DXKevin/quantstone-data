@@ -407,8 +407,10 @@ export const api = {
     request<CollectionProgress>(`/api/v1/collection-jobs/${jobId}/progress`),
   listCollectionRuns: (jobId: string) =>
     request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
-  listCollectionLogs: (jobId: string, limit = 500) =>
-    request<CollectionLogs>(`/api/v1/collection-jobs/${jobId}/logs?limit=${limit}`),
+  listCollectionLogs: (jobId: string, limit = 500, minLevel?: string) =>
+    request<CollectionLogs>(
+      `/api/v1/collection-jobs/${jobId}/logs?limit=${limit}${minLevel ? `&min_level=${encodeURIComponent(minLevel)}` : ""}`,
+    ),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
   listMaintenanceJobs: (datasetId?: string) => {

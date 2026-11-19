@@ -420,6 +420,8 @@ body { font-size: 14px; }
 .job-log-row.log-level-warning .job-log-level { background: #fff0c2; color: #8a5b00; }
 .job-log-row.log-level-error, .job-log-row.log-level-critical { background: #fff7f7; }
 .job-log-row.log-level-error .job-log-level, .job-log-row.log-level-critical .job-log-level { background: #fde2e2; color: #a33b3b; }
+.log-level-filter { display: inline-flex; align-items: center; gap: 6px; color: #6d7872; font-size: 11px; }
+.log-level-filter select { padding: 3px 6px; border: 1px solid #d9e2dc; border-radius: 4px; background: #fff; color: #263d33; font-size: 11px; }
 
 /* 数据概览卡片 */
 .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }

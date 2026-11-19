@@ -86,11 +86,23 @@ def get_logger() -> logging.Logger:
     return logging.getLogger(LOGGER_NAME)
 
 
-def read_job_logs(data_root: Path, job_id: str, *, limit: int = 500) -> list[dict[str, Any]]:
+LOG_LEVEL_VALUES = {
+    "DEBUG": 10,
+    "INFO": 20,
+    "WARNING": 30,
+    "ERROR": 40,
+    "CRITICAL": 50,
+}
+
+
+def read_job_logs(
+    data_root: Path, job_id: str, *, limit: int = 500, min_level: str | None = None
+) -> list[dict[str, Any]]:
     """读取任务最近的结构化日志；忽略并发写入造成的不完整行。"""
     target = data_root / "logs" / "collection" / f"{job_id}.log"
     if not target.is_file():
         return []
+    threshold = LOG_LEVEL_VALUES.get((min_level or "").upper())
     entries: deque[dict[str, Any]] = deque(maxlen=limit)
     with target.open(encoding="utf-8") as source:
         for line in source:
@@ -98,8 +110,13 @@ def read_job_logs(data_root: Path, job_id: str, *, limit: int = 500) -> list[dic
                 item = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(item, dict):
-                entries.append(item)
+            if not isinstance(item, dict):
+                continue
+            if threshold is not None:
+                level = LOG_LEVEL_VALUES.get(str(item.get("level", "")).upper(), 0)
+                if level < threshold:
+                    continue
+            entries.append(item)
     return list(entries)
 
 

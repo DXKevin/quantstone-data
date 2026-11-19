@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from quantstone_data import collection as collection_module
 from quantstone_data.main import create_app
 from quantstone_data.models import CollectionJob
 
@@ -72,6 +73,21 @@ def test_job_can_be_cancelled_before_running(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
+
+
+def test_running_job_cancel_registers_request(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        job_id = create_import_job(client)
+        collection_module._RUNNING_JOBS.add(job_id)
+        try:
+            response = client.post(f"/api/v1/collection-jobs/{job_id}/cancel")
+            assert job_id in collection_module._CANCEL_REQUESTS
+        finally:
+            collection_module._RUNNING_JOBS.discard(job_id)
+            collection_module._CANCEL_REQUESTS.discard(job_id)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelling"
 
 
 def test_finished_job_cannot_be_cancelled(tmp_path: Path) -> None:

@@ -13,6 +13,7 @@ from uuid import uuid4
 import pyarrow.parquet as pq
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, selectinload
 
 from .collection_protocol import CollectionContext, RateLimitExceeded
@@ -395,6 +396,12 @@ def _execute_daily_job(
             session.flush()
         elif run.status == "succeeded":
             continue
+
+        # 先提交分区开始状态，释放 SQLite 读写事务，避免供应商调用期间
+        # 阻塞取消请求等其他写操作。
+        run.status = "fetching"
+        run.error = None
+        session.commit()
 
         run_directory = data_root / "staging" / job.id / run.id
         context = CollectionContext(run.id, run_directory, token)
@@ -1089,43 +1096,45 @@ def cancel_collection_job(job_id: str, request: Request, session: SessionDep) ->
         if job.id in _PUBLISHING_JOBS:
             raise HTTPException(status_code=409, detail="任务正在发布，已无法安全取消")
 
+        was_running = job.id in _RUNNING_JOBS
+        target_status = CollectionJobStatus.CANCELLED.value
         if job.id in _QUEUED_JOBS:
             if request.app.state.background_executor.cancel(job.id):
                 _QUEUED_JOBS.discard(job.id)
-                job.status = CollectionJobStatus.CANCELLED.value
-                log_event(
-                    "collection_job_cancelled",
-                    job_id=job.id,
-                    dataset_id=job.dataset_id,
-                )
             else:
-                job.status = CollectionJobStatus.CANCELLING.value
+                target_status = CollectionJobStatus.CANCELLING.value
                 _CANCEL_REQUESTS.add(job.id)
-                log_event(
-                    "collection_job_cancel_requested",
-                    job_id=job.id,
-                    dataset_id=job.dataset_id,
-                )
-        elif job.id in _RUNNING_JOBS:
-            # 先落库再登记取消请求，避免与执行线程写回 CANCELLED 的顺序竞争。
-            job.status = CollectionJobStatus.CANCELLING.value
-            session.commit()
+        elif was_running:
+            # 先登记取消请求：即使状态写库暂时被锁，工作线程也会在分区边界停止。
             _CANCEL_REQUESTS.add(job.id)
+            target_status = CollectionJobStatus.CANCELLING.value
+
+        job.status = target_status
+        response = serialize_job(job)
+        try:
+            session.commit()
+        except OperationalError as error:
+            session.rollback()
+            if not was_running or "database is locked" not in str(error).lower():
+                raise HTTPException(
+                    status_code=503, detail="数据库繁忙，请稍后重试取消"
+                ) from error
             log_event(
-                "collection_job_cancel_requested",
+                "collection_job_cancel_pending",
+                level=logging.WARNING,
                 job_id=job.id,
                 dataset_id=job.dataset_id,
+                error=str(error),
             )
-        else:
-            job.status = CollectionJobStatus.CANCELLED.value
-            log_event(
-                "collection_job_cancelled",
-                job_id=job.id,
-                dataset_id=job.dataset_id,
-            )
-        session.commit()
-    session.refresh(job)
-    return serialize_job(job)
+            return response
+        log_event(
+            "collection_job_cancelled"
+            if target_status == CollectionJobStatus.CANCELLED.value
+            else "collection_job_cancel_requested",
+            job_id=job.id,
+            dataset_id=job.dataset_id,
+        )
+    return response
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
