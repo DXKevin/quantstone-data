@@ -22,6 +22,7 @@ import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } 
 import {
   api,
   CollectorDefinition,
+  CollectionReadiness,
   CollectionPurpose,
   DatasetCreatePayload,
   DatasetDetail,
@@ -37,6 +38,7 @@ type View = "list" | "create" | "edit" | "metadata" | "detail";
 type Area = "overview" | "datasets" | "collection";
 type DatasetSection = "registry" | "presets";
 type CollectionSection = "jobs" | "capabilities";
+type CollectionRequest = { datasetId: string; operation: CollectionPurpose };
 
 interface FieldDraft {
   key: number;
@@ -80,6 +82,7 @@ function App() {
   const [area, setArea] = useState<Area>("overview");
   const [datasetSection, setDatasetSection] = useState<DatasetSection>("registry");
   const [collectionSection, setCollectionSection] = useState<CollectionSection>("jobs");
+  const [collectionRequest, setCollectionRequest] = useState<CollectionRequest | null>(null);
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [presets, setPresets] = useState<DatasetPreset[]>([]);
@@ -158,7 +161,13 @@ function App() {
       <main className="main-area">
         {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
         {area === "collection" && collectionSection === "jobs" && (
-          <CollectionJobs datasets={datasets} collectors={collectors} navigation={<CollectionTabs selected="jobs" onSelect={setCollectionSection} />} />
+          <CollectionJobs
+            datasets={datasets}
+            collectors={collectors}
+            navigation={<CollectionTabs selected="jobs" onSelect={setCollectionSection} />}
+            requestedCollection={collectionRequest}
+            onRequestHandled={() => setCollectionRequest(null)}
+          />
         )}
         {area === "collection" && collectionSection === "capabilities" && (
           <CollectorCatalog collectors={collectors} navigation={<CollectionTabs selected="capabilities" onSelect={setCollectionSection} />} />
@@ -207,6 +216,11 @@ function App() {
             onBack={() => setView("list")}
             onEdit={() => setView("edit")}
             onEditMetadata={() => setView("metadata")}
+            onCollect={(operation) => {
+              setCollectionRequest({ datasetId: selected.id, operation });
+              setCollectionSection("jobs");
+              setArea("collection");
+            }}
             onDeleted={() => {
               setSelected(null);
               setView("list");
@@ -674,7 +688,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
   );
 }
 
-function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
+function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onCollect: (operation: CollectionPurpose) => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
   const [activating, setActivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -718,6 +732,8 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
         <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
+      <DatasetCollectionActions dataset={dataset} onCollect={props.onCollect} />
+
       <DatasetPreview dataset={dataset} />
 
       {dataset.storage_policy?.compaction === "yearly" && <DatasetMaintenance dataset={dataset} />}
@@ -732,6 +748,42 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
         </div>
       </section>
     </div>
+  );
+}
+
+function DatasetCollectionActions({ dataset, onCollect }: { dataset: DatasetDetail; onCollect: (operation: CollectionPurpose) => void }) {
+  const [readiness, setReadiness] = useState<CollectionReadiness | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setReadiness(null);
+    setError(null);
+    void api.getCollectionReadiness(dataset.id)
+      .then((result) => { if (active) setReadiness(result); })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "无法读取采集状态"); });
+    return () => { active = false; };
+  }, [dataset.id]);
+
+  const initialRequired = readiness?.initial_required ?? true;
+  return (
+    <section className="panel dataset-collection-panel">
+      <div className="card-title">
+        <div><h2>数据采集</h2><p>{initialRequired ? "该数据集必须先完成首次采集并发布数据，之后才能执行其他采集。" : "首次采集已完成，可以执行增量更新或其他契约操作。"}</p></div>
+        {readiness && <span className={initialRequired ? "collection-gate pending" : "collection-gate ready"}>{initialRequired ? "等待首次采集" : "可增量更新"}</span>}
+      </div>
+      {error && <div className="maintenance-error"><X size={14} />{error}</div>}
+      <div className="dataset-collection-actions">
+        {dataset.collection_bindings.map((binding) => {
+          const isInitial = binding.purpose === "initial";
+          const disabled = dataset.status !== "active" || !readiness || (isInitial ? !initialRequired : initialRequired);
+          const label = isInitial && !initialRequired ? "首次采集已完成" : purposeLabels[binding.purpose];
+          return <button type="button" className={isInitial ? "primary-button" : "secondary-button"} disabled={disabled} key={binding.purpose} onClick={() => onCollect(binding.purpose)}><RefreshCw size={15} />{label}</button>;
+        })}
+        {!dataset.collection_bindings.length && <span className="collection-empty">该数据集尚未绑定采集器操作。</span>}
+      </div>
+      {dataset.status !== "active" && <p className="collection-hint">请先启用数据集，再开始首次采集。</p>}
+    </section>
   );
 }
 

@@ -70,3 +70,8 @@ class CollectionJobRead(BaseModel):
     error: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class CollectionReadiness(BaseModel):
+    dataset_id: str
+    initial_required: bool

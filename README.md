@@ -112,6 +112,7 @@ GET    /api/v1/collectors/{collector_key}/operations/{operation_key}
 GET    /api/v1/catalog/partitions?dataset_id=...
 POST   /api/v1/collection-jobs
 GET    /api/v1/collection-jobs
+GET    /api/v1/collection-jobs/readiness/{dataset_id}
 GET    /api/v1/collection-jobs/{job_id}
 GET    /api/v1/collection-jobs/{job_id}/runs
 GET    /api/v1/collection-jobs/{job_id}/logs
@@ -129,6 +130,9 @@ GET    /health
 `PUT` 仅用于修改草稿的完整数据契约；`PATCH` 用于修改显示名称和说明，已启用数据集也可使用。
 “预置契约”页面展示随项目代码版本管理的常用契约，并通过现有创建接口生成 Registry 草稿；
 预置不会自动创建、同步或覆盖数据集。
+
+已启用数据集的详情页直接提供契约支持的采集按钮。新数据集必须先成功完成首次采集并发布
+数据，之后才能创建增量更新、缺口修复或范围重建任务。
 
 手动文件入库采用两步流程：先创建 `input_method=file_import` 的采集任务，再将文件上传到该任务的 `/file` 接口。文件只会进入外部数据根目录的 staging 区，不会直接发布为正式数据。
 

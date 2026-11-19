@@ -61,9 +61,16 @@ const runStatusLabels: Record<string, string> = {
   review_failed: "审核异常",
 };
 
-export default function CollectionJobs({ datasets, collectors, navigation }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; navigation?: ReactNode }) {
+export default function CollectionJobs({ datasets, collectors, navigation, requestedCollection, onRequestHandled }: {
+  datasets: DatasetSummary[];
+  collectors: CollectorDefinition[];
+  navigation?: ReactNode;
+  requestedCollection?: { datasetId: string; operation: CollectionOperation } | null;
+  onRequestHandled?: () => void;
+}) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
   const [view, setView] = useState<"list" | "create">("list");
+  const [creationDefaults, setCreationDefaults] = useState<{ datasetId: string; operation: CollectionOperation } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -99,6 +106,13 @@ export default function CollectionJobs({ datasets, collectors, navigation }: { d
   useEffect(() => {
     void loadJobs();
   }, [loadJobs]);
+
+  useEffect(() => {
+    if (!requestedCollection) return;
+    setCreationDefaults(requestedCollection);
+    setView("create");
+    onRequestHandled?.();
+  }, [requestedCollection, onRequestHandled]);
 
   useEffect(() => {
     jobsRef.current = jobs;
@@ -287,9 +301,12 @@ export default function CollectionJobs({ datasets, collectors, navigation }: { d
       <CreateCollectionJob
         datasets={activeDatasets}
         collectors={collectors}
-        onCancel={() => setView("list")}
+        initialDatasetId={creationDefaults?.datasetId}
+        initialOperation={creationDefaults?.operation}
+        onCancel={() => { setCreationDefaults(null); setView("list"); }}
         onComplete={async (message) => {
           setNotice(message);
+          setCreationDefaults(null);
           setView("list");
           await loadJobs();
         }}
@@ -441,12 +458,17 @@ export default function CollectionJobs({ datasets, collectors, navigation }: { d
 function CreateCollectionJob(props: {
   datasets: DatasetSummary[];
   collectors: CollectorDefinition[];
+  initialDatasetId?: string;
+  initialOperation?: CollectionOperation;
   onCancel: () => void;
   onComplete: (message: string) => Promise<void>;
 }) {
-  const [datasetId, setDatasetId] = useState(props.datasets[0]?.id ?? "");
-  const [operation, setOperation] = useState<CollectionOperation>("initial");
-  const [inputMethod, setInputMethod] = useState<CollectionInputMethod>("file_import");
+  const initialDataset = props.datasets.find((dataset) => dataset.id === props.initialDatasetId);
+  const initialOperation = props.initialOperation ?? "initial";
+  const hasRequestedBinding = initialDataset?.collection_bindings.some((binding) => binding.purpose === initialOperation) ?? false;
+  const [datasetId, setDatasetId] = useState(initialDataset?.id ?? props.datasets[0]?.id ?? "");
+  const [operation, setOperation] = useState<CollectionOperation>(initialOperation);
+  const [inputMethod, setInputMethod] = useState<CollectionInputMethod>(hasRequestedBinding ? "collector" : "file_import");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

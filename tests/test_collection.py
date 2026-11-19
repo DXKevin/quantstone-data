@@ -176,6 +176,25 @@ def test_initial_collection_can_be_created_without_date_range(tmp_path: Path) ->
     assert response.json()["end_date"] is None
 
 
+def test_incremental_collection_requires_completed_initial_collection(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        dataset_id = create_dataset(client)
+        readiness = client.get(f"/api/v1/collection-jobs/readiness/{dataset_id}")
+        response = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": dataset_id,
+                "operation": "incremental",
+                "input_method": "file_import",
+            },
+        )
+
+    assert readiness.status_code == 200
+    assert readiness.json() == {"dataset_id": dataset_id, "initial_required": True}
+    assert response.status_code == 409
+    assert response.json()["detail"] == "该数据集尚未完成首次采集，请先执行首次采集并发布数据"
+
+
 def test_collector_job_requires_a_binding_for_its_purpose(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         dataset_id = create_dataset(client)
@@ -183,7 +202,7 @@ def test_collector_job_requires_a_binding_for_its_purpose(tmp_path: Path) -> Non
             "/api/v1/collection-jobs",
             json={
                 "dataset_id": dataset_id,
-                "operation": "incremental",
+                "operation": "initial",
                 "input_method": "collector",
                 "collector_key": "mock",
             },
@@ -316,6 +335,9 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
 
         submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         executed = wait_for_job(client, created.json()["id"])
+        readiness = client.get(
+            "/api/v1/collection-jobs/readiness/tushare.cn.stock.stock_basic"
+        )
         review_response = client.get(f"/api/v1/collection-jobs/{created.json()['id']}/review")
 
         def failing_call(_token: str, _list_status: str, _fields: list[str]) -> list[dict]:
@@ -363,6 +385,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert executed.status_code == 200
     body = executed.json()
     assert body["status"] == "succeeded"
+    assert readiness.json()["initial_required"] is False
     assert review_response.status_code == 200
     assert review_response.json()["row_count"] == 1
     report = (tmp_path / "data" / body["staged_path"]).read_text(encoding="utf-8")

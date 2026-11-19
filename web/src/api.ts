@@ -167,6 +167,11 @@ export interface CollectionJobCreatePayload {
   parameters: Record<string, unknown>;
 }
 
+export interface CollectionReadiness {
+  dataset_id: string;
+  initial_required: boolean;
+}
+
 export interface CollectionProgress {
   job_id: string;
   status: CollectionJobStatus;
@@ -326,6 +331,8 @@ export const api = {
   deleteDataset: (id: string) =>
     request<void>(`/api/v1/datasets/${id}`, { method: "DELETE" }),
   listCollectionJobs: () => request<CollectionJob[]>("/api/v1/collection-jobs"),
+  getCollectionReadiness: (datasetId: string) =>
+    request<CollectionReadiness>(`/api/v1/collection-jobs/readiness/${encodeURIComponent(datasetId)}`),
   createCollectionJob: (payload: CollectionJobCreatePayload) =>
     request<CollectionJob>("/api/v1/collection-jobs", {
       method: "POST",

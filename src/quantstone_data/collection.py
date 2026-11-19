@@ -20,6 +20,8 @@ from .collection_schemas import (
     CollectionJobCreate,
     CollectionJobRead,
     CollectionJobStatus,
+    CollectionOperation,
+    CollectionReadiness,
     InputMethod,
 )
 from .collector_registry import get_operation, validate_operation_parameters
@@ -51,6 +53,26 @@ TERMINAL_JOB_STATUSES = {
     CollectionJobStatus.REVIEW_FAILED.value,
     CollectionJobStatus.CANCELLED.value,
 }
+
+
+def has_completed_initial_collection(session: Session, dataset_id: str) -> bool:
+    published_partition = session.scalar(
+        select(CatalogPartition.id).where(CatalogPartition.dataset_id == dataset_id).limit(1)
+    )
+    if published_partition is not None:
+        return True
+    successful_initial_job = session.scalar(
+        select(CollectionJob.id)
+        .where(
+            CollectionJob.dataset_id == dataset_id,
+            CollectionJob.operation == CollectionOperation.INITIAL.value,
+            CollectionJob.status == CollectionJobStatus.SUCCEEDED.value,
+        )
+        .limit(1)
+    )
+    return successful_initial_job is not None
+
+
 RETRYABLE_JOB_STATUSES = {
     CollectionJobStatus.FAILED.value,
     CollectionJobStatus.REVIEW_FAILED.value,
@@ -684,6 +706,14 @@ def create_collection_job(
         raise HTTPException(status_code=404, detail="dataset not found")
     if dataset.status != DatasetStatus.ACTIVE.value:
         raise HTTPException(status_code=409, detail="only active datasets can be collected")
+    if (
+        payload.operation is not CollectionOperation.INITIAL
+        and not has_completed_initial_collection(session, payload.dataset_id)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="该数据集尚未完成首次采集，请先执行首次采集并发布数据",
+        )
     if dataset.storage_policy and dataset.storage_policy.get("logical_partition_field"):
         calendar_id = dataset.storage_policy.get("calendar_dataset_id")
         calendar = session.get(Dataset, calendar_id) if calendar_id else None
@@ -1197,6 +1227,17 @@ def list_collection_jobs(
     if dataset_id:
         query = query.where(CollectionJob.dataset_id == dataset_id)
     return [serialize_job(job) for job in session.scalars(query)]
+
+
+@router.get("/readiness/{dataset_id}", response_model=CollectionReadiness)
+def get_collection_readiness(dataset_id: str, session: SessionDep) -> CollectionReadiness:
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return CollectionReadiness(
+        dataset_id=dataset_id,
+        initial_required=not has_completed_initial_collection(session, dataset_id),
+    )
 
 
 @router.get("/{job_id}", response_model=CollectionJobRead)
