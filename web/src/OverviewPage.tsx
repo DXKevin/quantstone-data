@@ -345,20 +345,18 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
                   <div className="coverage-head">
                     <span>覆盖</span>
                     <span>
-                      {!hasDateCoverage
-                        ? "不适用"
-                        : item.coverage_percent === null
+                      {hasDateCoverage
+                        ? item.coverage_percent === null
                           ? "尚无已发布分区"
-                          : `${item.coverage_percent}% · ${item.partitions}/${item.expected_partitions ?? 0} 个交易日`}
+                          : `${item.coverage_percent}% · ${item.partitions}/${item.expected_partitions ?? 0} 个交易日`
+                        : item.partitions > 0
+                          ? "100% · 快照已发布"
+                          : "0% · 尚未初始化"}
                     </span>
                   </div>
-                  {!hasDateCoverage ? (
-                    <div className="coverage-na">快照数据集，不计算日覆盖率</div>
-                  ) : (
-                    <div className="coverage-bar">
-                      <i style={{ width: `${Math.min(item.coverage_percent ?? 0, 100)}%` }} />
-                    </div>
-                  )}
+                  <div className="coverage-bar">
+                    <i style={{ width: `${hasDateCoverage ? Math.min(item.coverage_percent ?? 0, 100) : item.partitions > 0 ? 100 : 0}%` }} />
+                  </div>
                 </div>
 
                 <div className="overview-foot">

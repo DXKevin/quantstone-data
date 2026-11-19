@@ -465,7 +465,6 @@ body { font-size: 14px; }
 .overview-action { min-height: 26px; padding: 0 9px; border: 1px solid #cfe0d7; border-radius: 5px; background: #f4faf7; color: #166a4a; font-size: 10.5px; cursor: pointer; }
 .overview-action:hover { background: #e9f6ef; }
 .overview-action:disabled { opacity: .6; cursor: wait; }
-.coverage-na { padding-top: 4px; color: #8a948f; font-size: 10px; }
 .start-dialog { width: min(440px, 100%); display: grid; gap: 14px; padding: 22px 24px; border-radius: 9px; background: white; box-shadow: 0 24px 70px rgba(0,0,0,.28); }
 .start-dialog h2 { margin: 0; font-size: 18px; }
 .start-dialog p { margin: 0; color: var(--muted); font-size: 11px; }
