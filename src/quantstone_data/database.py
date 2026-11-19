@@ -37,7 +37,27 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
     inspector = inspect(engine)
     dataset_columns = {item["name"] for item in inspector.get_columns("datasets")}
     job_columns = {item["name"] for item in inspector.get_columns("collection_jobs")}
+    added_update_frequency = "update_frequency" not in dataset_columns
     with engine.begin() as connection:
+        if added_update_frequency:
+            connection.execute(
+                text(
+                    "ALTER TABLE datasets ADD COLUMN update_frequency VARCHAR(32) "
+                    "NOT NULL DEFAULT 'manual'"
+                )
+            )
+            connection.execute(
+                text(
+                    "UPDATE datasets SET update_frequency = 'daily' "
+                    "WHERE id IN ('tushare.cn.stock.daily', 'tushare.cn.stock.stock_basic')"
+                )
+            )
+            connection.execute(
+                text(
+                    "UPDATE datasets SET update_frequency = 'monthly' "
+                    "WHERE id = 'tushare.cn.stock.trade_cal'"
+                )
+            )
         if "category_id" not in dataset_columns:
             connection.execute(
                 text(

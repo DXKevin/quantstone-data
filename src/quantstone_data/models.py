@@ -50,6 +50,7 @@ class Dataset(Base):
         ForeignKey("dataset_categories.id", ondelete="SET NULL"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    update_frequency: Mapped[str] = mapped_column(String(32), default="manual")
     current_schema_version: Mapped[int] = mapped_column(Integer, default=1)
     collection_bindings: Mapped[list[dict]] = mapped_column(JSON, default=list)
     storage_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)

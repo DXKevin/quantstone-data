@@ -301,8 +301,11 @@ def daily_completion(
     """按日分区数据集的最近 N 个交易日汇总完成率。"""
     days = max(COVERAGE_MIN_DAYS, min(days, COVERAGE_MAX_DAYS))
     coverage = dataset_coverage(request, session, days)
+    frequencies = dict(session.execute(select(Dataset.id, Dataset.update_frequency)).all())
     rows: list[dict] = []
     for item in coverage["datasets"]:
+        if frequencies.get(item["dataset_id"]) != "daily":
+            continue
         cells: dict[str, str] = item["cells"]
         summary: dict[str, int] = item["summary"]
         latest_date = max(cells) if cells else None
@@ -339,6 +342,8 @@ def daily_completion(
     for dataset in session.scalars(select(Dataset).order_by(Dataset.id)):
         policy = dataset.storage_policy or {}
         if dataset.status != "active" or policy.get("layout") != "snapshot":
+            continue
+        if dataset.update_frequency != "daily":
             continue
         last_published = session.scalar(
             select(func.max(CatalogPartition.published_at)).where(

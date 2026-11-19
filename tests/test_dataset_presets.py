@@ -27,6 +27,9 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
 
     daily = presets[2]["contract"]
     stock_basic = presets[1]["contract"]
+    assert presets[0]["contract"]["update_frequency"] == "monthly"
+    assert stock_basic["update_frequency"] == "daily"
+    assert daily["update_frequency"] == "daily"
     assert [item["name"] for item in stock_basic["fields"]] == [
         "ts_code",
         "symbol",

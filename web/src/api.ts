@@ -1,4 +1,5 @@
 export type DatasetStatus = "draft" | "active" | "paused" | "deprecated";
+export type UpdateFrequency = "daily" | "weekly" | "monthly" | "manual";
 export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
 export type CollectionPurpose = CollectionOperation;
 export type CollectionInputMethod = "collector" | "file_import";
@@ -31,6 +32,7 @@ export interface DatasetSummary {
   instrument: string;
   market: string | null;
   category_id: string | null;
+  update_frequency: UpdateFrequency;
   status: DatasetStatus;
   current_schema_version: number;
   collection_bindings: DatasetCollectionBinding[];
@@ -79,6 +81,7 @@ export interface DatasetCreatePayload {
   market: string | null;
   display_name: string;
   description: string | null;
+  update_frequency: UpdateFrequency;
   collection_bindings: DatasetCollectionBinding[];
   storage_policy: DatasetStoragePolicy | null;
   primary_key: string[];
@@ -103,6 +106,7 @@ export type DatasetUpdatePayload = Pick<
   DatasetCreatePayload,
   | "display_name"
   | "description"
+  | "update_frequency"
   | "collection_bindings"
   | "storage_policy"
   | "primary_key"
@@ -112,7 +116,7 @@ export type DatasetUpdatePayload = Pick<
 
 export type DatasetMetadataUpdatePayload = Pick<
   DatasetCreatePayload,
-  "display_name" | "description"
+  "display_name" | "description" | "update_frequency"
 >;
 
 export interface CollectorParameter {

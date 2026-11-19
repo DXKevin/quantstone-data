@@ -181,6 +181,22 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — DeepSeek Harness（数据集更新频率）
+
+完成：
+
+- 数据集契约新增 `update_frequency`：`daily` / `weekly` / `monthly` / `manual`；
+- 数据库启动迁移为旧数据集补齐字段：daily 和 stock_basic 设为 `daily`，trade_cal 设为
+  `monthly`，其余默认 `manual`；
+- 预置契约、创建/编辑表单、基本信息展示和 API 类型同步更新；
+- 日更完成率面板只统计 `daily` 数据集，月更的交易日历不再误入日更统计。
+
+验证：
+
+- `pytest`：73 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- `npm run build`：通过。
+
 ### 2026-11-19 — DeepSeek Harness（日更数据完成率）
 
 完成：

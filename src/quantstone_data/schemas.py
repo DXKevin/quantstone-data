@@ -17,6 +17,13 @@ class DatasetStatus(StrEnum):
     DEPRECATED = "deprecated"
 
 
+class UpdateFrequency(StrEnum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    MANUAL = "manual"
+
+
 class CollectionPurpose(StrEnum):
     INITIAL = "initial"
     INCREMENTAL = "incremental"
@@ -75,6 +82,7 @@ class DatasetCreate(BaseModel):
     market: str | None = Field(default=None, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -110,6 +118,7 @@ class DatasetCreate(BaseModel):
 class DatasetUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -157,6 +166,7 @@ class DatasetCategoryAssignment(BaseModel):
 class DatasetMetadataUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    update_frequency: UpdateFrequency | None = None
 
 
 class DatasetFieldRead(BaseModel):
@@ -191,6 +201,7 @@ class DatasetRead(BaseModel):
     display_name: str
     description: str | None
     category_id: str | None
+    update_frequency: UpdateFrequency
     collection_bindings: list[DatasetCollectionBinding]
     storage_policy: DatasetStoragePolicy | None
     status: DatasetStatus
@@ -210,6 +221,7 @@ class DatasetSummary(BaseModel):
     instrument: str
     market: str | None
     category_id: str | None
+    update_frequency: UpdateFrequency
     status: DatasetStatus
     current_schema_version: int
     collection_bindings: list[DatasetCollectionBinding]

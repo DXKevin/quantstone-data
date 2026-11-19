@@ -43,6 +43,7 @@ DATASET_PRESETS = (
             market=None,
             display_name="A股交易日历",
             description="TuShare trade_cal 上交所交易日历；沪深北股票交易所共用交易日安排。",
+            update_frequency="monthly",
             collection_bindings=[
                 {
                     "purpose": "initial",
@@ -86,6 +87,7 @@ DATASET_PRESETS = (
             market=None,
             display_name="A股股票列表",
             description="TuShare stock_basic 全部股票基础信息，包含上市、退市和暂停上市状态。",
+            update_frequency="daily",
             collection_bindings=[
                 {
                     "purpose": "initial",
@@ -142,6 +144,7 @@ DATASET_PRESETS = (
             market=None,
             display_name="A股日K",
             description="TuShare daily 未复权日线行情。",
+            update_frequency="daily",
             collection_bindings=[
                 {
                     "purpose": "initial",
