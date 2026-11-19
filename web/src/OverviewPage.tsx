@@ -281,6 +281,7 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
           {items.map((item) => {
             const summary = datasetById.get(item.dataset_id);
             const purposes = new Set(summary?.collection_bindings.map((binding) => binding.purpose) ?? []);
+            const initialCompleted = item.partitions > 0;
             const initialKey = `${item.dataset_id}:initial`;
             const incrementalKey = `${item.dataset_id}:incremental`;
             return (
@@ -299,7 +300,37 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
               >
                 <div className="overview-card-head">
                   <strong>{item.display_name}</strong>
-                  <span className={`status status-${item.status}`}><i />{statusLabels[item.status]}</span>
+                  <div className="overview-head-actions">
+                    {item.status === "active" && !initialCompleted && purposes.has("initial") && (
+                      <button
+                        type="button"
+                        className="overview-action"
+                        disabled={startingKey === initialKey}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void startCollection(item, "initial");
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        {startingKey === initialKey ? "提交中…" : "首次采集"}
+                      </button>
+                    )}
+                    {item.status === "active" && initialCompleted && purposes.has("incremental") && (
+                      <button
+                        type="button"
+                        className="overview-action"
+                        disabled={startingKey === incrementalKey}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void startCollection(item, "incremental");
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        {startingKey === incrementalKey ? "提交中…" : "增量更新"}
+                      </button>
+                    )}
+                    <span className={`status status-${item.status}`}><i />{statusLabels[item.status]}</span>
+                  </div>
                 </div>
                 <code className="overview-id">{item.dataset_id}</code>
 
@@ -314,13 +345,17 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
                     <span>覆盖</span>
                     <span>
                       {item.coverage_percent === null
-                        ? "不按日分区"
+                        ? "不适用"
                         : `${item.coverage_percent}% · ${item.partitions}/${item.expected_partitions ?? 0} 个交易日`}
                     </span>
                   </div>
-                  <div className="coverage-bar">
-                    <i style={{ width: `${Math.min(item.coverage_percent ?? 0, 100)}%` }} />
-                  </div>
+                  {item.coverage_percent === null ? (
+                    <div className="coverage-na">快照数据集，不计算日覆盖率</div>
+                  ) : (
+                    <div className="coverage-bar">
+                      <i style={{ width: `${Math.min(item.coverage_percent, 100)}%` }} />
+                    </div>
+                  )}
                 </div>
 
                 <div className="overview-foot">
@@ -328,35 +363,6 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
                   <span>最新 {item.latest_partition ?? "—"}</span>
                   <span>{item.published_at ? `发布 ${formatDate(item.published_at)}` : "尚未发布"}</span>
                 </div>
-
-                {item.status === "active" && purposes.size > 0 && (
-                  <div
-                    className="overview-actions"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    {purposes.has("initial") && (
-                      <button
-                        type="button"
-                        className="overview-action"
-                        disabled={startingKey === initialKey}
-                        onClick={() => void startCollection(item, "initial")}
-                      >
-                        {startingKey === initialKey ? "提交中…" : "首次采集"}
-                      </button>
-                    )}
-                    {purposes.has("incremental") && (
-                      <button
-                        type="button"
-                        className="overview-action"
-                        disabled={startingKey === incrementalKey}
-                        onClick={() => void startCollection(item, "incremental")}
-                      >
-                        {startingKey === incrementalKey ? "提交中…" : "增量更新"}
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}
