@@ -461,6 +461,15 @@ body { font-size: 14px; }
 .coverage-bar { height: 6px; border-radius: 999px; background: #edf1ee; overflow: hidden; }
 .coverage-bar i { display: block; height: 100%; background: #17a673; border-radius: 999px; }
 .overview-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #5f6a64; font-size: 10.5px; }
+.overview-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid #eef2ef; }
+.overview-action { flex: 1; min-height: 32px; border: 1px solid #cfe0d7; border-radius: 5px; background: #f4faf7; color: #166a4a; font-size: 11px; cursor: pointer; }
+.overview-action:hover { background: #e9f6ef; }
+.overview-action:disabled { opacity: .6; cursor: wait; }
+.start-dialog { width: min(440px, 100%); display: grid; gap: 14px; padding: 22px 24px; border-radius: 9px; background: white; box-shadow: 0 24px 70px rgba(0,0,0,.28); }
+.start-dialog h2 { margin: 0; font-size: 18px; }
+.start-dialog p { margin: 0; color: var(--muted); font-size: 11px; }
+.start-dialog .form-error { margin: 0; }
+.start-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 
 /* 覆盖热力图 */
 .coverage-panel { margin-bottom: 20px; }

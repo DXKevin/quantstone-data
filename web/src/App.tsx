@@ -164,7 +164,7 @@ function App() {
       </aside>
 
       <main className="main-area">
-        {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
+        {area === "overview" && <OverviewPage datasets={datasets} collectors={collectors} onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
         {area === "collection" && collectionSection === "jobs" && (
           <CollectionJobs
             datasets={datasets}

@@ -1,6 +1,6 @@
-import { AlertCircle, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type CollectionOverview, type DatasetOverview, type DatasetStatus } from "./api";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { api, type CollectionJobCreatePayload, type CollectionOverview, type CollectionPurpose, type CollectorDefinition, type CollectorOperation, type CollectorParameter, type DatasetOverview, type DatasetStatus, type DatasetSummary } from "./api";
 import CoverageHeatmap from "./CoverageHeatmap";
 
 const statusLabels: Record<DatasetStatus, string> = {
@@ -37,12 +37,24 @@ const layoutLabels: Record<string, string> = {
   snapshot: "完整快照",
 };
 
-export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void }) {
+type PendingStart = {
+  datasetId: string;
+  displayName: string;
+  purpose: CollectionPurpose;
+  operation: CollectorOperation;
+  values: Record<string, string>;
+};
+
+export default function OverviewPage({ datasets, collectors, onOpen }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; onOpen: (id: string) => void }) {
   const [items, setItems] = useState<DatasetOverview[]>([]);
   const [collection, setCollection] = useState<CollectionOverview | null>(null);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [startingKey, setStartingKey] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingStart, setPendingStart] = useState<PendingStart | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,6 +88,112 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
     [items],
   );
 
+  const datasetById = useMemo(
+    () => new Map(datasets.map((dataset) => [dataset.id, dataset])),
+    [datasets],
+  );
+
+  function resolveBinding(datasetId: string, purpose: CollectionPurpose) {
+    const summary = datasetById.get(datasetId);
+    const binding = summary?.collection_bindings.find((entry) => entry.purpose === purpose);
+    if (!binding) return null;
+    const collector = collectors.find((entry) => entry.key === binding.collector_key);
+    const operation = collector?.operations.find((entry) => entry.key === binding.operation);
+    return operation ? { binding, operation } : null;
+  }
+
+  async function refreshCollection() {
+    try {
+      setCollection(await api.getCollectionOverview());
+    } catch {
+      // 概览刷新失败不影响任务已提交的结果。
+    }
+  }
+
+  async function startCollection(item: DatasetOverview, purpose: CollectionPurpose) {
+    setActionNotice(null);
+    setActionError(null);
+    const resolved = resolveBinding(item.dataset_id, purpose);
+    if (!resolved) {
+      setActionError("该数据集没有绑定对应的采集器操作。");
+      return;
+    }
+    if (resolved.operation.parameters.some((parameter) => parameter.required)) {
+      const values = Object.fromEntries(
+        resolved.operation.parameters.map((parameter) => [
+          parameter.name,
+          parameter.data_type === "date" && parameter.name === "end_date" ? localToday() : "",
+        ]),
+      );
+      setPendingStart({
+        datasetId: item.dataset_id,
+        displayName: item.display_name,
+        purpose,
+        operation: resolved.operation,
+        values,
+      });
+      return;
+    }
+    await submitStart(item.dataset_id, item.display_name, purpose, resolved.operation, {});
+  }
+
+  async function submitStart(
+    datasetId: string,
+    displayName: string,
+    purpose: CollectionPurpose,
+    operation: CollectorOperation,
+    values: Record<string, string>,
+  ) {
+    const key = `${datasetId}:${purpose}`;
+    setStartingKey(key);
+    setActionNotice(null);
+    setActionError(null);
+    try {
+      const parameters = Object.fromEntries(
+        operation.parameters
+          .filter((parameter) => values[parameter.name]?.trim())
+          .map((parameter) => [parameter.name, convertParameterValue(parameter, values[parameter.name])]),
+      );
+      const payload: CollectionJobCreatePayload = {
+        dataset_id: datasetId,
+        operation: purpose,
+        input_method: "collector",
+        start_date: null,
+        end_date: null,
+        collector_key: null,
+        parameters,
+      };
+      const job = await api.createCollectionJob(payload);
+      await api.executeCollectionJob(job.id);
+      setPendingStart(null);
+      setActionNotice(`${displayName} 的${operationLabels[purpose]}已提交执行，可在采集页查看进度。`);
+      await refreshCollection();
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "无法启动采集任务");
+    } finally {
+      setStartingKey(null);
+    }
+  }
+
+  function submitPending(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingStart) return;
+    const missing = pendingStart.operation.parameters.find(
+      (parameter) => parameter.required && !pendingStart.values[parameter.name]?.trim(),
+    );
+    if (missing) {
+      setActionError(`请填写${missing.description || missing.name}`);
+      return;
+    }
+    void submitStart(
+      pendingStart.datasetId,
+      pendingStart.displayName,
+      pendingStart.purpose,
+      pendingStart.operation,
+      pendingStart.values,
+    );
+  }
+
   return (
     <div className="page">
       <header className="page-header">
@@ -86,6 +204,9 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
         </div>
         <button className="toolbar-button" onClick={() => void load()}><RefreshCw size={15} />刷新</button>
       </header>
+
+      {actionNotice && <div className="notice-banner"><CheckCircle2 size={17} />{actionNotice}</div>}
+      {actionError && !pendingStart && <div className="form-error"><AlertCircle size={17} />{actionError}</div>}
 
       <CoverageHeatmap onOpen={onOpen} />
 
@@ -157,47 +278,119 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
         <div className="state-box empty-state"><strong>还没有数据集</strong><p>先在数据集页面创建并启用一个数据集。</p></div>
       ) : (
         <section className="overview-grid">
-          {items.map((item) => (
-            <button
-              type="button"
-              className="overview-card"
-              key={item.dataset_id}
-              onClick={() => onOpen(item.dataset_id)}
-            >
-              <div className="overview-card-head">
-                <strong>{item.display_name}</strong>
-                <span className={`status status-${item.status}`}><i />{statusLabels[item.status]}</span>
-              </div>
-              <code className="overview-id">{item.dataset_id}</code>
-
-              <div className="overview-metrics">
-                <div><span>分区</span><b>{item.partitions.toLocaleString()}</b></div>
-                <div><span>行数</span><b>{item.rows.toLocaleString()}</b></div>
-                <div><span>体积</span><b>{formatBytes(item.size_bytes)}</b></div>
-              </div>
-
-              <div className="overview-coverage">
-                <div className="coverage-head">
-                  <span>覆盖</span>
-                  <span>
-                    {item.coverage_percent === null
-                      ? "不按日分区"
-                      : `${item.coverage_percent}% · ${item.partitions}/${item.expected_partitions ?? 0} 个交易日`}
-                  </span>
+          {items.map((item) => {
+            const summary = datasetById.get(item.dataset_id);
+            const purposes = new Set(summary?.collection_bindings.map((binding) => binding.purpose) ?? []);
+            const initialKey = `${item.dataset_id}:initial`;
+            const incrementalKey = `${item.dataset_id}:incremental`;
+            return (
+              <div
+                className="overview-card"
+                key={item.dataset_id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpen(item.dataset_id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onOpen(item.dataset_id);
+                  }
+                }}
+              >
+                <div className="overview-card-head">
+                  <strong>{item.display_name}</strong>
+                  <span className={`status status-${item.status}`}><i />{statusLabels[item.status]}</span>
                 </div>
-                <div className="coverage-bar">
-                  <i style={{ width: `${Math.min(item.coverage_percent ?? 0, 100)}%` }} />
-                </div>
-              </div>
+                <code className="overview-id">{item.dataset_id}</code>
 
-              <div className="overview-foot">
-                <span>{layoutLabels[item.layout ?? ""] ?? "未配置布局"}</span>
-                <span>最新 {item.latest_partition ?? "—"}</span>
-                <span>{item.published_at ? `发布 ${formatDate(item.published_at)}` : "尚未发布"}</span>
+                <div className="overview-metrics">
+                  <div><span>分区</span><b>{item.partitions.toLocaleString()}</b></div>
+                  <div><span>行数</span><b>{item.rows.toLocaleString()}</b></div>
+                  <div><span>体积</span><b>{formatBytes(item.size_bytes)}</b></div>
+                </div>
+
+                <div className="overview-coverage">
+                  <div className="coverage-head">
+                    <span>覆盖</span>
+                    <span>
+                      {item.coverage_percent === null
+                        ? "不按日分区"
+                        : `${item.coverage_percent}% · ${item.partitions}/${item.expected_partitions ?? 0} 个交易日`}
+                    </span>
+                  </div>
+                  <div className="coverage-bar">
+                    <i style={{ width: `${Math.min(item.coverage_percent ?? 0, 100)}%` }} />
+                  </div>
+                </div>
+
+                <div className="overview-foot">
+                  <span>{layoutLabels[item.layout ?? ""] ?? "未配置布局"}</span>
+                  <span>最新 {item.latest_partition ?? "—"}</span>
+                  <span>{item.published_at ? `发布 ${formatDate(item.published_at)}` : "尚未发布"}</span>
+                </div>
+
+                {item.status === "active" && purposes.size > 0 && (
+                  <div
+                    className="overview-actions"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    {purposes.has("initial") && (
+                      <button
+                        type="button"
+                        className="overview-action"
+                        disabled={startingKey === initialKey}
+                        onClick={() => void startCollection(item, "initial")}
+                      >
+                        {startingKey === initialKey ? "提交中…" : "首次采集"}
+                      </button>
+                    )}
+                    {purposes.has("incremental") && (
+                      <button
+                        type="button"
+                        className="overview-action"
+                        disabled={startingKey === incrementalKey}
+                        onClick={() => void startCollection(item, "incremental")}
+                      >
+                        {startingKey === incrementalKey ? "提交中…" : "增量更新"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            </button>
-          ))}
+            );
+          })}
         </section>
+      )}
+
+      {pendingStart && (
+        <div className="modal-backdrop" onClick={() => setPendingStart(null)}>
+          <form className="start-dialog" onClick={(event) => event.stopPropagation()} onSubmit={submitPending}>
+            <h2>{operationLabels[pendingStart.purpose]} · {pendingStart.displayName}</h2>
+            <p>{pendingStart.operation.name}。请填写本次运行参数。</p>
+            {pendingStart.operation.parameters.map((parameter) => (
+              <label className="input-field" key={parameter.name}>
+                <span>{parameter.description || parameter.name}{parameter.required && <b>*</b>}</span>
+                <input
+                  type={parameter.data_type === "date" ? "date" : ["int", "int32", "int64", "float", "float32", "float64", "number"].includes(parameter.data_type) ? "number" : "text"}
+                  value={pendingStart.values[parameter.name] ?? ""}
+                  onChange={(event) => setPendingStart((current) => current ? {
+                    ...current,
+                    values: { ...current.values, [parameter.name]: event.target.value },
+                  } : current)}
+                />
+                <small>{parameter.name}</small>
+              </label>
+            ))}
+            {actionError && <div className="form-error"><AlertCircle size={16} />{actionError}</div>}
+            <div className="dialog-actions">
+              <button type="button" className="ghost-button" onClick={() => setPendingStart(null)}>取消</button>
+              <button type="submit" className="primary-button" disabled={startingKey === `${pendingStart.datasetId}:${pendingStart.purpose}`}>
+                {startingKey === `${pendingStart.datasetId}:${pendingStart.purpose}` ? "提交中…" : "开始采集"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );
@@ -214,4 +407,20 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function convertParameterValue(parameter: CollectorParameter, value: string) {
+  if (parameter.data_type === "boolean") return value === "true";
+  if (["int", "integer", "int32", "int64"].includes(parameter.data_type)) {
+    return Number.parseInt(value, 10);
+  }
+  if (["float", "float32", "float64", "number"].includes(parameter.data_type)) {
+    return Number.parseFloat(value);
+  }
+  return value;
+}
+
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
