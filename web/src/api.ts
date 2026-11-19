@@ -35,6 +35,7 @@ export interface DatasetSummary {
   category_id: string | null;
   update_frequency: UpdateFrequency;
   time_granularity: TimeGranularity;
+  is_historical: boolean;
   status: DatasetStatus;
   current_schema_version: number;
   collection_bindings: DatasetCollectionBinding[];
@@ -85,6 +86,7 @@ export interface DatasetCreatePayload {
   description: string | null;
   update_frequency: UpdateFrequency;
   time_granularity: TimeGranularity;
+  is_historical: boolean;
   collection_bindings: DatasetCollectionBinding[];
   storage_policy: DatasetStoragePolicy | null;
   primary_key: string[];
@@ -172,6 +174,7 @@ export type DatasetUpdatePayload = Pick<
   | "description"
   | "update_frequency"
   | "time_granularity"
+  | "is_historical"
   | "collection_bindings"
   | "storage_policy"
   | "primary_key"
@@ -181,7 +184,7 @@ export type DatasetUpdatePayload = Pick<
 
 export type DatasetMetadataUpdatePayload = Pick<
   DatasetCreatePayload,
-  "display_name" | "description" | "update_frequency" | "time_granularity"
+  "display_name" | "description" | "update_frequency" | "time_granularity" | "is_historical"
 >;
 
 export interface CollectorParameter {

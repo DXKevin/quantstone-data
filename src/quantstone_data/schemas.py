@@ -94,6 +94,7 @@ class DatasetCreate(BaseModel):
     description: str | None = None
     update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
     time_granularity: TimeGranularity = TimeGranularity.NONE
+    is_historical: bool = False
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -131,6 +132,7 @@ class DatasetUpdate(BaseModel):
     description: str | None = None
     update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
     time_granularity: TimeGranularity = TimeGranularity.NONE
+    is_historical: bool = False
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -180,6 +182,7 @@ class DatasetMetadataUpdate(BaseModel):
     description: str | None = None
     update_frequency: UpdateFrequency | None = None
     time_granularity: TimeGranularity | None = None
+    is_historical: bool | None = None
 
 
 class DatasetFieldRead(BaseModel):
@@ -216,6 +219,7 @@ class DatasetRead(BaseModel):
     category_id: str | None
     update_frequency: UpdateFrequency
     time_granularity: TimeGranularity
+    is_historical: bool
     collection_bindings: list[DatasetCollectionBinding]
     storage_policy: DatasetStoragePolicy | None
     status: DatasetStatus
@@ -237,6 +241,7 @@ class DatasetSummary(BaseModel):
     category_id: str | None
     update_frequency: UpdateFrequency
     time_granularity: TimeGranularity
+    is_historical: bool
     status: DatasetStatus
     current_schema_version: int
     collection_bindings: list[DatasetCollectionBinding]

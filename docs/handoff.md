@@ -188,7 +188,8 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 分析 `/home/ssd_data/stock_database/stock_a_quote/stock_day_a_l2/SZ/{order,trade}/20260323`；
 - 创建并启用 `zhongtai.cn.stock.l2_order.sz`、`zhongtai.cn.stock.l2_trade.sz`；
 - 两个契约与 Wind 深市 L2 使用完全相同的字段名/类型/主键，读取时可复用同一套列解析；
-- 中泰设为 `manual` 更新频率，只作为历史补齐，不进入日更统计；
+- 中泰设为 `manual` 更新频率并标记 `is_historical=true`，不进入日更统计和覆盖热力图；
+- 数据集契约新增 `is_historical` 布尔字段，历史数据集不参与热力图/日更跟踪；
 - 预置契约页新增两个中泰数据集。
 
 映射结论：

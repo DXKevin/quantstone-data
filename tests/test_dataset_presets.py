@@ -53,6 +53,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert l2_trade["fields"][6]["source_name"] == "委托代码"
     assert l2_trade["fields"][7]["nullable"] is True
     assert zt_order["provider"] == "zhongtai"
+    assert zt_order["is_historical"] is True
     assert zt_order["update_frequency"] == "manual"
     assert zt_order["primary_key"] == ["trade_date", "symbol", "exchange_order_no"]
     assert [item["name"] for item in zt_order["fields"]] == [
@@ -82,6 +83,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "int64",
     ]
     assert zt_trade["primary_key"] == ["trade_date", "symbol", "trade_no"]
+    assert zt_trade["is_historical"] is True
     assert presets[0]["contract"]["update_frequency"] == "monthly"
     assert presets[0]["contract"]["time_granularity"] == "day"
     assert stock_basic["update_frequency"] == "daily"

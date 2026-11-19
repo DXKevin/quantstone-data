@@ -523,6 +523,7 @@ DATASET_PRESETS = (
             ),
             update_frequency="manual",
             time_granularity="tick",
+            is_historical=True,
             collection_bindings=[],
             storage_policy={
                 "logical_partition_field": "trade_date",
@@ -553,6 +554,7 @@ DATASET_PRESETS = (
             ),
             update_frequency="manual",
             time_granularity="tick",
+            is_historical=True,
             collection_bindings=[],
             storage_policy={
                 "logical_partition_field": "trade_date",

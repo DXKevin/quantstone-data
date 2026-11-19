@@ -302,9 +302,10 @@ def daily_completion(
     days = max(COVERAGE_MIN_DAYS, min(days, COVERAGE_MAX_DAYS))
     coverage = dataset_coverage(request, session, days)
     frequencies = dict(session.execute(select(Dataset.id, Dataset.update_frequency)).all())
+    historical = dict(session.execute(select(Dataset.id, Dataset.is_historical)).all())
     rows: list[dict] = []
     for item in coverage["datasets"]:
-        if frequencies.get(item["dataset_id"]) != "daily":
+        if historical.get(item["dataset_id"]) or frequencies.get(item["dataset_id"]) != "daily":
             continue
         cells: dict[str, str] = item["cells"]
         summary: dict[str, int] = item["summary"]
@@ -343,7 +344,7 @@ def daily_completion(
         policy = dataset.storage_policy or {}
         if dataset.status != "active" or policy.get("layout") != "snapshot":
             continue
-        if dataset.update_frequency != "daily":
+        if dataset.is_historical or dataset.update_frequency != "daily":
             continue
         last_published = session.scalar(
             select(func.max(CatalogPartition.published_at)).where(
@@ -397,6 +398,8 @@ def dataset_coverage(
     targets: list[tuple[Dataset, str]] = []
     for dataset in session.scalars(select(Dataset).order_by(Dataset.id)):
         policy = dataset.storage_policy or {}
+        if dataset.is_historical:
+            continue
         calendar_id = policy.get("calendar_dataset_id")
         if policy.get("logical_partition_field") and calendar_id:
             targets.append((dataset, calendar_id))

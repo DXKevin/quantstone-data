@@ -52,6 +52,7 @@ class Dataset(Base):
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     update_frequency: Mapped[str] = mapped_column(String(32), default="manual")
     time_granularity: Mapped[str] = mapped_column(String(32), default="none")
+    is_historical: Mapped[bool] = mapped_column(Boolean, default=False)
     current_schema_version: Mapped[int] = mapped_column(Integer, default=1)
     collection_bindings: Mapped[list[dict]] = mapped_column(JSON, default=list)
     storage_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)

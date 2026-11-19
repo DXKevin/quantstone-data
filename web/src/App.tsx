@@ -704,6 +704,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
   const [description, setDescription] = useState(props.dataset?.description ?? "");
   const [updateFrequency, setUpdateFrequency] = useState<UpdateFrequency>(props.dataset?.update_frequency ?? "manual");
   const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(props.dataset?.time_granularity ?? "none");
+  const [isHistorical, setIsHistorical] = useState(props.dataset?.is_historical ?? false);
   const [bindings, setBindings] = useState<Record<CollectionPurpose, string>>(() => {
     const values = { initial: "", incremental: "", repair: "", replace: "" };
     for (const binding of props.dataset?.collection_bindings ?? []) {
@@ -775,6 +776,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
       description: description || null,
       update_frequency: updateFrequency,
       time_granularity: timeGranularity,
+      is_historical: isHistorical,
       collection_bindings: (Object.entries(bindings) as Array<[CollectionPurpose, string]>)
         .filter(([, value]) => value)
         .map(([purpose, value]) => {
@@ -810,6 +812,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
             description: payload.description,
             update_frequency: payload.update_frequency,
             time_granularity: payload.time_granularity,
+            is_historical: payload.is_historical,
             collection_bindings: payload.collection_bindings,
             storage_policy: payload.storage_policy,
             primary_key: payload.primary_key,
@@ -850,6 +853,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
             <Input label="说明" value={description} onChange={setDescription} placeholder="说明数据来源、内容和用途" />
             <label className="input-field"><span>更新频率</span><select value={updateFrequency} onChange={(event) => setUpdateFrequency(event.target.value as UpdateFrequency)}><option value="daily">日更</option><option value="weekly">周更</option><option value="monthly">月更</option><option value="manual">手动</option></select><small>只有日更数据集会进入概览的日更完成率统计。</small></label>
             <label className="input-field"><span>最小时间颗粒</span><select value={timeGranularity} onChange={(event) => setTimeGranularity(event.target.value as TimeGranularity)}><option value="tick">逐笔</option><option value="second_3">3 秒</option><option value="second">秒</option><option value="minute">分钟</option><option value="hour">小时</option><option value="day">日</option><option value="none">无</option></select><small>快照类数据可选“无”；财务数据按最终日频选择“日”。</small></label>
+            <label className="input-field checkbox-field"><span>历史数据集</span><label><input type="checkbox" checked={isHistorical} onChange={(event) => setIsHistorical(event.target.checked)} />不参与覆盖热力图和日更跟踪</label></label>
           </div>
         </div>
       </section>
@@ -913,6 +917,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
   const [description, setDescription] = useState(props.dataset.description ?? "");
   const [updateFrequency, setUpdateFrequency] = useState<UpdateFrequency>(props.dataset.update_frequency);
   const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(props.dataset.time_granularity);
+  const [isHistorical, setIsHistorical] = useState(props.dataset.is_historical);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -930,6 +935,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
         description: description.trim() || null,
         update_frequency: updateFrequency,
         time_granularity: timeGranularity,
+        is_historical: isHistorical,
       }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存失败");
@@ -956,6 +962,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
             <Input label="说明" value={description} onChange={setDescription} placeholder="说明数据来源、内容和用途" />
             <label className="input-field"><span>更新频率</span><select value={updateFrequency} onChange={(event) => setUpdateFrequency(event.target.value as UpdateFrequency)}><option value="daily">日更</option><option value="weekly">周更</option><option value="monthly">月更</option><option value="manual">手动</option></select><small>只有日更数据集会进入概览的日更完成率统计。</small></label>
             <label className="input-field"><span>最小时间颗粒</span><select value={timeGranularity} onChange={(event) => setTimeGranularity(event.target.value as TimeGranularity)}><option value="tick">逐笔</option><option value="second_3">3 秒</option><option value="second">秒</option><option value="minute">分钟</option><option value="hour">小时</option><option value="day">日</option><option value="none">无</option></select><small>快照类数据可选“无”；财务数据按最终日频选择“日”。</small></label>
+            <label className="input-field checkbox-field"><span>历史数据集</span><label><input type="checkbox" checked={isHistorical} onChange={(event) => setIsHistorical(event.target.checked)} />不参与覆盖热力图和日更跟踪</label></label>
           </div>
           <div className="operation-help">字段、主键、采集绑定和存储策略属于当前数据集契约；如需实质变更，请创建独立的新数据集。</div>
         </div>
@@ -990,7 +997,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetC
       {error && <div className="form-error"><X size={17} />{error}</div>}
 
       <section className="detail-grid">
-        <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div><dt>更新频率</dt><dd>{frequencyLabels[dataset.update_frequency]}</dd></div><div><dt>最小时间颗粒</dt><dd>{granularityLabels[dataset.time_granularity]}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
+        <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div><dt>更新频率</dt><dd>{frequencyLabels[dataset.update_frequency]}</dd></div><div><dt>最小时间颗粒</dt><dd>{granularityLabels[dataset.time_granularity]}</dd></div><div><dt>历史数据集</dt><dd>{dataset.is_historical ? "是" : "否"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
         <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 

@@ -47,6 +47,7 @@ def serialize_dataset(dataset: Dataset) -> DatasetRead:
         category_id=dataset.category_id,
         update_frequency=UpdateFrequency(dataset.update_frequency),
         time_granularity=TimeGranularity(dataset.time_granularity),
+        is_historical=dataset.is_historical,
         collection_bindings=dataset.collection_bindings,
         storage_policy=dataset.storage_policy,
         status=DatasetStatus(dataset.status),
@@ -79,6 +80,7 @@ def create_dataset(payload: DatasetCreate, session: SessionDep) -> DatasetRead:
         description=payload.description,
         update_frequency=payload.update_frequency.value,
         time_granularity=payload.time_granularity.value,
+        is_historical=payload.is_historical,
         status=DatasetStatus.DRAFT.value,
         current_schema_version=1,
         collection_bindings=[
@@ -144,6 +146,7 @@ def update_draft_dataset(
     dataset.description = payload.description
     dataset.update_frequency = payload.update_frequency.value
     dataset.time_granularity = payload.time_granularity.value
+    dataset.is_historical = payload.is_historical
     dataset.collection_bindings = [
         binding.model_dump(mode="json") for binding in payload.collection_bindings
     ]
@@ -188,6 +191,8 @@ def update_dataset_metadata(
         dataset.update_frequency = payload.update_frequency.value
     if payload.time_granularity is not None:
         dataset.time_granularity = payload.time_granularity.value
+    if payload.is_historical is not None:
+        dataset.is_historical = payload.is_historical
     session.commit()
 
     stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))
