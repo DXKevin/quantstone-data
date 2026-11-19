@@ -270,6 +270,28 @@ export interface CoverageResponse {
   datasets: CoverageDataset[];
 }
 
+export interface CollectionOverviewJob {
+  id: string;
+  dataset_id: string;
+  display_name: string;
+  operation: CollectionOperation;
+  input_method: CollectionInputMethod;
+  status: CollectionJobStatus;
+  updated_at: string;
+}
+
+export interface CollectionOverview {
+  total_jobs: number;
+  queued: number;
+  running: number;
+  awaiting_file: number;
+  staged: number;
+  succeeded_24h: number;
+  failed_24h: number;
+  last_completed_at: string | null;
+  recent_jobs: CollectionOverviewJob[];
+}
+
 export interface DatasetOverview {
   dataset_id: string;
   display_name: string;
@@ -452,6 +474,7 @@ export const api = {
   cancelMaintenanceJob: (jobId: string) =>
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
+  getCollectionOverview: () => request<CollectionOverview>("/api/v1/overview/collection"),
   getCoverage: (days: number) =>
     request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),
   readDatasetRows: (datasetId: string, filters: Record<string, string> = {}, limit = 20) => {

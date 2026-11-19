@@ -1,6 +1,6 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type DatasetOverview, type DatasetStatus } from "./api";
+import { api, type CollectionOverview, type DatasetOverview, type DatasetStatus } from "./api";
 import CoverageHeatmap from "./CoverageHeatmap";
 
 const statusLabels: Record<DatasetStatus, string> = {
@@ -8,6 +8,27 @@ const statusLabels: Record<DatasetStatus, string> = {
   active: "已启用",
   paused: "已暂停",
   deprecated: "已停用",
+};
+
+const jobStatusLabels: Record<string, string> = {
+  created: "已创建",
+  queued: "排队中",
+  running: "执行中",
+  cancelling: "正在取消",
+  cancelled: "已取消",
+  awaiting_file: "等待文件",
+  staged: "已进入临时区",
+  review_passed: "审核通过",
+  review_failed: "审核异常",
+  succeeded: "已发布",
+  failed: "执行失败",
+};
+
+const operationLabels: Record<string, string> = {
+  initial: "首次采集",
+  incremental: "增量更新",
+  repair: "缺口修复",
+  replace: "范围重建",
 };
 
 const layoutLabels: Record<string, string> = {
@@ -18,6 +39,7 @@ const layoutLabels: Record<string, string> = {
 
 export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void }) {
   const [items, setItems] = useState<DatasetOverview[]>([]);
+  const [collection, setCollection] = useState<CollectionOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +47,12 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
     setLoading(true);
     setError(null);
     try {
-      setItems(await api.getDatasetOverview());
+      const [datasets, collectionData] = await Promise.all([
+        api.getDatasetOverview(),
+        api.getCollectionOverview(),
+      ]);
+      setItems(datasets);
+      setCollection(collectionData);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载概览");
     } finally {
@@ -54,7 +81,7 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
         <div>
           <p className="eyebrow">OVERVIEW</p>
           <h1>数据概览</h1>
-          <p className="subtitle">按数据集聚合已发布的分区、行数、体积和覆盖情况。</p>
+          <p className="subtitle">按数据集聚合已发布的分区、行数、体积和覆盖情况，并汇总最近采集运行。</p>
         </div>
         <button className="toolbar-button" onClick={() => void load()}><RefreshCw size={15} />刷新</button>
       </header>
@@ -67,6 +94,44 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
         <div><span>总行数</span><strong>{totals.rows.toLocaleString()}</strong></div>
         <div><span>总体积</span><strong>{formatBytes(totals.bytes)}</strong></div>
       </section>
+
+      {collection && (
+        <section className="panel collection-overview-panel">
+          <div className="panel-toolbar">
+            <div>
+              <h2>采集概览</h2>
+              <span>{collection.total_jobs} 个任务 · 最近 24 小时</span>
+            </div>
+            <span className="collection-last">
+              最近完成 {collection.last_completed_at ? formatDate(collection.last_completed_at) : "—"}
+            </span>
+          </div>
+          <div className="collection-metrics">
+            <div><span>执行中</span><strong>{collection.running}</strong></div>
+            <div><span>排队中</span><strong>{collection.queued}</strong></div>
+            <div><span>等待文件</span><strong>{collection.awaiting_file}</strong></div>
+            <div><span>24h 成功</span><strong>{collection.succeeded_24h}</strong></div>
+            <div><span>24h 失败</span><strong>{collection.failed_24h}</strong></div>
+          </div>
+          <div className="recent-collection-list">
+            {collection.recent_jobs.length ? collection.recent_jobs.map((job) => (
+              <button
+                type="button"
+                className="recent-collection-row"
+                key={job.id}
+                onClick={() => onOpen(job.dataset_id)}
+              >
+                <span className={`job-status job-status-${job.status}`}><i />{jobStatusLabels[job.status] ?? job.status}</span>
+                <span className="recent-collection-name">
+                  <strong>{job.display_name}</strong>
+                  <code>{operationLabels[job.operation] ?? job.operation} · {job.dataset_id}</code>
+                </span>
+                <time>{formatDate(job.updated_at)}</time>
+              </button>
+            )) : <p className="recent-collection-empty">还没有采集任务。</p>}
+          </div>
+        </section>
+      )}
 
       {error && <div className="form-error"><AlertCircle size={17} />{error}</div>}
       {totals.missing > 0 && (

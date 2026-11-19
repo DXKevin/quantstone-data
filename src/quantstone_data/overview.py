@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -85,6 +85,68 @@ def _serialize_timestamp(value: datetime | None) -> str | None:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.isoformat()
+
+
+@router.get("/collection")
+def collection_overview(session: SessionDep) -> dict:
+    counts = dict(
+        session.execute(
+            select(CollectionJob.status, func.count(CollectionJob.id)).group_by(
+                CollectionJob.status
+            )
+        ).all()
+    )
+    # SQLite 保存的是无时区的 UTC 时间，这里用同样口径计算最近 24 小时。
+    since = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=24)
+    succeeded_24h = session.scalar(
+        select(func.count())
+        .select_from(CollectionJob)
+        .where(
+            CollectionJob.status == "succeeded",
+            CollectionJob.updated_at >= since,
+        )
+    )
+    failed_24h = session.scalar(
+        select(func.count())
+        .select_from(CollectionJob)
+        .where(
+            CollectionJob.status.in_(("failed", "review_failed")),
+            CollectionJob.updated_at >= since,
+        )
+    )
+    last_completed_at = session.scalar(
+        select(func.max(CollectionJob.updated_at)).where(
+            CollectionJob.status == "succeeded"
+        )
+    )
+    recent_jobs = session.scalars(
+        select(CollectionJob)
+        .order_by(CollectionJob.created_at.desc(), CollectionJob.id.desc())
+        .limit(5)
+    ).all()
+    dataset_names = dict(session.execute(select(Dataset.id, Dataset.display_name)).all())
+    return {
+        "total_jobs": sum(counts.values()),
+        "queued": counts.get("queued", 0),
+        "running": counts.get("running", 0) + counts.get("cancelling", 0),
+        "awaiting_file": counts.get("awaiting_file", 0),
+        "staged": counts.get("staged", 0),
+        "succeeded_24h": succeeded_24h or 0,
+        "failed_24h": failed_24h or 0,
+        "last_completed_at": _serialize_timestamp(last_completed_at),
+        "recent_jobs": [
+            {
+                "id": job.id,
+                "dataset_id": job.dataset_id,
+                "display_name": dataset_names.get(job.dataset_id, job.dataset_id),
+                "operation": job.operation,
+                "input_method": job.input_method,
+                "status": job.status,
+                "updated_at": _serialize_timestamp(job.updated_at),
+            }
+            for job in recent_jobs
+        ],
+    }
 
 
 @router.get("/datasets")

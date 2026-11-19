@@ -57,6 +57,22 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .summary-strip span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 8px; }
 .summary-strip strong { font-size: 23px; font-weight: 650; }
 .summary-strip .summary-text { font-size: 16px; padding-top: 5px; }
+.collection-overview-panel { margin-bottom: 20px; }
+.collection-last { color: var(--muted); font-size: 11px; }
+.collection-metrics { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--line); }
+.collection-metrics > div { padding: 14px 20px; border-right: 1px solid var(--line); }
+.collection-metrics > div:last-child { border-right: 0; }
+.collection-metrics span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+.collection-metrics strong { font-size: 20px; }
+.recent-collection-list { display: flex; flex-direction: column; }
+.recent-collection-row { display: grid; grid-template-columns: 100px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 20px; border: 0; border-bottom: 1px solid #eef2ef; background: transparent; text-align: left; cursor: pointer; }
+.recent-collection-row:last-child { border-bottom: 0; }
+.recent-collection-row:hover { background: #f7faf8; }
+.recent-collection-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.recent-collection-name strong { color: #263d33; font-size: 12px; }
+.recent-collection-name code { color: #607068; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-collection-row time { color: #6d7872; font-size: 11px; }
+.recent-collection-empty { margin: 0; padding: 16px 20px; color: var(--muted); font-size: 11px; }
 .panel { background: var(--panel); border: 1px solid var(--line); }
 .panel-toolbar { min-height: 72px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
 .panel-toolbar h2, .card-title h2 { display: inline; margin: 0; font-size: 14px; }
@@ -567,4 +583,5 @@ body { font-size: 14px; }
   .category-row > b { display: none; }
   .dataset-category-assignment { grid-template-columns: 1fr; }
   .dataset-category-assignment .category-assignment-error { grid-column: 1; }
+  .collection-metrics { grid-template-columns: repeat(2, 1fr); }
 }
