@@ -1042,6 +1042,7 @@ function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
   const [jobs, setJobs] = useState<MaintenanceJob[]>([]);
   const [year, setYear] = useState(new Date().getFullYear() - 1);
   const [submitting, setSubmitting] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -1080,8 +1081,25 @@ function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
     }
   }
 
-  async function cancel(job: MaintenanceJob) {
+  async function submitAll() {
+    setAutoSubmitting(true);
     setError(null);
+    setNotice(null);
+    try {
+      const result = await api.compactAllYears(dataset.id);
+      setJobs((current) => [...result.jobs, ...current]);
+      const skipped = result.skipped_years.length;
+      setNotice(
+        `已提交 ${result.jobs.length} 个年度合并任务${skipped ? `，跳过 ${skipped} 个已有任务` : ""}。`,
+      );
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "提交自动合并任务失败");
+    } finally {
+      setAutoSubmitting(false);
+    }
+  }
+
+  async function cancel(job: MaintenanceJob) {    setError(null);
     try {
       const cancelled = await api.cancelMaintenanceJob(job.id);
       setJobs((current) => current.map((item) => item.id === job.id ? cancelled : item));
@@ -1099,7 +1117,8 @@ function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
       </div>
       <div className="maintenance-controls">
         <label><span>合并年份</span><input type="number" min="1990" max="2100" value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
-        <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting || dataset.status !== "active"}><RefreshCw size={15} className={submitting ? "spin" : ""} />{submitting ? "提交中…" : "开始后台合并"}</button>
+        <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting || autoSubmitting || dataset.status !== "active"}><RefreshCw size={15} className={submitting ? "spin" : ""} />{submitting ? "提交中…" : "合并该年份"}</button>
+        <button type="button" className="secondary-button" onClick={() => void submitAll()} disabled={submitting || autoSubmitting || dataset.status !== "active"}><RefreshCw size={15} className={autoSubmitting ? "spin" : ""} />{autoSubmitting ? "识别中…" : "自动合并全部年份"}</button>
         {dataset.status !== "active" && <small>数据集启用后才能执行合并。</small>}
       </div>
       {notice && <div className="maintenance-notice">{notice}</div>}

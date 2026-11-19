@@ -562,7 +562,9 @@ TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布�
 体积和缺失文件时按文件去重，不会因为多个分区共用一个文件而重复累加。
 
 年度合并由 `POST /api/v1/datasets/{dataset_id}/compact?year=YYYY` 提交为持久化
-`MaintenanceJob`，接口立即返回 `202 + queued`。维护任务与采集任务共用同一个单工作线程
+`MaintenanceJob`，接口立即返回 `202 + queued`。`POST .../compact-all` 会扫描 Catalog 中
+尚未指向年度文件的年份，为每个待合并年份创建一个任务；已有排队或执行中任务的年份会被
+跳过。前端提供“自动合并全部年份”，不需要逐年在年份输入框中提交。维护任务与采集任务共用同一个单工作线程
 后台队列，避免采集和合并同时修改 Catalog 或物理文件。数据集详情负责展示最近维护任务，
 前端轮询 `GET /api/v1/maintenance-jobs?dataset_id=...`；排队任务可以取消，合并一旦开始则不
 允许中断，以免在文件替换临界区留下不确定状态。

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from .database import get_session
 from .logging_config import log_event
 from .maintenance_schemas import MaintenanceJobRead, MaintenanceJobStatus
-from .models import Dataset, MaintenanceJob
+from .models import CatalogPartition, Dataset, MaintenanceJob
 from .storage import compact_year
 
 router = APIRouter(tags=["maintenance"])
@@ -180,6 +180,106 @@ def create_compaction_job(
             parameters=job.parameters,
         )
     return serialize_job(job)
+
+
+@router.post(
+    "/datasets/{dataset_id}/compact-all",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def create_auto_compaction_jobs(
+    dataset_id: str,
+    request: Request,
+    session: SessionDep,
+) -> dict:
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    if dataset.status != "active":
+        raise HTTPException(status_code=409, detail="数据集启用后才能执行年度合并")
+    policy = dataset.storage_policy or {}
+    if policy.get("layout") != "yearly_with_delta" or policy.get("compaction") != "yearly":
+        raise HTTPException(status_code=409, detail="该数据集未配置年度合并策略")
+
+    partition_rows = session.execute(
+        select(CatalogPartition.partition_key, CatalogPartition.file_path).where(
+            CatalogPartition.dataset_id == dataset_id
+        )
+    ).all()
+    annual_only: dict[str, bool] = {}
+    for partition_key, file_path in partition_rows:
+        year = partition_key[:4]
+        if not year.isdigit() or not 1990 <= int(year) <= 2100:
+            continue
+        target_rel = f"datasets/{dataset_id}/annual/{year}.parquet"
+        annual_only[year] = annual_only.get(year, True) and file_path == target_rel
+
+    candidate_years = sorted(int(year) for year, only in annual_only.items() if not only)
+    active_years = {
+        int(item.parameters.get("year", 0))
+        for item in session.scalars(
+            select(MaintenanceJob).where(
+                MaintenanceJob.dataset_id == dataset_id,
+                MaintenanceJob.operation == "compact_year",
+                MaintenanceJob.status.in_(
+                    (
+                        MaintenanceJobStatus.QUEUED.value,
+                        MaintenanceJobStatus.RUNNING.value,
+                    )
+                ),
+            )
+        )
+    }
+    pending_years = [year for year in candidate_years if year not in active_years]
+    if not pending_years:
+        detail = (
+            "没有需要合并的年份"
+            if not candidate_years
+            else "所有待合并年份都已有排队或执行中的任务"
+        )
+        raise HTTPException(status_code=409, detail=detail)
+
+    created: list[MaintenanceJob] = []
+    for year in pending_years:
+        job = MaintenanceJob(
+            id=str(uuid4()),
+            dataset_id=dataset_id,
+            operation="compact_year",
+            parameters={"year": year},
+            status=MaintenanceJobStatus.QUEUED.value,
+        )
+        session.add(job)
+        created.append(job)
+    session.commit()
+
+    with _MAINTENANCE_LOCK:
+        for job in created:
+            try:
+                request.app.state.background_executor.submit(
+                    job.id,
+                    partial(
+                        _run_compaction,
+                        job.id,
+                        request.app.state.session_factory,
+                        request.app.state.data_root,
+                    ),
+                )
+                log_event(
+                    "maintenance_job_queued",
+                    maintenance_job_id=job.id,
+                    dataset_id=dataset_id,
+                    operation=job.operation,
+                    parameters=job.parameters,
+                )
+            except RuntimeError:
+                job.status = MaintenanceJobStatus.FAILED.value
+                job.error = "后台任务执行器不可用"
+        session.commit()
+
+    return {
+        "jobs": [serialize_job(job) for job in created],
+        "skipped_years": sorted(active_years.intersection(candidate_years)),
+        "candidate_years": candidate_years,
+    }
 
 
 @router.get("/maintenance-jobs", response_model=list[MaintenanceJobRead])

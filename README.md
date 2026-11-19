@@ -130,6 +130,7 @@ GET    /api/v1/maintenance-jobs?dataset_id=...
 GET    /api/v1/maintenance-jobs/{job_id}
 POST   /api/v1/maintenance-jobs/{job_id}/cancel
 POST   /api/v1/datasets/{dataset_id}/compact?year=YYYY
+POST   /api/v1/datasets/{dataset_id}/compact-all
 GET    /health
 ```
 

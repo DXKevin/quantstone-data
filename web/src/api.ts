@@ -238,6 +238,12 @@ export interface CollectionLogs {
 
 export type MaintenanceJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
+export interface AutoCompactionResult {
+  jobs: MaintenanceJob[];
+  skipped_years: number[];
+  candidate_years: number[];
+}
+
 export interface MaintenanceJob {
   id: string;
   dataset_id: string;
@@ -471,6 +477,8 @@ export const api = {
   },
   createCompactionJob: (datasetId: string, year: number) =>
     request<MaintenanceJob>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact?year=${year}`, { method: "POST" }),
+  compactAllYears: (datasetId: string) =>
+    request<AutoCompactionResult>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact-all`, { method: "POST" }),
   cancelMaintenanceJob: (jobId: string) =>
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
