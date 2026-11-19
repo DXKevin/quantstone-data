@@ -58,11 +58,10 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .summary-strip strong { font-size: 23px; font-weight: 650; }
 .summary-strip .summary-text { font-size: 16px; padding-top: 5px; }
 .collection-overview-panel { margin-bottom: 20px; }
-.collection-overview-toggle { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.collection-overview-toggle:hover { background: #f7faf8; }
-.collection-overview-toggle > div { display: flex; align-items: center; gap: 8px; }
-.collection-overview-toggle svg { color: #607068; }
 .collection-last { color: var(--muted); font-size: 11px; }
+.collection-tasks-toggle { width: 100%; display: flex; align-items: center; gap: 7px; padding: 9px 20px; border: 0; background: #fbfcfb; color: #4e655b; font: inherit; font-size: 11px; cursor: pointer; }
+.collection-tasks-toggle:hover { background: #f4f8f6; }
+.collection-tasks-toggle small { margin-left: auto; color: var(--muted); font-size: 10px; }
 .collection-metrics { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--line); }
 .collection-metrics > div { padding: 14px 20px; border-right: 1px solid var(--line); }
 .collection-metrics > div:last-child { border-right: 0; }
