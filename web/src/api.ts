@@ -191,6 +191,26 @@ export interface CollectionProgress {
   processed: number;
   latest_partition: string | null;
   percent: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_seconds: number | null;
+  eta_seconds: number | null;
+  expected_finish_at: string | null;
+  eta_basis: "running_rate" | "history" | "insufficient_data" | null;
+}
+
+export interface CollectionJobPage {
+  items: CollectionJob[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CollectionRunPage {
+  items: CollectionRun[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface CollectionRun {
@@ -387,7 +407,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ dataset_ids: datasetIds, review_token: reviewToken, confirmation }),
     }),
-  listCollectionJobs: () => request<CollectionJob[]>("/api/v1/collection-jobs"),
+  listCollectionJobs: (params: { limit?: number; offset?: number; status?: string; datasetId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.offset !== undefined) query.set("offset", String(params.offset));
+    if (params.status) query.set("status", params.status);
+    if (params.datasetId) query.set("dataset_id", params.datasetId);
+    const suffix = query.toString();
+    return request<CollectionJobPage>(`/api/v1/collection-jobs${suffix ? `?${suffix}` : ""}`);
+  },
   getCollectionReadiness: (datasetId: string) =>
     request<CollectionReadiness>(`/api/v1/collection-jobs/readiness/${encodeURIComponent(datasetId)}`),
   createCollectionJob: (payload: CollectionJobCreatePayload) =>
@@ -405,8 +433,10 @@ export const api = {
     request<void>(`/api/v1/collection-jobs/${jobId}`, { method: "DELETE" }),
   getCollectionProgress: (jobId: string) =>
     request<CollectionProgress>(`/api/v1/collection-jobs/${jobId}/progress`),
-  listCollectionRuns: (jobId: string) =>
-    request<CollectionRun[]>(`/api/v1/collection-jobs/${jobId}/runs`),
+  listCollectionRuns: (jobId: string, limit = 100, offset = 0) =>
+    request<CollectionRunPage>(
+      `/api/v1/collection-jobs/${jobId}/runs?limit=${limit}&offset=${offset}`,
+    ),
   listCollectionLogs: (jobId: string, limit = 500, minLevel?: string) =>
     request<CollectionLogs>(
       `/api/v1/collection-jobs/${jobId}/logs?limit=${limit}${minLevel ? `&min_level=${encodeURIComponent(minLevel)}` : ""}`,

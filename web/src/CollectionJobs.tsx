@@ -69,6 +69,9 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   onRequestHandled?: () => void;
 }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
+  const [jobTotal, setJobTotal] = useState(0);
+  const [jobPage, setJobPage] = useState(0);
+  const jobLimit = 20;
   const [view, setView] = useState<"list" | "create">("list");
   const [creationDefaults, setCreationDefaults] = useState<{ datasetId: string; operation: CollectionOperation } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   const [confirming, setConfirming] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [runs, setRuns] = useState<Record<string, CollectionRun[]>>({});
+  const [runTotals, setRunTotals] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<Record<string, CollectionLogEntry[]>>({});
   const [detailTab, setDetailTab] = useState<"runs" | "logs">("runs");
   const [logLevel, setLogLevel] = useState("ALL");
@@ -90,13 +94,23 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     [datasets],
   );
 
-  const loadJobs = useCallback(async (silent = false) => {
+  const jobPageRef = useRef(0);
+  useEffect(() => {
+    jobPageRef.current = jobPage;
+  }, [jobPage]);
+
+  const loadJobs = useCallback(async (silent = false, page = jobPageRef.current) => {
     if (!silent) {
       setLoading(true);
       setError(null);
     }
     try {
-      setJobs(await api.listCollectionJobs());
+      const data = await api.listCollectionJobs({
+        limit: jobLimit,
+        offset: page * jobLimit,
+      });
+      setJobs(data.items);
+      setJobTotal(data.total);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载采集任务");
     } finally {
@@ -105,8 +119,8 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   }, []);
 
   useEffect(() => {
-    void loadJobs();
-  }, [loadJobs]);
+    void loadJobs(false, jobPage);
+  }, [jobPage, loadJobs]);
 
   useEffect(() => {
     if (!requestedCollection) return;
@@ -146,7 +160,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
         for (const entry of entries) if (entry) next[entry[0]] = entry[1];
         return next;
       });
-      await loadJobs(true);
+      await loadJobs(true, jobPage);
       if (expandedJobId && running.some((job) => job.id === expandedJobId)) {
         if (detailTab === "logs") await loadLogs(expandedJobId);
         else await loadRuns(expandedJobId);
@@ -159,7 +173,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
       alive = false;
       window.clearInterval(timer);
     };
-  }, [hasRunning, loadJobs, expandedJobId, detailTab]);
+  }, [hasRunning, loadJobs, expandedJobId, detailTab, jobPage]);
 
   async function uploadExisting(job: CollectionJob, file: File) {
     setNotice(null);
@@ -220,10 +234,14 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     }
   }
 
-  async function loadRuns(jobId: string) {
+  async function loadRuns(jobId: string, offset = 0, append = false) {
     try {
-      const data = await api.listCollectionRuns(jobId);
-      setRuns((current) => ({ ...current, [jobId]: data }));
+      const data = await api.listCollectionRuns(jobId, 100, offset);
+      setRuns((current) => ({
+        ...current,
+        [jobId]: append ? [...(current[jobId] ?? []), ...data.items] : data.items,
+      }));
+      setRunTotals((current) => ({ ...current, [jobId]: data.total }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载执行明细");
     }
@@ -291,7 +309,11 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     setNotice(null);
     try {
       await api.deleteCollectionJob(job.id);
-      await loadJobs();
+      if (jobs.length === 1 && jobPage > 0) {
+        setJobPage(jobPage - 1);
+      } else {
+        await loadJobs(false, jobPage);
+      }
       setNotice("任务记录已删除。");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "删除任务失败");
@@ -310,7 +332,8 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
           setNotice(message);
           setCreationDefaults(null);
           setView("list");
-          await loadJobs();
+          setJobPage(0);
+          await loadJobs(false, 0);
         }}
       />
     );
@@ -318,6 +341,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
 
   const stagedCount = jobs.filter((job) => job.status === "staged").length;
   const waitingCount = jobs.filter((job) => job.status === "awaiting_file").length;
+  const pageCount = Math.max(1, Math.ceil(jobTotal / jobLimit));
   const failedReviewRuns = review?.data.runs?.filter((run) => !run.passed) ?? [];
   const topLevelErrors = review?.data.errors ?? [];
 
@@ -336,9 +360,9 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
       </header>
 
       <section className="summary-strip jobs-summary">
-        <div><span>任务总数</span><strong>{jobs.length}</strong></div>
-        <div><span>等待文件</span><strong>{waitingCount}</strong></div>
-        <div><span>已进入临时区</span><strong>{stagedCount}</strong></div>
+        <div><span>任务总数</span><strong>{jobTotal}</strong></div>
+        <div><span>本页等待文件</span><strong>{waitingCount}</strong></div>
+        <div><span>本页已进入临时区</span><strong>{stagedCount}</strong></div>
         <div><span>可采集数据集</span><strong>{activeDatasets.length}</strong></div>
       </section>
 
@@ -370,7 +394,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
 
       <section className="panel">
         <div className="panel-toolbar">
-          <div><h2>任务记录</h2><span>{jobs.length} 个任务</span></div>
+          <div><h2>任务记录</h2><span>共 {jobTotal} 个任务</span></div>
           <button className="toolbar-button" onClick={() => void loadJobs()}><RefreshCw size={15} />刷新</button>
         </div>
         {loading ? (
@@ -396,6 +420,9 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                 <span className="file-cell">{job.source_file_name ? <><strong>{job.source_file_name}</strong><small>{formatBytes(job.source_size_bytes)}</small></> : job.status === "awaiting_file" ? <UploadFileButton onFile={(file) => void uploadExisting(job, file)} /> : "—"}</span>
                 <span className="job-status-cell">
                   <JobStatus status={job.status} />
+                  {jobProgress?.eta_seconds != null && jobProgress.expected_finish_at && (
+                    <small className="job-eta">预计 {formatClock(jobProgress.expected_finish_at)} 完成 · 约 {formatDuration(jobProgress.eta_seconds)}</small>
+                  )}
                 </span>
                 <span className="job-actions" onClick={(event) => event.stopPropagation()}>
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "提交中…" : "执行采集"}</button>}
@@ -436,9 +463,10 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                   </div>
                   {job.error && <div className="job-error-banner"><AlertCircle size={15} /><span><strong>任务失败原因</strong>{job.error}</span></div>}
                   {detailTab === "runs" && (jobRuns.length ? (
+                    <>
                     <div className="run-table">
                       <div className="run-row run-head"><span>分区</span><span>状态</span><span>行数</span><span>文件</span><span>错误</span></div>
-                      {[...jobRuns].reverse().map((run) => (
+                      {jobRuns.map((run) => (
                         <div className="run-row" key={run.id}>
                           <code>{run.partition_key}</code>
                           <span className={`run-status run-status-${run.status}`}>{runStatusLabels[run.status] ?? run.status}</span>
@@ -448,6 +476,11 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                         </div>
                       ))}
                     </div>
+                    <div className="run-footer">
+                      <span>已显示 {jobRuns.length} / {runTotals[job.id] ?? jobRuns.length} 条</span>
+                      {jobRuns.length < (runTotals[job.id] ?? jobRuns.length) && <button className="toolbar-button" type="button" onClick={() => void loadRuns(job.id, jobRuns.length, true)}>加载更多</button>}
+                    </div>
+                    </>
                   ) : (
                     <p className="job-detail-empty">还没有分区运行记录。</p>
                   ))}
@@ -467,6 +500,14 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
               </div>
               );
             })}
+          </div>
+        )}
+        {jobTotal > jobLimit && (
+          <div className="job-pagination">
+            <span>共 {jobTotal} 个任务</span>
+            <button className="toolbar-button" type="button" disabled={jobPage === 0} onClick={() => setJobPage((page) => Math.max(0, page - 1))}>上一页</button>
+            <span>第 {jobPage + 1} / {pageCount} 页</span>
+            <button className="toolbar-button" type="button" disabled={(jobPage + 1) * jobLimit >= jobTotal} onClick={() => setJobPage((page) => page + 1)}>下一页</button>
           </div>
         )}
       </section>
@@ -639,7 +680,32 @@ function formatProgress(progress: CollectionProgress) {
   if (progress.percent !== null) parts.push(`${progress.percent}%`);
   if (progress.failed) parts.push(`失败 ${progress.failed}`);
   if (progress.latest_partition) parts.push(`最新 ${progress.latest_partition}`);
+  if (progress.eta_seconds !== null && progress.expected_finish_at) {
+    parts.push(`预计 ${formatClock(progress.expected_finish_at)} 完成（约 ${formatDuration(progress.eta_seconds)}）`);
+  } else if (progress.status === "running" && progress.eta_basis === "insufficient_data") {
+    parts.push("预计完成时间计算中");
+  }
+  if (progress.status !== "queued" && progress.status !== "running" && progress.status !== "cancelling" && progress.elapsed_seconds !== null) {
+    parts.push(`耗时 ${formatDuration(progress.elapsed_seconds)}`);
+  }
   return parts.join(" · ");
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+}
+
+function formatClock(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
 }
 
 function formatBytes(value: number | null) {

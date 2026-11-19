@@ -691,7 +691,14 @@ CANCELLED    已取消
   发布，任务和运行记录都进入 `CANCELLED`。任务一旦进入发布临界区则拒绝取消，避免成功
   发布后被覆盖成 `CANCELLING`。
 - 任务进度由分区运行记录统计：`GET /api/v1/collection-jobs/{id}/progress` 返回预期分区
-  总数（来自交易日历）、已发布数、失败数、最新分区和百分比。
+  总数（来自交易日历）、已发布数、失败数、最新分区和百分比。进度接口同时返回
+  `started_at`、`finished_at`、`elapsed_seconds`、`eta_seconds`、`expected_finish_at` 和
+  `eta_basis`：日分区任务按已处理分区的平均耗时估算剩余时间；快照任务使用同一
+  `collector_operation` 最近成功任务的中位耗时；样本不足时只标记为 `insufficient_data`，
+  不虚构完成时间。
+- 任务记录接口使用 `limit` / `offset` 分页并返回 `total`，默认 20 条、最大 200 条；
+  分区运行明细同样分页，默认 100 条、按分区倒序，前端通过“加载更多”读取更早分区。
+  翻页和轮询只刷新当前页，不重复拉取全部历史记录。
 - 任务记录可以删除，但只允许在非执行状态下删除；删除只移除任务和运行记录，不删除已
   发布的 Parquet 文件与 Catalog 记录。
 - 任务记录保存任务级 `error`。所有采集执行路径都必须在异常退出时将任务持久化为

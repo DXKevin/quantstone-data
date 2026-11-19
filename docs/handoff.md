@@ -178,6 +178,28 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — DeepSeek Harness（任务完成时间与分页）
+
+完成：
+
+- 进度接口新增 `started_at`、`finished_at`、`elapsed_seconds`、`eta_seconds`、
+  `expected_finish_at`、`eta_basis`；日分区任务按平均分区耗时估算剩余时间，快照任务按同一
+  `collector_operation` 最近成功任务的中位耗时估算；
+- 任务列表改为 `limit` / `offset` 分页，返回 `{items, total, limit, offset}`，默认 20 条；
+- 分区运行明细改为分页并返回总数，按分区倒序，前端支持“加载更多”；
+- 前端任务列表显示预计完成时间和剩余时长，新增分页控件；轮询只刷新当前页。
+
+验证：
+
+- `pytest -q`：71 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- `npm run build`：通过；
+- 实测一个 10 个分区的 daily 任务：处理到 5/10 时返回 `eta_seconds=3`，
+  取消接口返回 200，任务最终进入 `cancelled`；运行明细分页返回 `total=6`。
+
+注意：该实测任务重新发布了 2018-07-16 至 2018-07-23 之间的已有分区，覆盖范围没有变化，
+只是走了一遍采集、审核和发布流程。
+
 ### 2026-11-19 — DeepSeek Harness（取消 500 与日志级别筛选）
 
 完成：

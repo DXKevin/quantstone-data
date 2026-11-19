@@ -608,8 +608,8 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     assert submitted.status_code == 202
     assert executed.status_code == 200
     assert executed.json()["status"] == "succeeded"
-    assert runs.json()[0]["row_count"] == 2
-    assert runs.json()[0]["status"] == "succeeded"
+    assert runs.json()["items"][0]["row_count"] == 2
+    assert runs.json()["items"][0]["status"] == "succeeded"
     assert collected_dates == ["20261118"]
     assert catalog.json()[0]["partition_key"] == "2026-11-18"
     assert storage.status_code == 200
@@ -624,8 +624,8 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     assert failed_submitted.status_code == 202
     assert failed_job.json()["status"] == "failed"
     assert failed_job.json()["error"] == upstream_error
-    assert failed_runs.json()[0]["status"] == "failed"
-    assert failed_runs.json()[0]["error"] == upstream_error
+    assert failed_runs.json()["items"][0]["status"] == "failed"
+    assert failed_runs.json()["items"][0]["error"] == upstream_error
 
 
 def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
@@ -760,5 +760,5 @@ def test_snapshot_job_can_be_cancelled_before_publish(tmp_path: Path, monkeypatc
     assert submitted.status_code == 202
     assert executed.status_code == 200
     assert executed.json()["status"] == "cancelled"
-    assert runs.json()[0]["status"] == "cancelled"
+    assert runs.json()["items"][0]["status"] == "cancelled"
     assert catalog.json() == []

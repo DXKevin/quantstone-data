@@ -3,7 +3,7 @@ import json
 import logging
 import shutil
 import threading
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Annotated
@@ -11,7 +11,17 @@ from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
 import pyarrow.parquet as pq
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, selectinload
@@ -1213,29 +1223,126 @@ def collection_job_progress(
 
     succeeded = counts.get("succeeded", 0)
     failed = counts.get("failed", 0)
+    processed = succeeded + failed
+    started_at = _as_utc(
+        session.scalar(
+            select(func.min(CollectionRun.created_at)).where(CollectionRun.job_id == job_id)
+        )
+    )
+    finished_at = None
+    if job.status in TERMINAL_JOB_STATUSES:
+        finished_at = _as_utc(
+            session.scalar(
+                select(func.max(CollectionRun.updated_at)).where(
+                    CollectionRun.job_id == job_id
+                )
+            )
+            or job.updated_at
+        )
+    elapsed_seconds = None
+    if started_at is not None:
+        elapsed_seconds = max(
+            round(((finished_at or datetime.now(UTC)) - started_at).total_seconds()), 0
+        )
+
+    eta_seconds: int | None = None
+    expected_finish_at: datetime | None = None
+    eta_basis: str | None = None
+    if job.status == CollectionJobStatus.RUNNING.value:
+        if expected_total is not None:
+            if processed >= 5 and elapsed_seconds is not None:
+                remaining = max(expected_total - processed, 0)
+                eta_seconds = max(round(elapsed_seconds / processed * remaining), 0)
+                eta_basis = "running_rate"
+            else:
+                eta_basis = "insufficient_data"
+        else:
+            history_seconds = _snapshot_history_seconds(session, job)
+            if history_seconds is not None:
+                eta_seconds = max(round(history_seconds), 0)
+                eta_basis = "history"
+            else:
+                eta_basis = "insufficient_data"
+        if eta_seconds is not None:
+            expected_finish_at = datetime.now(UTC) + timedelta(seconds=eta_seconds)
+
     return {
         "job_id": job.id,
         "status": job.status,
         "expected_total": expected_total,
         "succeeded": succeeded,
         "failed": failed,
-        "processed": succeeded + failed,
+        "processed": processed,
         "latest_partition": latest_partition,
         "percent": (
             round(succeeded * 100 / expected_total, 1) if expected_total else None
         ),
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "elapsed_seconds": elapsed_seconds,
+        "eta_seconds": eta_seconds,
+        "expected_finish_at": expected_finish_at,
+        "eta_basis": eta_basis,
     }
 
 
-@router.get("", response_model=list[CollectionJobRead])
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _snapshot_history_seconds(session: Session, job: CollectionJob) -> float | None:
+    rows = session.execute(
+        select(CollectionJob.created_at, CollectionJob.updated_at)
+        .where(
+            CollectionJob.id != job.id,
+            CollectionJob.collector_key == job.collector_key,
+            CollectionJob.collector_operation == job.collector_operation,
+            CollectionJob.status == CollectionJobStatus.SUCCEEDED.value,
+        )
+        .order_by(CollectionJob.created_at.desc())
+        .limit(5)
+    ).all()
+    durations = sorted(
+        (finished - started).total_seconds()
+        for started, finished in (
+            (_as_utc(created_at), _as_utc(updated_at)) for created_at, updated_at in rows
+        )
+        if started is not None and finished is not None and finished >= started
+    )
+    return durations[len(durations) // 2] if durations else None
+
+
+@router.get("")
 def list_collection_jobs(
     session: SessionDep,
     dataset_id: str | None = None,
-) -> list[CollectionJobRead]:
-    query = select(CollectionJob).order_by(CollectionJob.created_at.desc())
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    filters = []
     if dataset_id:
-        query = query.where(CollectionJob.dataset_id == dataset_id)
-    return [serialize_job(job) for job in session.scalars(query)]
+        filters.append(CollectionJob.dataset_id == dataset_id)
+    if status_filter:
+        filters.append(CollectionJob.status == status_filter)
+    total = session.scalar(
+        select(func.count()).select_from(CollectionJob).where(*filters)
+    )
+    items = session.scalars(
+        select(CollectionJob)
+        .where(*filters)
+        .order_by(CollectionJob.created_at.desc(), CollectionJob.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return {
+        "items": [serialize_job(job) for job in items],
+        "total": total or 0,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/readiness/{dataset_id}", response_model=CollectionReadiness)

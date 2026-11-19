@@ -69,24 +69,41 @@ def storage_overview(request: Request, session: SessionDep) -> dict:
 
 
 @router.get("/collection-jobs/{job_id}/runs")
-def list_collection_runs(job_id: str, session: SessionDep) -> list[dict]:
+def list_collection_runs(
+    job_id: str,
+    session: SessionDep,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    total = session.scalar(
+        select(func.count())
+        .select_from(CollectionRun)
+        .where(CollectionRun.job_id == job_id)
+    )
     items = session.scalars(
         select(CollectionRun)
         .where(CollectionRun.job_id == job_id)
-        .order_by(CollectionRun.partition_key)
+        .order_by(CollectionRun.partition_key.desc())
+        .limit(limit)
+        .offset(offset)
     )
-    return [
-        {
-            "id": item.id,
-            "partition_key": item.partition_key,
-            "status": item.status,
-            "staged_path": item.staged_path,
-            "published_path": item.published_path,
-            "row_count": item.row_count,
-            "error": item.error,
-        }
-        for item in items
-    ]
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "partition_key": item.partition_key,
+                "status": item.status,
+                "staged_path": item.staged_path,
+                "published_path": item.published_path,
+                "row_count": item.row_count,
+                "error": item.error,
+            }
+            for item in items
+        ],
+        "total": total or 0,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/collection-jobs/{job_id}/logs")

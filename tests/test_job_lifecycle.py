@@ -64,6 +64,10 @@ def test_created_job_reports_progress(tmp_path: Path) -> None:
     assert body["failed"] == 0
     assert body["expected_total"] is None
     assert body["percent"] is None
+    assert body["started_at"] is None
+    assert body["finished_at"] is None
+    assert body["eta_seconds"] is None
+    assert body["expected_finish_at"] is None
 
 
 def test_job_can_be_cancelled_before_running(tmp_path: Path) -> None:
@@ -88,6 +92,36 @@ def test_running_job_cancel_registers_request(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelling"
+
+
+def test_job_list_is_paginated(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=dataset_payload()).status_code == 201
+        assert client.post(f"/api/v1/datasets/{DATASET_ID}/activate").status_code == 200
+        created_ids = []
+        for _ in range(3):
+            response = client.post(
+                "/api/v1/collection-jobs",
+                json={
+                    "dataset_id": DATASET_ID,
+                    "operation": "initial",
+                    "input_method": "file_import",
+                },
+            )
+            assert response.status_code == 201
+            created_ids.append(response.json()["id"])
+        first = client.get("/api/v1/collection-jobs?limit=2&offset=0")
+        second = client.get("/api/v1/collection-jobs?limit=2&offset=2")
+
+    assert first.status_code == 200
+    assert first.json()["total"] == 3
+    assert first.json()["limit"] == 2
+    assert len(first.json()["items"]) == 2
+    assert second.json()["total"] == 3
+    assert len(second.json()["items"]) == 1
+    assert set(created_ids) == {
+        item["id"] for item in first.json()["items"] + second.json()["items"]
+    }
 
 
 def test_finished_job_cannot_be_cancelled(tmp_path: Path) -> None:

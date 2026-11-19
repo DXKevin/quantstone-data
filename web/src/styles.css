@@ -224,6 +224,9 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .job-status-cancelling { background: #fff3d9; color: #956400; }
 .job-status-cancelled { background: #edf0ee; color: #606c66; }
 .job-status-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.job-eta { color: #6d7872; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.job-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 16px; border-top: 1px solid #eef2ef; color: #607068; font-size: 12px; }
+.run-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; color: #607068; font-size: 11px; }
 .job-progress { font-size: 10px; color: #6b7a73; line-height: 1.4; }
 .spin { animation: spin .9s linear infinite; }
 .mini-upload-button.danger-mini { border-color: #e3b8b8; color: #a33b3b; background: #fff7f7; }
