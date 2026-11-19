@@ -1,5 +1,6 @@
 export type DatasetStatus = "draft" | "active" | "paused" | "deprecated";
 export type UpdateFrequency = "daily" | "weekly" | "monthly" | "manual";
+export type TimeGranularity = "tick" | "second_3" | "second" | "minute" | "hour" | "day" | "none";
 export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
 export type CollectionPurpose = CollectionOperation;
 export type CollectionInputMethod = "collector" | "file_import";
@@ -33,6 +34,7 @@ export interface DatasetSummary {
   market: string | null;
   category_id: string | null;
   update_frequency: UpdateFrequency;
+  time_granularity: TimeGranularity;
   status: DatasetStatus;
   current_schema_version: number;
   collection_bindings: DatasetCollectionBinding[];
@@ -82,6 +84,7 @@ export interface DatasetCreatePayload {
   display_name: string;
   description: string | null;
   update_frequency: UpdateFrequency;
+  time_granularity: TimeGranularity;
   collection_bindings: DatasetCollectionBinding[];
   storage_policy: DatasetStoragePolicy | null;
   primary_key: string[];
@@ -107,6 +110,7 @@ export type DatasetUpdatePayload = Pick<
   | "display_name"
   | "description"
   | "update_frequency"
+  | "time_granularity"
   | "collection_bindings"
   | "storage_policy"
   | "primary_key"
@@ -116,7 +120,7 @@ export type DatasetUpdatePayload = Pick<
 
 export type DatasetMetadataUpdatePayload = Pick<
   DatasetCreatePayload,
-  "display_name" | "description" | "update_frequency"
+  "display_name" | "description" | "update_frequency" | "time_granularity"
 >;
 
 export interface CollectorParameter {

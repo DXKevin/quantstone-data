@@ -38,7 +38,21 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
     dataset_columns = {item["name"] for item in inspector.get_columns("datasets")}
     job_columns = {item["name"] for item in inspector.get_columns("collection_jobs")}
     added_update_frequency = "update_frequency" not in dataset_columns
+    added_time_granularity = "time_granularity" not in dataset_columns
     with engine.begin() as connection:
+        if added_time_granularity:
+            connection.execute(
+                text(
+                    "ALTER TABLE datasets ADD COLUMN time_granularity VARCHAR(32) "
+                    "NOT NULL DEFAULT 'none'"
+                )
+            )
+            connection.execute(
+                text(
+                    "UPDATE datasets SET time_granularity = 'day' "
+                    "WHERE id IN ('tushare.cn.stock.daily', 'tushare.cn.stock.trade_cal')"
+                )
+            )
         if added_update_frequency:
             connection.execute(
                 text(

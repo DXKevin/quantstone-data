@@ -268,7 +268,7 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
                         </div>
                         <small>{row.last_updated_at ? `最近更新 ${formatDate(row.last_updated_at)}` : "尚未更新"}</small>
                       </div>
-                      <span className="daily-completion-gaps">快照数据集 · 每个交易日检查更新</span>
+                      <span />
                     </>
                   ) : (
                     <>
@@ -276,10 +276,12 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
                         <div className="coverage-bar">
                           <i style={{ width: `${Math.min(row.completion_percent ?? 0, 100)}%` }} />
                         </div>
-                        <small>{row.complete} / {row.expected} 个交易日 · {row.completion_percent ?? "—"}%</small>
+                        <small>{row.complete} / {row.expected} · {row.completion_percent ?? "—"}%</small>
                       </div>
                       <span className="daily-completion-gaps">
-                        缺失 {row.missing} · 失败 {row.failed + row.abnormal}{row.pending ? ` · 待采集 ${row.pending}` : ""}
+                        {row.missing || row.failed || row.abnormal || row.pending
+                          ? `缺失 ${row.missing} · 失败 ${row.failed + row.abnormal}${row.pending ? ` · 待采集 ${row.pending}` : ""}`
+                          : ""}
                       </span>
                     </>
                   )}

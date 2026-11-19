@@ -24,6 +24,16 @@ class UpdateFrequency(StrEnum):
     MANUAL = "manual"
 
 
+class TimeGranularity(StrEnum):
+    TICK = "tick"
+    SECOND_3 = "second_3"
+    SECOND = "second"
+    MINUTE = "minute"
+    HOUR = "hour"
+    DAY = "day"
+    NONE = "none"
+
+
 class CollectionPurpose(StrEnum):
     INITIAL = "initial"
     INCREMENTAL = "incremental"
@@ -83,6 +93,7 @@ class DatasetCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
+    time_granularity: TimeGranularity = TimeGranularity.NONE
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -119,6 +130,7 @@ class DatasetUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     update_frequency: UpdateFrequency = UpdateFrequency.MANUAL
+    time_granularity: TimeGranularity = TimeGranularity.NONE
     collection_bindings: list[DatasetCollectionBinding] = Field(default_factory=list)
     storage_policy: DatasetStoragePolicy | None = None
     primary_key: list[str] = Field(min_length=1)
@@ -167,6 +179,7 @@ class DatasetMetadataUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     update_frequency: UpdateFrequency | None = None
+    time_granularity: TimeGranularity | None = None
 
 
 class DatasetFieldRead(BaseModel):
@@ -202,6 +215,7 @@ class DatasetRead(BaseModel):
     description: str | None
     category_id: str | None
     update_frequency: UpdateFrequency
+    time_granularity: TimeGranularity
     collection_bindings: list[DatasetCollectionBinding]
     storage_policy: DatasetStoragePolicy | None
     status: DatasetStatus
@@ -222,6 +236,7 @@ class DatasetSummary(BaseModel):
     market: str | None
     category_id: str | None
     update_frequency: UpdateFrequency
+    time_granularity: TimeGranularity
     status: DatasetStatus
     current_schema_version: int
     collection_bindings: list[DatasetCollectionBinding]
