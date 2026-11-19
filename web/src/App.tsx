@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   CollectorDefinition,
@@ -34,7 +34,8 @@ import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "metadata" | "detail";
-type Area = "overview" | "datasets" | "presets" | "collectors" | "collection";
+type Area = "overview" | "datasets" | "presets" | "collection";
+type CollectionSection = "jobs" | "capabilities";
 
 interface FieldDraft {
   key: number;
@@ -76,6 +77,7 @@ const purposeLabels: Record<CollectionPurpose, string> = {
 
 function App() {
   const [area, setArea] = useState<Area>("overview");
+  const [collectionSection, setCollectionSection] = useState<CollectionSection>("jobs");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [presets, setPresets] = useState<DatasetPreset[]>([]);
@@ -143,8 +145,7 @@ function App() {
           <button className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} />概览</button>
           <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
           <button className={area === "presets" ? "nav-item active" : "nav-item"} onClick={() => setArea("presets")}><BookOpen size={17} />预置契约</button>
-          <button className={area === "collectors" ? "nav-item active" : "nav-item"} onClick={() => setArea("collectors")}><Cable size={17} />采集器</button>
-          <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
+          <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集</button>
         </nav>
         <div className="sidebar-bottom">
           <button className="nav-item" disabled><CircleHelp size={17} />帮助</button>
@@ -155,8 +156,12 @@ function App() {
 
       <main className="main-area">
         {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); void openDataset(id); }} />}
-        {area === "collection" && <CollectionJobs datasets={datasets} collectors={collectors} />}
-        {area === "collectors" && <CollectorCatalog collectors={collectors} />}
+        {area === "collection" && collectionSection === "jobs" && (
+          <CollectionJobs datasets={datasets} collectors={collectors} navigation={<CollectionTabs selected="jobs" onSelect={setCollectionSection} />} />
+        )}
+        {area === "collection" && collectionSection === "capabilities" && (
+          <CollectorCatalog collectors={collectors} navigation={<CollectionTabs selected="capabilities" onSelect={setCollectionSection} />} />
+        )}
         {area === "presets" && (
           <DatasetPresetCatalog
             presets={presets}
@@ -210,6 +215,15 @@ function App() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+function CollectionTabs(props: { selected: CollectionSection; onSelect: (section: CollectionSection) => void }) {
+  return (
+    <div className="section-tabs" aria-label="采集页面">
+      <button className={props.selected === "jobs" ? "active" : ""} onClick={() => props.onSelect("jobs")}><Activity size={16} />任务</button>
+      <button className={props.selected === "capabilities" ? "active" : ""} onClick={() => props.onSelect("capabilities")}><Cable size={16} />采集能力</button>
     </div>
   );
 }
@@ -285,11 +299,12 @@ function DatasetPresetCatalog(props: {
   );
 }
 
-function CollectorCatalog({ collectors }: { collectors: CollectorDefinition[] }) {
+function CollectorCatalog({ collectors, navigation }: { collectors: CollectorDefinition[]; navigation: ReactNode }) {
   return (
     <div className="page">
+      {navigation}
       <header className="page-header">
-        <div><p className="eyebrow">COLLECTOR REGISTRY</p><h1>采集器</h1><p className="subtitle">查看采集器、公开操作、运行参数和输出数据集。</p></div>
+        <div><p className="eyebrow">COLLECTOR REGISTRY</p><h1>采集能力</h1><p className="subtitle">查看采集器、公开操作、运行参数和输出数据集。</p></div>
       </header>
       <section className="summary-strip">
         <div><span>采集器</span><strong>{collectors.length}</strong></div>

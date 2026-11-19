@@ -10,7 +10,7 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type CollectionInputMethod,
@@ -61,7 +61,7 @@ const runStatusLabels: Record<string, string> = {
   review_failed: "审核异常",
 };
 
-export default function CollectionJobs({ datasets, collectors }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[] }) {
+export default function CollectionJobs({ datasets, collectors, navigation }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; navigation?: ReactNode }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
   const [view, setView] = useState<"list" | "create">("list");
   const [loading, setLoading] = useState(true);
@@ -304,10 +304,11 @@ export default function CollectionJobs({ datasets, collectors }: { datasets: Dat
 
   return (
     <div className="page">
+      {navigation}
       <header className="page-header">
         <div>
           <p className="eyebrow">COLLECTION JOBS</p>
-          <h1>采集任务</h1>
+          <h1>采集</h1>
           <p className="subtitle">统一管理采集器任务和手动文件入库。</p>
         </div>
         <button className="primary-button" onClick={() => setView("create")} disabled={!activeDatasets.length}>
