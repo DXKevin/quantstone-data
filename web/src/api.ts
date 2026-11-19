@@ -285,8 +285,9 @@ export interface CoverageResponse {
 export interface DailyCompletionRow {
   dataset_id: string;
   display_name: string;
+  layout: "date" | "snapshot";
   latest_trade_date: string | null;
-  latest_status: "complete" | "missing" | "failed" | "abnormal" | "pending" | null;
+  latest_status: "complete" | "missing" | "failed" | "abnormal" | "pending" | "stale" | null;
   complete: number;
   expected: number;
   completion_percent: number | null;
@@ -294,6 +295,7 @@ export interface DailyCompletionRow {
   failed: number;
   abnormal: number;
   pending: number;
+  last_updated_at: string | null;
 }
 
 export interface DailyCompletion {

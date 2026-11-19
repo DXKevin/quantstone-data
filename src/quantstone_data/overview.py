@@ -316,6 +316,7 @@ def daily_completion(
             {
                 "dataset_id": item["dataset_id"],
                 "display_name": item["display_name"],
+                "layout": "date",
                 "latest_trade_date": latest_date,
                 "latest_status": cells.get(latest_date) if latest_date else None,
                 "complete": summary.get("complete", 0),
@@ -329,8 +330,49 @@ def daily_completion(
                 "failed": summary.get("failed", 0),
                 "abnormal": summary.get("abnormal", 0),
                 "pending": summary.get("pending", 0),
+                "last_updated_at": None,
             }
         )
+
+    latest_trade_date = coverage["dates"][-1] if coverage["dates"] else coverage["today"]
+    latest_trade_day = date.fromisoformat(latest_trade_date)
+    for dataset in session.scalars(select(Dataset).order_by(Dataset.id)):
+        policy = dataset.storage_policy or {}
+        if dataset.status != "active" or policy.get("layout") != "snapshot":
+            continue
+        last_published = session.scalar(
+            select(func.max(CatalogPartition.published_at)).where(
+                CatalogPartition.dataset_id == dataset.id
+            )
+        )
+        last_job = session.scalar(
+            select(func.max(CollectionJob.updated_at)).where(
+                CollectionJob.dataset_id == dataset.id,
+                CollectionJob.status == "succeeded",
+            )
+        )
+        updates = [item for item in (last_published, last_job) if item is not None]
+        last_updated = max(updates) if updates else None
+        updated_day = last_updated.date() if last_updated is not None else None
+        complete = updated_day is not None and updated_day >= latest_trade_day
+        rows.append(
+            {
+                "dataset_id": dataset.id,
+                "display_name": dataset.display_name,
+                "layout": "snapshot",
+                "latest_trade_date": latest_trade_date,
+                "latest_status": "complete" if complete else "stale",
+                "complete": 1 if complete else 0,
+                "expected": 1,
+                "completion_percent": 100.0 if complete else 0.0,
+                "missing": 0 if complete else 1,
+                "failed": 0,
+                "abnormal": 0,
+                "pending": 0,
+                "last_updated_at": _serialize_timestamp(last_updated),
+            }
+        )
+
     return {
         "today": coverage["today"],
         "days": days,

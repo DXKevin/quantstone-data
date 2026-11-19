@@ -37,6 +37,7 @@ const dailyStatusLabels: Record<string, string> = {
   failed: "采集失败",
   abnormal: "文件异常",
   pending: "待采集",
+  stale: "需更新",
   none: "—",
 };
 
@@ -58,6 +59,7 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
   const [items, setItems] = useState<DatasetOverview[]>([]);
   const [collection, setCollection] = useState<CollectionOverview | null>(null);
   const [dailyCompletion, setDailyCompletion] = useState<DailyCompletion | null>(null);
+  const [dailyExpanded, setDailyExpanded] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,28 +239,54 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
               <span>最近 {dailyCompletion.days} 个交易日 · {dailyCompletion.today}</span>
             </div>
           </div>
-          <div className="daily-completion-list">
-            {dailyCompletion.datasets.map((row) => (
-              <div className="daily-completion-row" key={row.dataset_id}>
-                <div className="daily-completion-name">
-                  <strong>{row.display_name}</strong>
-                  <code>{row.dataset_id}</code>
-                </div>
-                <span className={`daily-status daily-status-${row.latest_status ?? "none"}`}>
-                  {row.latest_trade_date ? `${row.latest_trade_date} · ${dailyStatusLabels[row.latest_status ?? "none"]}` : "无交易日"}
-                </span>
-                <div className="daily-completion-progress">
-                  <div className="coverage-bar">
-                    <i style={{ width: `${Math.min(row.completion_percent ?? 0, 100)}%` }} />
+          <button
+            type="button"
+            className="daily-completion-toggle"
+            aria-expanded={dailyExpanded}
+            onClick={() => setDailyExpanded((expanded) => !expanded)}
+          >
+            {dailyExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <span>完成率明细</span>
+            <small>{dailyCompletion.datasets.length} 个数据集</small>
+          </button>
+          {dailyExpanded && (
+            <div className="daily-completion-list">
+              {dailyCompletion.datasets.map((row) => (
+                <div className="daily-completion-row" key={row.dataset_id}>
+                  <div className="daily-completion-name">
+                    <strong>{row.display_name}</strong>
+                    <code>{row.dataset_id}</code>
                   </div>
-                  <small>{row.complete} / {row.expected} 个交易日 · {row.completion_percent ?? "—"}%</small>
+                  <span className={`daily-status daily-status-${row.latest_status ?? "none"}`}>
+                    {row.latest_trade_date ? `${row.latest_trade_date} · ${dailyStatusLabels[row.latest_status ?? "none"]}` : "无交易日"}
+                  </span>
+                  {row.layout === "snapshot" ? (
+                    <>
+                      <div className="daily-completion-progress">
+                        <div className="coverage-bar">
+                          <i style={{ width: `${row.completion_percent ?? 0}%` }} />
+                        </div>
+                        <small>{row.last_updated_at ? `最近更新 ${formatDate(row.last_updated_at)}` : "尚未更新"}</small>
+                      </div>
+                      <span className="daily-completion-gaps">快照数据集 · 每个交易日检查更新</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="daily-completion-progress">
+                        <div className="coverage-bar">
+                          <i style={{ width: `${Math.min(row.completion_percent ?? 0, 100)}%` }} />
+                        </div>
+                        <small>{row.complete} / {row.expected} 个交易日 · {row.completion_percent ?? "—"}%</small>
+                      </div>
+                      <span className="daily-completion-gaps">
+                        缺失 {row.missing} · 失败 {row.failed + row.abnormal}{row.pending ? ` · 待采集 ${row.pending}` : ""}
+                      </span>
+                    </>
+                  )}
                 </div>
-                <span className="daily-completion-gaps">
-                  缺失 {row.missing} · 失败 {row.failed + row.abnormal}{row.pending ? ` · 待采集 ${row.pending}` : ""}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
