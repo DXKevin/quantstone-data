@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type CollectionOverview, type DatasetOverview, type DatasetStatus } from "./api";
 import CoverageHeatmap from "./CoverageHeatmap";
@@ -40,6 +40,7 @@ const layoutLabels: Record<string, string> = {
 export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void }) {
   const [items, setItems] = useState<DatasetOverview[]>([]);
   const [collection, setCollection] = useState<CollectionOverview | null>(null);
+  const [collectionExpanded, setCollectionExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,39 +98,52 @@ export default function OverviewPage({ onOpen }: { onOpen: (id: string) => void 
 
       {collection && (
         <section className="panel collection-overview-panel">
-          <div className="panel-toolbar">
+          <button
+            type="button"
+            className="panel-toolbar collection-overview-toggle"
+            aria-expanded={collectionExpanded}
+            onClick={() => setCollectionExpanded((expanded) => !expanded)}
+          >
             <div>
+              {collectionExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               <h2>采集概览</h2>
-              <span>{collection.total_jobs} 个任务 · 最近 24 小时</span>
+              <span>
+                {collection.total_jobs} 个任务 · 24h 成功 {collection.succeeded_24h} · 失败 {collection.failed_24h}
+                {collection.running > 0 ? ` · 执行中 ${collection.running}` : ""}
+              </span>
             </div>
             <span className="collection-last">
               最近完成 {collection.last_completed_at ? formatDate(collection.last_completed_at) : "—"}
             </span>
-          </div>
-          <div className="collection-metrics">
-            <div><span>执行中</span><strong>{collection.running}</strong></div>
-            <div><span>排队中</span><strong>{collection.queued}</strong></div>
-            <div><span>等待文件</span><strong>{collection.awaiting_file}</strong></div>
-            <div><span>24h 成功</span><strong>{collection.succeeded_24h}</strong></div>
-            <div><span>24h 失败</span><strong>{collection.failed_24h}</strong></div>
-          </div>
-          <div className="recent-collection-list">
-            {collection.recent_jobs.length ? collection.recent_jobs.map((job) => (
-              <button
-                type="button"
-                className="recent-collection-row"
-                key={job.id}
-                onClick={() => onOpen(job.dataset_id)}
-              >
-                <span className={`job-status job-status-${job.status}`}><i />{jobStatusLabels[job.status] ?? job.status}</span>
-                <span className="recent-collection-name">
-                  <strong>{job.display_name}</strong>
-                  <code>{operationLabels[job.operation] ?? job.operation} · {job.dataset_id}</code>
-                </span>
-                <time>{formatDate(job.updated_at)}</time>
-              </button>
-            )) : <p className="recent-collection-empty">还没有采集任务。</p>}
-          </div>
+          </button>
+          {collectionExpanded && (
+            <>
+              <div className="collection-metrics">
+                <div><span>执行中</span><strong>{collection.running}</strong></div>
+                <div><span>排队中</span><strong>{collection.queued}</strong></div>
+                <div><span>等待文件</span><strong>{collection.awaiting_file}</strong></div>
+                <div><span>24h 成功</span><strong>{collection.succeeded_24h}</strong></div>
+                <div><span>24h 失败</span><strong>{collection.failed_24h}</strong></div>
+              </div>
+              <div className="recent-collection-list">
+                {collection.recent_jobs.length ? collection.recent_jobs.map((job) => (
+                  <button
+                    type="button"
+                    className="recent-collection-row"
+                    key={job.id}
+                    onClick={() => onOpen(job.dataset_id)}
+                  >
+                    <span className={`job-status job-status-${job.status}`}><i />{jobStatusLabels[job.status] ?? job.status}</span>
+                    <span className="recent-collection-name">
+                      <strong>{job.display_name}</strong>
+                      <code>{operationLabels[job.operation] ?? job.operation} · {job.dataset_id}</code>
+                    </span>
+                    <time>{formatDate(job.updated_at)}</time>
+                  </button>
+                )) : <p className="recent-collection-empty">还没有采集任务。</p>}
+              </div>
+            </>
+          )}
         </section>
       )}
 
