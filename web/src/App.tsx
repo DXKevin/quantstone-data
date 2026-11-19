@@ -34,7 +34,8 @@ import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "metadata" | "detail";
-type Area = "overview" | "datasets" | "presets" | "collection";
+type Area = "overview" | "datasets" | "collection";
+type DatasetSection = "registry" | "presets";
 type CollectionSection = "jobs" | "capabilities";
 
 interface FieldDraft {
@@ -77,6 +78,7 @@ const purposeLabels: Record<CollectionPurpose, string> = {
 
 function App() {
   const [area, setArea] = useState<Area>("overview");
+  const [datasetSection, setDatasetSection] = useState<DatasetSection>("registry");
   const [collectionSection, setCollectionSection] = useState<CollectionSection>("jobs");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
@@ -143,8 +145,7 @@ function App() {
         </div>
         <nav>
           <button className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} />概览</button>
-          <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
-          <button className={area === "presets" ? "nav-item active" : "nav-item"} onClick={() => setArea("presets")}><BookOpen size={17} />预置契约</button>
+          <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setDatasetSection("registry"); setView("list"); }}><Database size={17} />数据集</button>
           <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集</button>
         </nav>
         <div className="sidebar-bottom">
@@ -155,27 +156,29 @@ function App() {
       </aside>
 
       <main className="main-area">
-        {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); void openDataset(id); }} />}
+        {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
         {area === "collection" && collectionSection === "jobs" && (
           <CollectionJobs datasets={datasets} collectors={collectors} navigation={<CollectionTabs selected="jobs" onSelect={setCollectionSection} />} />
         )}
         {area === "collection" && collectionSection === "capabilities" && (
           <CollectorCatalog collectors={collectors} navigation={<CollectionTabs selected="capabilities" onSelect={setCollectionSection} />} />
         )}
-        {area === "presets" && (
+        {area === "datasets" && datasetSection === "presets" && (
           <DatasetPresetCatalog
             presets={presets}
             datasets={datasets}
             loading={loading}
             error={error}
+            navigation={<DatasetTabs selected="presets" onSelect={setDatasetSection} />}
             onCreated={(dataset) => {
               void handleSaved(dataset);
               setArea("datasets");
+              setDatasetSection("registry");
             }}
             onRetry={() => void loadDatasets()}
           />
         )}
-        {area === "datasets" && view === "list" && (
+        {area === "datasets" && datasetSection === "registry" && view === "list" && (
           <DatasetList
             datasets={filtered}
             total={datasets.length}
@@ -186,18 +189,19 @@ function App() {
             onCreate={() => setView("create")}
             onOpen={(id) => void openDataset(id)}
             onRetry={() => void loadDatasets()}
+            navigation={<DatasetTabs selected="registry" onSelect={setDatasetSection} />}
           />
         )}
-        {area === "datasets" && view === "create" && (
+        {area === "datasets" && datasetSection === "registry" && view === "create" && (
           <DatasetForm collectors={collectors} datasets={datasets} onCancel={() => setView("list")} onSaved={(data) => void handleSaved(data)} />
         )}
-        {area === "datasets" && view === "edit" && selected && (
+        {area === "datasets" && datasetSection === "registry" && view === "edit" && selected && (
           <DatasetForm collectors={collectors} datasets={datasets} dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
-        {area === "datasets" && view === "metadata" && selected && (
+        {area === "datasets" && datasetSection === "registry" && view === "metadata" && selected && (
           <DatasetMetadataForm dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
-        {area === "datasets" && view === "detail" && selected && (
+        {area === "datasets" && datasetSection === "registry" && view === "detail" && selected && (
           <DatasetDetailView
             dataset={selected}
             onBack={() => setView("list")}
@@ -219,6 +223,15 @@ function App() {
   );
 }
 
+function DatasetTabs(props: { selected: DatasetSection; onSelect: (section: DatasetSection) => void }) {
+  return (
+    <div className="section-tabs" aria-label="数据集页面">
+      <button className={props.selected === "registry" ? "active" : ""} onClick={() => props.onSelect("registry")}><Database size={16} />数据集</button>
+      <button className={props.selected === "presets" ? "active" : ""} onClick={() => props.onSelect("presets")}><BookOpen size={16} />预置契约</button>
+    </div>
+  );
+}
+
 function CollectionTabs(props: { selected: CollectionSection; onSelect: (section: CollectionSection) => void }) {
   return (
     <div className="section-tabs" aria-label="采集页面">
@@ -233,6 +246,7 @@ function DatasetPresetCatalog(props: {
   datasets: DatasetSummary[];
   loading: boolean;
   error: string | null;
+  navigation: ReactNode;
   onCreated: (dataset: DatasetDetail) => void;
   onRetry: () => void;
 }) {
@@ -254,6 +268,7 @@ function DatasetPresetCatalog(props: {
 
   return (
     <div className="page">
+      {props.navigation}
       <header className="page-header">
         <div><p className="eyebrow">VERSIONED CONTRACT PRESETS</p><h1>预置契约</h1><p className="subtitle">项目随代码维护的常用数据集契约。选择契约可快速创建 Registry 草稿。</p></div>
       </header>
@@ -353,9 +368,11 @@ function DatasetList(props: {
   onCreate: () => void;
   onOpen: (id: string) => void;
   onRetry: () => void;
+  navigation: ReactNode;
 }) {
   return (
     <div className="page">
+      {props.navigation}
       <header className="page-header">
         <div><p className="eyebrow">DATASET REGISTRY</p><h1>数据集</h1><p className="subtitle">定义并管理供应商数据集的字段契约与版本。</p></div>
         <button className="primary-button" onClick={props.onCreate}><Plus size={17} />创建数据集</button>
