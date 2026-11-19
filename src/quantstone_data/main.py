@@ -20,6 +20,8 @@ from .database import (
 from .dataset_categories import router as dataset_categories_router
 from .dataset_deletion import router as dataset_deletion_router
 from .dataset_presets import router as dataset_presets_router
+from .directory_import import recover_interrupted_import_jobs
+from .directory_import import router as directory_import_router
 from .logging_config import configure_logging, log_event
 from .maintenance import recover_interrupted_maintenance_jobs
 from .maintenance import router as maintenance_router
@@ -42,11 +44,13 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         with session_factory() as session:
             recovered_jobs = recover_interrupted_jobs(session)
             recovered_maintenance = recover_interrupted_maintenance_jobs(session)
-        if recovered_jobs or recovered_maintenance:
+            recovered_imports = recover_interrupted_import_jobs(session)
+        if recovered_jobs or recovered_maintenance or recovered_imports:
             log_event(
                 "interrupted_jobs_recovered",
                 collection_jobs=recovered_jobs,
                 maintenance_jobs=recovered_maintenance,
+                import_jobs=recovered_imports,
                 level=30,
             )
         executor = BackgroundJobExecutor()
@@ -71,6 +75,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
     app.include_router(overview_router, prefix="/api/v1")
     app.include_router(storage_router, prefix="/api/v1")
     app.include_router(maintenance_router, prefix="/api/v1")
+    app.include_router(directory_import_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def log_http_request(request: Request, call_next):

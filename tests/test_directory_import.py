@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+import time
+from datetime import date
+from pathlib import Path
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+from fastapi.testclient import TestClient
+
+from quantstone_data.field_types import arrow_type
+from quantstone_data.main import create_app
+
+ORDER_ID = "wind.cn.stock.l2_order.sz"
+
+
+def _write_order_file(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    schema = pa.schema(
+        [
+            pa.field("symbol", arrow_type("string"), nullable=False),
+            pa.field("exchange_code", arrow_type("string"), nullable=False),
+            pa.field("trade_date", arrow_type("date"), nullable=False),
+            pa.field("event_time", arrow_type("int32"), nullable=False),
+            pa.field("channel_code", arrow_type("string"), nullable=False),
+            pa.field("exchange_order_no", arrow_type("int64"), nullable=False),
+            pa.field("order_type", arrow_type("string"), nullable=False),
+            pa.field("side", arrow_type("string"), nullable=False),
+            pa.field("price", arrow_type("int64"), nullable=False),
+            pa.field("volume", arrow_type("int64"), nullable=False),
+        ]
+    )
+    table = pa.Table.from_pylist(
+        [
+            {
+                "symbol": "000001.SZ",
+                "exchange_code": "000001",
+                "trade_date": date(2026, 11, 18),
+                "event_time": 93000000,
+                "channel_code": "0",
+                "exchange_order_no": 1,
+                "order_type": "0",
+                "side": "B",
+                "price": 120000,
+                "volume": 100,
+            },
+            {
+                "symbol": "000001.SZ",
+                "exchange_code": "000001",
+                "trade_date": date(2026, 11, 18),
+                "event_time": 93000100,
+                "channel_code": "0",
+                "exchange_order_no": 2,
+                "order_type": "0",
+                "side": "S",
+                "price": 120100,
+                "volume": 200,
+            },
+        ],
+        schema=schema,
+    )
+    pq.write_table(table, path, compression="zstd")
+
+
+def _wait_status(client: TestClient, job_id: str, expected: set[str], timeout: float = 10):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/v1/import-jobs/{job_id}")
+        assert response.status_code == 200
+        body = response.json()
+        if body["status"] in expected:
+            return body
+        time.sleep(0.05)
+    raise AssertionError(f"import job did not reach {expected}: {body}")
+
+
+def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
+        data_root=tmp_path / "data",
+    )
+    with TestClient(app) as client:
+        presets = {
+            item["contract"]["id"]: item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+        }
+        calendar = presets["tushare.cn.stock.trade_cal"]
+        assert client.post("/api/v1/datasets", json=calendar).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code
+            == 200
+        )
+        order = presets[ORDER_ID]
+        assert client.post("/api/v1/datasets", json=order).status_code == 201
+        assert client.post(f"/api/v1/datasets/{ORDER_ID}/activate").status_code == 200
+
+        source = (
+            tmp_path
+            / "data"
+            / "imports"
+            / "wind_l2"
+            / "sz"
+            / "20261118"
+            / "l2_order.parquet"
+        )
+        _write_order_file(source)
+
+        created = client.post(
+            "/api/v1/import-jobs",
+            json={
+                "dataset_id": ORDER_ID,
+                "scanner_key": "wind_l2_sz",
+                "operation": "import_order",
+                "source_root": str(source.parent.parent),
+            },
+        )
+        assert created.status_code == 202, created.text
+        job_id = created.json()["id"]
+        ready = _wait_status(client, job_id, {"review_ready"})
+        assert ready["summary"]["ready"] == 1
+
+        manifest = client.get(f"/api/v1/import-jobs/{job_id}/manifest")
+        assert manifest.status_code == 200
+        assert manifest.json()["files"][0]["partition_key"] == "20261118"
+
+        executed = client.post(f"/api/v1/import-jobs/{job_id}/execute")
+        assert executed.status_code == 200
+        completed = _wait_status(client, job_id, {"succeeded", "failed"})
+        assert completed["status"] == "succeeded", completed["error"]
+
+        partitions = client.get(
+            f"/api/v1/catalog/partitions?dataset_id={ORDER_ID}"
+        )
+        assert partitions.status_code == 200
+        assert len(partitions.json()) == 1
+        assert partitions.json()[0]["row_count"] == 2
+        assert partitions.json()[0]["partition_key"] == "20261118"

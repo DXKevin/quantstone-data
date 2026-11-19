@@ -39,6 +39,8 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
         "tushare.cn.stock.daily",
         "tushare.cn.stock.stock_basic",
         "tushare.cn.stock.trade_cal",
+        "wind.cn.stock.l2_order.sz",
+        "wind.cn.stock.l2_trade.sz",
     }
 
 

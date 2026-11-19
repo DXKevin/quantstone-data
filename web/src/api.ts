@@ -105,6 +105,67 @@ export interface DatasetPreset {
   contract: DatasetCreatePayload;
 }
 
+export interface ScannerOperation {
+  key: string;
+  name: string;
+  description: string;
+  dataset_id: string;
+  filename: string;
+}
+
+export interface ScannerDefinition {
+  key: string;
+  name: string;
+  description: string;
+  operations: ScannerOperation[];
+}
+
+export type ImportJobStatus =
+  | "created"
+  | "scanning"
+  | "review_ready"
+  | "importing"
+  | "cancelling"
+  | "cancelled"
+  | "succeeded"
+  | "failed";
+
+export interface ImportJob {
+  id: string;
+  dataset_id: string;
+  scanner_key: string;
+  operation: string;
+  parameters: Record<string, unknown>;
+  status: ImportJobStatus;
+  manifest_path: string | null;
+  summary: Record<string, unknown> | null;
+  collection_job_id: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ImportManifestFile {
+  partition_key: string;
+  path: string;
+  size_bytes: number | null;
+  mtime: string | null;
+  row_count: number | null;
+  status: "ready" | "duplicate" | "invalid";
+  errors: Array<Record<string, unknown>>;
+}
+
+export interface ImportManifest {
+  job_id: string;
+  dataset_id: string;
+  scanner_key: string;
+  operation: string;
+  source_root: string;
+  generated_at: string;
+  files: ImportManifestFile[];
+  summary: Record<string, number>;
+}
+
 export type DatasetUpdatePayload = Pick<
   DatasetCreatePayload,
   | "display_name"
@@ -520,6 +581,31 @@ export const api = {
     request<CatalogPartitionItem[]>(`/api/v1/catalog/partitions?dataset_id=${encodeURIComponent(datasetId)}`),
   cancelMaintenanceJob: (jobId: string) =>
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
+  listScanners: () => request<ScannerDefinition[]>("/api/v1/scanners"),
+  listImportJobs: (datasetId?: string) => {
+    const query = datasetId ? `?dataset_id=${encodeURIComponent(datasetId)}` : "";
+    return request<ImportJob[]>(`/api/v1/import-jobs${query}`);
+  },
+  createImportJob: (payload: {
+    dataset_id: string;
+    scanner_key: string;
+    operation: string;
+    source_root: string;
+    start_date?: string | null;
+    end_date?: string | null;
+  }) =>
+    request<ImportJob>("/api/v1/import-jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getImportJob: (jobId: string) =>
+    request<ImportJob>(`/api/v1/import-jobs/${jobId}`),
+  getImportManifest: (jobId: string) =>
+    request<ImportManifest>(`/api/v1/import-jobs/${jobId}/manifest`),
+  executeImportJob: (jobId: string) =>
+    request<ImportJob>(`/api/v1/import-jobs/${jobId}/execute`, { method: "POST" }),
+  cancelImportJob: (jobId: string) =>
+    request<ImportJob>(`/api/v1/import-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   getCollectionOverview: () => request<CollectionOverview>("/api/v1/overview/collection"),
   getDailyCompletion: (days = 30) =>

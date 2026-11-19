@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  FolderInput,
   Cable,
   Database,
   LayoutGrid,
@@ -37,13 +38,14 @@ import {
   UpdateFrequency,
 } from "./api";
 import CollectionJobs from "./CollectionJobs";
+import ImportJobs from "./ImportJobs";
 import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "metadata" | "detail";
 type Area = "overview" | "datasets" | "collection";
 type DatasetSection = "registry" | "presets";
-type CollectionSection = "jobs" | "capabilities";
+type CollectionSection = "jobs" | "capabilities" | "imports";
 type CollectionRequest = { datasetId: string; operation: CollectionPurpose };
 
 interface FieldDraft {
@@ -210,6 +212,9 @@ function App() {
         {area === "collection" && collectionSection === "capabilities" && (
           <CollectorCatalog collectors={collectors} navigation={<CollectionTabs selected="capabilities" onSelect={setCollectionSection} />} />
         )}
+        {area === "collection" && collectionSection === "imports" && (
+          <ImportJobs datasets={datasets} navigation={<CollectionTabs selected="imports" onSelect={setCollectionSection} />} />
+        )}
         {area === "datasets" && datasetSection === "presets" && (
           <DatasetPresetCatalog
             presets={presets}
@@ -288,6 +293,7 @@ function CollectionTabs(props: { selected: CollectionSection; onSelect: (section
     <div className="section-tabs" aria-label="采集页面">
       <button className={props.selected === "jobs" ? "active" : ""} onClick={() => props.onSelect("jobs")}><Activity size={16} />任务</button>
       <button className={props.selected === "capabilities" ? "active" : ""} onClick={() => props.onSelect("capabilities")}><Cable size={16} />采集能力</button>
+      <button className={props.selected === "imports" ? "active" : ""} onClick={() => props.onSelect("imports")}><FolderInput size={16} />目录导入</button>
     </div>
   );
 }

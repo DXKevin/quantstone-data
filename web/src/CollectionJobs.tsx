@@ -33,9 +33,10 @@ const operationLabels: Record<CollectionOperation, string> = {
   replace: "范围重建",
 };
 
-const inputLabels: Record<CollectionInputMethod, string> = {
+const inputLabels: Record<string, string> = {
   collector: "采集器",
   file_import: "手动文件",
+  directory_import: "目录导入",
 };
 
 const statusLabels = {

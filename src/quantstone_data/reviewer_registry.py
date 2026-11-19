@@ -2,6 +2,8 @@ from .reviewer_types import ReviewContext, ReviewerDefinition, ReviewReport
 from .reviewers.tushare.cn.stock.daily import REVIEWER as TUSHARE_DAILY
 from .reviewers.tushare.cn.stock.stock_basic import REVIEWER as TUSHARE_STOCK_BASIC
 from .reviewers.tushare.cn.stock.trade_cal import REVIEWER as TUSHARE_TRADE_CAL
+from .reviewers.wind.l2 import ORDER_REVIEWER as WIND_L2_ORDER
+from .reviewers.wind.l2 import TRADE_REVIEWER as WIND_L2_TRADE
 
 
 def _build_registry(
@@ -17,7 +19,15 @@ def _build_registry(
     return registry
 
 
-REVIEWERS = _build_registry((TUSHARE_DAILY, TUSHARE_STOCK_BASIC, TUSHARE_TRADE_CAL))
+REVIEWERS = _build_registry(
+    (
+        TUSHARE_DAILY,
+        TUSHARE_STOCK_BASIC,
+        TUSHARE_TRADE_CAL,
+        WIND_L2_ORDER,
+        WIND_L2_TRADE,
+    )
+)
 
 
 def review_dataset(dataset_id: str, context: ReviewContext) -> ReviewReport:

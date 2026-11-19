@@ -131,6 +131,13 @@ GET    /api/v1/maintenance-jobs/{job_id}
 POST   /api/v1/maintenance-jobs/{job_id}/cancel
 POST   /api/v1/datasets/{dataset_id}/compact?year=YYYY
 POST   /api/v1/datasets/{dataset_id}/compact-all
+GET    /api/v1/scanners
+POST   /api/v1/import-jobs
+GET    /api/v1/import-jobs
+GET    /api/v1/import-jobs/{job_id}
+GET    /api/v1/import-jobs/{job_id}/manifest
+POST   /api/v1/import-jobs/{job_id}/execute
+POST   /api/v1/import-jobs/{job_id}/cancel
 GET    /health
 ```
 

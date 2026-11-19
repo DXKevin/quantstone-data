@@ -181,6 +181,37 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — DeepSeek Harness（Wind L2 迁移脚本与目录导入）
+
+完成：
+
+- 临时转换脚本保存在 `/home/quantadmin/l2_migration/convert_wind_l2.py`，说明见同目录
+  `README.md`；脚本不属于前后端项目，按契约重写列名/类型并输出到
+  `/home/hhd_data/quantstone-data/imports/wind_l2/sz`；
+- 转换脚本在 `20261118` 上验证：order 116,393,103 行、trade 104,411,003 行，耗时约
+  45 秒，输出约 0.91 GB / 1.23 GB；`exchange_code` 恢复六位字符串，`order_code` 输出
+  字符串 `"0"`，主键组合单日唯一；
+- 已实现正式目录导入功能：`ImportJob` 模型、`wind_l2_sz` 扫描器、清单/审核/执行/取消
+  API、L2 审核器、前端“采集 → 目录导入”页面；
+- 已把 `20261118` 的 order/trade 从 `imports/wind_l2_test` 扫描并导入 Catalog：
+  两个数据集各有 1 个分区，行数与转换输出一致；
+- 导入任务与采集/合并共用单工作线程，源目录限制在 `imports/` 或
+  `QUANTSTONE_IMPORT_ROOTS`。
+
+验证：
+
+- `pytest -q`：74 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- `npm run build`：通过；
+- 实跑扫描 → `review_ready` → 导入 → `succeeded`，Catalog 可预览。
+
+已知限制：
+
+- 转换只跑了 `20261118`，其余 169 天需要用户手动执行全量脚本；
+- 全量约 170 天、550 GB 源，预计转换约 2 小时、输出约 350 GB；
+- L2 审核器目前检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
+- 测试数据在 `imports/wind_l2_test`，正式全量输出应在默认的 `imports/wind_l2/sz`。
+
 ### 2026-11-19 — DeepSeek Harness（创建深市 Wind L2 数据集）
 
 完成：

@@ -391,9 +391,24 @@ QuantStone 入库是两个独立步骤。
 不同。扫描器只负责理解外部目录并生成清单，不以目录现状直接推断 Catalog 覆盖，也不在
 系统启动时自动遍历磁盘。文件清单生成后，审核和发布继续复用数据集现有流程。
 
-目录扫描器的注册模型暂定与采集器保持相同思想：显式的 `scanner_key + operation +
-parameters`，operation 声明可导入的目标数据集和参数；具体模型尚未实现，开发前仍需确认
-源目录访问范围、原文件是否移动或只读引用、重复导入判定及失败恢复方式。
+目录扫描器使用显式的 `scanner_key + operation` 注册，operation 声明目标数据集和文件名。
+当前已实现 `wind_l2_sz` 扫描器，包含 `import_order` 和 `import_trade` 两个操作；源目录
+必须位于数据根目录的 `imports/` 或 `QUANTSTONE_IMPORT_ROOTS` 配置的允许根目录内。
+导入任务使用独立 `ImportJob` 状态：
+
+```text
+created → scanning → review_ready → importing → succeeded/failed
+                                 ↘ cancelled / cancelling
+```
+
+扫描阶段按交易日期目录识别 `l2_order.parquet` / `l2_trade.parquet`，检查 Parquet Schema、
+行数、分区日期和契约要求的非空字段，生成不可变清单 `imports/jobs/<job_id>/manifest.json`。
+已有 Catalog 分区的日期标记为 `duplicate`，导入时跳过。执行导入前重新校验源文件大小和
+mtime；文件先复制到 staging，再由 L2 审核器复核，最后复用 `publish_partition` 写正式
+目录和 Catalog。导入任务和采集、合并共用同一个后台单工作线程。
+
+当前 L2 审核器检查 Schema、空值、行数和分区日期，不对上亿行的主键组合做全量唯一性扫描；
+主键唯一性应在转换脚本或一次性离线校验中确认。
 
 ## 9. 采集器原则
 
