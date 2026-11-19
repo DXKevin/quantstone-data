@@ -662,3 +662,30 @@ body { font-size: 14px; }
 }
 .checkbox-field > label { display: flex; align-items: center; gap: 6px; min-height: 38px; color: #5f6a64; font-size: 11.5px; }
 .checkbox-field input[type="checkbox"] { width: 16px; height: 16px; }
+
+/* Catalog */
+.catalog-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.catalog-stats > div { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.catalog-stats span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.catalog-stats strong { color: #21372d; font-size: 22px; font-weight: 600; }
+.catalog-stats small { color: #8a948f; font-size: 10px; }
+.catalog-toolbar { align-items: flex-end; }
+.catalog-filters { display: flex; gap: 8px; align-items: center; }
+.catalog-filters select { height: 36px; border: 1px solid #d6ddd9; border-radius: 5px; padding: 0 9px; background: white; max-width: 360px; }
+.catalog-table { display: flex; flex-direction: column; }
+.catalog-row { display: grid; grid-template-columns: minmax(220px, 1.4fr) 110px 100px 90px 135px minmax(220px, 1.8fr); gap: 12px; align-items: center; padding: 9px 20px; border-bottom: 1px solid #eef2ef; font-size: 10.5px; }
+.catalog-row:last-child { border-bottom: 0; }
+.catalog-head { background: #f7f9f8; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; position: sticky; top: 0; z-index: 1; }
+.catalog-dataset { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.catalog-dataset button { border: 0; background: none; padding: 0; color: #263d33; font-size: 11px; text-align: left; cursor: pointer; }
+.catalog-dataset button:hover { color: var(--accent); text-decoration: underline; }
+.catalog-dataset code { color: #7b8780; font-size: 9.5px; }
+.catalog-file { color: #6d7872; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-top: 1px solid #eef2ef; color: var(--muted); font-size: 10.5px; }
+.catalog-footer > div { display: flex; gap: 6px; }
+@media (max-width: 1100px) {
+  .catalog-stats { grid-template-columns: 1fr 1fr; }
+  .catalog-row { grid-template-columns: 1fr 1fr; }
+  .catalog-head { display: none; }
+  .catalog-file { grid-column: 1 / -1; }
+}

@@ -1,5 +1,6 @@
 import {
   Activity,
+  Archive,
   ArrowLeft,
   Ban,
   BookOpen,
@@ -37,13 +38,14 @@ import {
   TimeGranularity,
   UpdateFrequency,
 } from "./api";
+import CatalogPage from "./CatalogPage";
 import CollectionJobs from "./CollectionJobs";
 import ImportJobs from "./ImportJobs";
 import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "metadata" | "detail";
-type Area = "overview" | "datasets" | "collection";
+type Area = "overview" | "datasets" | "catalog" | "collection";
 type DatasetSection = "registry" | "presets";
 type CollectionSection = "jobs" | "capabilities" | "imports";
 type CollectionRequest = { datasetId: string; operation: CollectionPurpose };
@@ -183,6 +185,7 @@ function App() {
         <nav>
           <button title="概览" className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} /><span className="nav-label">概览</span></button>
           <button title="数据集" className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setDatasetSection("registry"); setView("list"); }}><Database size={17} /><span className="nav-label">数据集</span></button>
+          <button title="Catalog" className={area === "catalog" ? "nav-item active" : "nav-item"} onClick={() => setArea("catalog")}><Archive size={17} /><span className="nav-label">Catalog</span></button>
           <button title="采集" className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} /><span className="nav-label">采集</span></button>
         </nav>
         <div className="sidebar-bottom">
@@ -198,6 +201,7 @@ function App() {
 
       <main className="main-area">
         {area === "overview" && <OverviewPage datasets={datasets} collectors={collectors} onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} onOpenCollectionJob={(jobId) => { setCollectionJobRequest(jobId); setCollectionSection("jobs"); setArea("collection"); }} />}
+        {area === "catalog" && <CatalogPage datasets={datasets} onOpenDataset={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
         {area === "collection" && collectionSection === "jobs" && (
           <CollectionJobs
             datasets={datasets}
