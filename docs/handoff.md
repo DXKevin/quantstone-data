@@ -108,6 +108,7 @@
 - 新增 `scripts/quantstone-dev.sh`，统一管理前后端的启动、停止、重启、状态和日志；前端监听局域网 5173 端口；
 - 已启用数据集可以修改显示名称和说明；身份字段与数据契约继续锁定，等待版本化变更能力；
 - 当前 Linux Registry 已创建并启用 `tushare.cn.stock.trade_cal`，尚未执行首次采集；
+- 新增项目级“预置契约”目录，首批包含 TuShare `trade_cal`、`stock_basic` 和 `daily`，可在前端一键创建 Registry 草稿；
 
 尚未实现：
 
@@ -162,6 +163,27 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
+
+### 2026-11-19 — Codex（项目级预置契约）
+
+完成：
+
+- 新增代码版本管理的预置契约目录与 `GET /api/v1/dataset-presets`；
+- 首批固定 TuShare `trade_cal`、`stock_basic`、`daily` 的字段、主键、采集绑定和存储策略；
+- 前端侧栏新增“预置契约”区域，可查看契约摘要并一键创建 Registry 草稿；
+- 已存在的数据集显示当前状态，预置不会自动同步或覆盖 Registry；
+- 架构文档明确 Registry 仍是运行时权威来源，预置只作为显式创建模板。
+
+验证：
+
+- `pytest -q`：50 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- `npm run build`：通过。
+
+下一步：
+
+- 通过预置创建 `stock_basic` 或 `daily` 前，先按实际需要复核字段范围；
+- `daily` 启用和采集仍要求 `trade_cal` 已发布正式快照。
 
 ### 2026-11-19 — Codex（创建 TuShare 交易日历数据集）
 

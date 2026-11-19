@@ -83,6 +83,12 @@ export interface DatasetCreatePayload {
   }>;
 }
 
+export interface DatasetPreset {
+  key: string;
+  category: string;
+  contract: DatasetCreatePayload;
+}
+
 export type DatasetUpdatePayload = Pick<
   DatasetCreatePayload,
   | "display_name"
@@ -297,6 +303,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listDatasets: () => request<DatasetSummary[]>("/api/v1/datasets"),
+  listDatasetPresets: () => request<DatasetPreset[]>("/api/v1/dataset-presets"),
   listCollectors: () => request<CollectorDefinition[]>("/api/v1/collectors"),
   getDataset: (id: string) => request<DatasetDetail>(`/api/v1/datasets/${id}`),
   createDataset: (payload: DatasetCreatePayload) =>

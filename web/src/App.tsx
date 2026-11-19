@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowLeft,
   Ban,
+  BookOpen,
   Check,
   ChevronRight,
   CircleHelp,
@@ -24,6 +25,7 @@ import {
   CollectionPurpose,
   DatasetCreatePayload,
   DatasetDetail,
+  DatasetPreset,
   DatasetSummary,
   MaintenanceJob,
 } from "./api";
@@ -32,7 +34,7 @@ import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
 type View = "list" | "create" | "edit" | "metadata" | "detail";
-type Area = "overview" | "datasets" | "collectors" | "collection";
+type Area = "overview" | "datasets" | "presets" | "collectors" | "collection";
 
 interface FieldDraft {
   key: number;
@@ -76,6 +78,7 @@ function App() {
   const [area, setArea] = useState<Area>("overview");
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
+  const [presets, setPresets] = useState<DatasetPreset[]>([]);
   const [collectors, setCollectors] = useState<CollectorDefinition[]>([]);
   const [selected, setSelected] = useState<DatasetDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,12 +89,14 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const [datasetItems, collectorItems] = await Promise.all([
+      const [datasetItems, collectorItems, presetItems] = await Promise.all([
         api.listDatasets(),
         api.listCollectors(),
+        api.listDatasetPresets(),
       ]);
       setDatasets(datasetItems);
       setCollectors(collectorItems);
+      setPresets(presetItems);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载数据集");
     } finally {
@@ -137,6 +142,7 @@ function App() {
         <nav>
           <button className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} />概览</button>
           <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setView("list"); }}><Database size={17} />数据集</button>
+          <button className={area === "presets" ? "nav-item active" : "nav-item"} onClick={() => setArea("presets")}><BookOpen size={17} />预置契约</button>
           <button className={area === "collectors" ? "nav-item active" : "nav-item"} onClick={() => setArea("collectors")}><Cable size={17} />采集器</button>
           <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集任务</button>
         </nav>
@@ -151,6 +157,19 @@ function App() {
         {area === "overview" && <OverviewPage onOpen={(id) => { setArea("datasets"); void openDataset(id); }} />}
         {area === "collection" && <CollectionJobs datasets={datasets} collectors={collectors} />}
         {area === "collectors" && <CollectorCatalog collectors={collectors} />}
+        {area === "presets" && (
+          <DatasetPresetCatalog
+            presets={presets}
+            datasets={datasets}
+            loading={loading}
+            error={error}
+            onCreated={(dataset) => {
+              void handleSaved(dataset);
+              setArea("datasets");
+            }}
+            onRetry={() => void loadDatasets()}
+          />
+        )}
         {area === "datasets" && view === "list" && (
           <DatasetList
             datasets={filtered}
@@ -191,6 +210,77 @@ function App() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+function DatasetPresetCatalog(props: {
+  presets: DatasetPreset[];
+  datasets: DatasetSummary[];
+  loading: boolean;
+  error: string | null;
+  onCreated: (dataset: DatasetDetail) => void;
+  onRetry: () => void;
+}) {
+  const [creating, setCreating] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const existing = new Map(props.datasets.map((item) => [item.id, item]));
+
+  async function createFromPreset(preset: DatasetPreset) {
+    setCreating(preset.key);
+    setCreateError(null);
+    try {
+      props.onCreated(await api.createDataset(preset.contract));
+    } catch (reason) {
+      setCreateError(reason instanceof Error ? reason.message : "无法从预置契约创建数据集");
+    } finally {
+      setCreating(null);
+    }
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div><p className="eyebrow">VERSIONED CONTRACT PRESETS</p><h1>预置契约</h1><p className="subtitle">项目随代码维护的常用数据集契约。选择契约可快速创建 Registry 草稿。</p></div>
+      </header>
+      <section className="summary-strip">
+        <div><span>预置契约</span><strong>{props.presets.length}</strong></div>
+        <div><span>已创建</span><strong>{props.presets.filter((item) => existing.has(item.contract.id)).length}</strong></div>
+        <div><span>维护方式</span><strong className="summary-text">代码版本管理</strong></div>
+        <div><span>创建结果</span><strong className="summary-text">Registry 草稿</strong></div>
+      </section>
+      {props.error && <div className="error-banner"><span>{props.error}</span><button onClick={props.onRetry}>重试</button></div>}
+      {createError && <div className="error-banner"><span>{createError}</span></div>}
+      {props.loading && <div className="empty-state">正在加载预置契约…</div>}
+      {!props.loading && props.presets.map((preset) => {
+        const contract = preset.contract;
+        const current = existing.get(contract.id);
+        return (
+          <section className="panel preset-card" key={preset.key}>
+            <div className="preset-header">
+              <div><span className="preset-category">{preset.category}</span><h2>{contract.display_name}</h2><code>{contract.id}</code></div>
+              {current ? (
+                <span className={`status status-${current.status}`}>已创建 · {statusLabels[current.status]}</span>
+              ) : (
+                <button className="primary-button" disabled={creating === preset.key} onClick={() => void createFromPreset(preset)}>
+                  <Plus size={16} />{creating === preset.key ? "正在创建…" : "创建草稿"}
+                </button>
+              )}
+            </div>
+            <p className="preset-description">{contract.description}</p>
+            <div className="preset-facts">
+              <div><span>字段</span><strong>{contract.fields.length}</strong></div>
+              <div><span>主键</span><code>{contract.primary_key.join(" + ")}</code></div>
+              <div><span>时间字段</span><code>{contract.time_field ?? "—"}</code></div>
+              <div><span>存储布局</span><code>{contract.storage_policy?.layout ?? "—"}</code></div>
+            </div>
+            <div className="preset-contract-grid">
+              <div><strong>字段契约</strong><p>{contract.fields.map((item) => `${item.name}: ${item.data_type}${item.nullable ? "?" : ""}`).join(" · ")}</p></div>
+              <div><strong>采集绑定</strong><p>{contract.collection_bindings.map((item) => `${purposeLabels[item.purpose]}: ${item.operation}`).join(" · ") || "未绑定"}</p></div>
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
