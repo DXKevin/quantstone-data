@@ -191,7 +191,8 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
   `HHMMSSmmm` 的 `int32`；价格使用 0.0001 元的 `int64`；
 - 按原始 PDF 修正：`委托编号`（频道代码）和 trade 的 `委托代码` 都是 `char(1)`，统一
   使用 `string`；合并 Parquet 中的 `0.0` 浮点是类型推断漂移，不代表原始类型；
-- `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + channel_code + exchange_order_no`；
+- `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + exchange_order_no`；
+  `channel_code` 只保留为普通字段，不进入主键；
 - `l2_trade` 保留源文件 12 个字段，主键 `trade_date + symbol + trade_no`；`BS标志`
   可为空；`成交代码=C` 表示撤单，`0` 或空表示成交，原样保留；
 - 两个数据集均为日分区、日更、逐笔颗粒，交易日历绑定 `tushare.cn.stock.trade_cal`；

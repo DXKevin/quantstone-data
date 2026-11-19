@@ -179,8 +179,9 @@ wind.cn.stock.l2_trade.sz
 `exchange_code` 都按字符串保存；`channel_code`（源字段“委托编号”）和 trade 的
 `order_code`（源字段“委托代码”）原始规范都是 `char(1)`，必须按字符串保存。`event_time`
 为 `HHMMSSmmm` 整数；价格保存为放大 10,000 倍的整数。`l2_order` 主键为
-`trade_date + symbol + channel_code + exchange_order_no`，`l2_trade` 主键为
-`trade_date + symbol + trade_no`，两者都按交易日做日分区发布。深市两个数据集每日约
+`trade_date + symbol + exchange_order_no`，`l2_trade` 主键为
+`trade_date + symbol + trade_no`，两者都按交易日做日分区发布。`channel_code` 只作为
+普通字段保留，不进入主键；按实际数据约定，交易所委托号在同一证券同一交易日内唯一。深市两个数据集每日约
 1.24 GB / 1.70 GB，分别约 1.16 亿 / 1.04 亿行。沪市字段值域不同且当前样本只有 order
 文件，需单独建立契约。
 

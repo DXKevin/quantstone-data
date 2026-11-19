@@ -35,7 +35,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
     assert l2_order["time_granularity"] == "tick"
-    assert l2_order["primary_key"] == ["trade_date", "symbol", "channel_code", "exchange_order_no"]
+    assert l2_order["primary_key"] == ["trade_date", "symbol", "exchange_order_no"]
     assert l2_order["fields"][0]["name"] == "symbol"
     assert l2_order["fields"][0]["data_type"] == "string"
     assert l2_order["fields"][1]["name"] == "exchange_code"

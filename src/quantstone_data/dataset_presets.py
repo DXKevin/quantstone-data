@@ -212,12 +212,7 @@ DATASET_PRESETS = (
                 "write_strategy": "replace_partition",
                 "compaction": None,
             },
-            primary_key=[
-                "trade_date",
-                "symbol",
-                "channel_code",
-                "exchange_order_no",
-            ],
+            primary_key=["trade_date", "symbol", "exchange_order_no"],
             time_field="event_time",
             fields=[
                 field(
