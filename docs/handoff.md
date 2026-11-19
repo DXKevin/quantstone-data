@@ -17,7 +17,7 @@
 ## 当前状态
 
 更新时间：2026-11-19
-当前工作 Agent：无，等待下一位 Agent 接手  
+当前工作 Agent：无，等待下一位 Agent 接手
 工作分支：`main`  
 远程仓库：`git@github.com:DXKevin/quantstone-data.git`
 
@@ -103,6 +103,8 @@
 - 排队任务支持直接取消，后台开始处理后进入 `running` 并沿用协作式取消；
 - 新增独立的 `MaintenanceJob` 模型，年度合并改为 `202 + queued` 后台维护任务；
 - 采集和年度合并共用单工作线程，避免同时修改 Catalog 和物理文件；数据集详情新增年度合并入口、任务状态轮询和排队取消；
+- Linux 开发环境已完成初始化：代码位于 `/home/quantadmin/project/quantstone-data`，数据根目录为 `/home/hhd_data`；
+- 使用 Python 3.12 建立 `.venv`，前后端依赖已安装，并从空 Catalog 初始化 `var/quantstone-data.db`；
 
 尚未实现：
 
@@ -118,13 +120,13 @@
 
 ## 建议下一步
 
-先完成 **Linux 内网远程开发环境接管**，再确认服务器目录导入设计；暂不开发 SDK，也暂不
+Linux 内网远程开发环境已经接管完成。下一步确认服务器目录导入设计；暂不开发 SDK，也暂不
 继续扩展浏览器上传。
 
 建议第一步包含：
 
-1. 按 `docs/linux-remote-development.md` 在 Linux 克隆项目、重建依赖并运行全量验证；
-2. 决定迁移现有 SQLite Catalog 和数据根目录，还是从空 Catalog 开始；
+1. 配置 TuShare Token，并决定是否配置 systemd 常驻服务；
+2. 确认是否仍需迁移 Windows 历史 Catalog 和 TuShare 数据；当前 Linux 已从空 Catalog 开始；
 3. 确认 L2 专用目录扫描器的源路径规则、清单模型、重复判定和发布方式。
 
 不得把现有 TuShare Token、百度网盘账号或真实金融数据提交到 Git；本地 `.env` 只供运行使用。
@@ -136,7 +138,7 @@
 - FastAPI 测试会出现 Starlette 关于 `httpx` 的弃用警告，不影响现有测试结果；
 - 真实数据必须存放在仓库之外；
 - 当前前后端需要分别启动；
-- 项目准备迁移到 Linux 内网服务器，但尚未执行；服务器地址、目录和 Git 认证方式待确认；
+- 项目已在 Linux 初始化；服务器内网 IP、最终访问方式和 Git 推送认证仍待确认；
 - 默认 SQLite 仍位于工作目录的 `var/quantstone-data.db`，而数据文件位于
   `QUANTSTONE_DATA_ROOT`，迁移时必须成套处理；
 - 手动上传目前没有文件大小上限，应在真实大文件使用前增加可配置限制；
@@ -157,6 +159,38 @@
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
+
+### 2026-11-19 — Codex（Linux 环境初始化）
+
+完成：
+
+- 确认当前 Linux 工作区为 `/home/quantadmin/project/quantstone-data`，分支与 `origin/main` 一致；
+- 使用系统 Python 3.12 创建 `.venv`，安装项目开发依赖；
+- 安装前端 npm 依赖并生成生产构建；
+- 将本地 `.env` 的 `QUANTSTONE_DATA_ROOT` 配置为 `/home/hhd_data`；
+- 创建正式数据、staging、quarantine、revisions 和日志目录；
+- 从空 Catalog 初始化 `var/quantstone-data.db`，实际启动后端并确认数据根目录配置生效；
+- 更新 Linux 接管文档和 README 中的 Linux 启动命令。
+
+验证：
+
+- `pytest -q`：48 项通过，1 条 Starlette/httpx 弃用警告；
+- `ruff check .`：通过；
+- 前端 `npm run build`：通过；
+- 后端使用 `--env-file .env` 启动成功，`GET /health` 返回 `{"status":"ok"}`；
+- `/home/hhd_data/logs/application.log` 记录的 `data_root` 为 `/home/hhd_data`；验证后后端已关闭。
+
+下一步：
+
+- 配置 TuShare Token，并决定是否使用 systemd 常驻运行；
+- 确认 L2 import 根目录、源文件组织方式和目录扫描器设计；
+- 确认是否仍需迁移 Windows 历史 Catalog 与数据。
+
+遗留问题：
+
+- 当前 Catalog 为空，未迁移旧环境的 Registry、任务和 TuShare 数据；
+- 服务器内网 IP 与最终访问方式尚未写入项目配置；
+- 受限执行沙箱会阻塞 AnyIO 的跨线程测试门户，全量测试需在主机环境运行，项目本身验证通过。
 
 ### 2026-11-19 — Codex
 

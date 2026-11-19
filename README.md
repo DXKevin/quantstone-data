@@ -40,7 +40,16 @@ Linux 内网远程开发的迁移步骤和当前限制见
 
 ## 本地开发
 
-启动后端：
+Linux 启动后端：
+
+```bash
+python3.12 -m venv .venv
+TEMP="$PWD/var/tmp" TMP="$PWD/var/tmp" .venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/uvicorn quantstone_data.main:app --env-file .env --host 0.0.0.0 --port 8000
+```
+
+仓库根目录的 `.env` 至少配置 `QUANTSTONE_DATA_ROOT`；使用 `.env` 时启动命令必须包含
+`--env-file .env`。Windows PowerShell 启动方式：
 
 ```powershell
 python -m venv .venv

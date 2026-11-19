@@ -5,8 +5,9 @@
 项目将从 Windows 本地目录迁移到 Linux 内网服务器继续开发。代码通过 GitHub 仓库迁移，
 真实金融数据、SQLite Catalog、密钥和运行日志不进入 Git。
 
-本轮只完成交接说明，尚未执行 Linux 克隆、数据复制或服务部署。服务器地址、账号、目标
-代码目录和正式数据根目录仍待用户确定。
+Linux 开发环境已于 2026-11-19 完成初始化。当前代码目录为
+`/home/quantadmin/project/quantstone-data`，正式数据根目录为 `/home/hhd_data`。本轮从空
+Catalog 开始，尚未迁移 Windows 上的 SQLite Catalog 或真实数据，也尚未配置常驻服务。
 
 ## 推荐目录
 
@@ -41,7 +42,7 @@ Linux 应重新安装 Python 3.11+、Node.js 和项目依赖。
 密钥由 Linux 进程环境变量或仓库根目录下未提交的 `.env` 提供：
 
 ```bash
-export QUANTSTONE_DATA_ROOT=/data/quantstone-data
+export QUANTSTONE_DATA_ROOT=/home/hhd_data
 export TUSHARE_TOKEN='...'
 ```
 
@@ -49,7 +50,7 @@ export TUSHARE_TOKEN='...'
 
 ```bash
 cd /opt/quantstone-data
-.venv/bin/uvicorn quantstone_data.main:app --host 0.0.0.0 --port 8000
+.venv/bin/uvicorn quantstone_data.main:app --env-file .env --host 0.0.0.0 --port 8000
 
 cd /opt/quantstone-data/web
 npm run dev -- --host 0.0.0.0
@@ -94,21 +95,30 @@ npm run dev -- --host 0.0.0.0
 目录扫描器尚未实现。它可能需要针对现有 L2 来源定制，识别沪深市场、逐笔委托/逐笔成交、
 交易日期、压缩包和文件命名。扫描器不是 Catalog，也不能用磁盘扫描结果替代正式覆盖记录。
 
-## Linux 接管顺序
+## Linux 接管状态
 
-1. 在 Linux 克隆 `origin/main`，确认 Git 状态干净；
-2. 重新创建 Python 和前端依赖；
-3. 配置外部数据根目录和密钥；
-4. 运行 `pytest -q`、`ruff check src tests` 和 `npm run build`；
-5. 单进程启动后端和前端，使用内网浏览器验证；
-6. 决定是迁移现有 SQLite + 数据根目录，还是从空 Catalog 开始；
-7. 与用户确认服务器目录导入模型后，再开发 L2 专用扫描器。
+已完成：
+
+1. 在 Linux 使用 `main` 工作区接管项目；
+2. 使用 Python 3.12 创建 `.venv` 并安装开发依赖；
+3. 安装前端依赖并通过生产构建；
+4. 在本地 `.env` 配置 `QUANTSTONE_DATA_ROOT=/home/hhd_data`；
+5. 创建数据根目录的 `datasets`、`staging`、`quarantine`、`revisions` 和 `logs` 子目录；
+6. 从空 Catalog 初始化 `var/quantstone-data.db`；
+7. 完成全量测试并验证后端健康接口和日志写入。
+
+待完成：
+
+1. 配置 `TUSHARE_TOKEN`；
+2. 决定是否配置 systemd 常驻服务；
+3. 确认服务器目录导入模型后开发 L2 专用扫描器；
+4. 如仍需保留 Windows 历史状态，另行制定数据迁移与 Catalog 合并方案，不直接覆盖当前 Catalog。
 
 ## 交接给后续 Agent 的待确认项
 
-- Linux 服务器内网 IP、SSH 用户和 Git 认证方式；
-- Git 工作目录、正式数据根目录和 L2 import 目录；
-- 是否迁移 Windows 当前 Catalog 与 TuShare 数据；
+- Linux 服务器内网 IP 和最终对外访问方式；
+- L2 import 目录；
+- 是否仍需迁移 Windows 当前 Catalog 与 TuShare 数据；
 - 服务先采用开发命令还是配置 systemd；
 - L2 源文件当前格式、目录结构以及迁移后是否允许移动；
 - 扫描器的重复文件判定、失败恢复和多数据集联合导入规则。
