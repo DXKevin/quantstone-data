@@ -479,8 +479,13 @@ TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布�
 `catalog_partitions` 通过 `file_id` 指向文件，因此一个文件可以承载多个分区。统计行数、
 体积和缺失文件时按文件去重，不会因为多个分区共用一个文件而重复累加。
 
-年度合并由 `POST /api/v1/datasets/{dataset_id}/compact?year=YYYY` 触发：读取该年所有
-delta 文件，写成一份年度 Parquet，登记新文件并把整年分区指向它，旧文件移动到
+年度合并由 `POST /api/v1/datasets/{dataset_id}/compact?year=YYYY` 提交为持久化
+`MaintenanceJob`，接口立即返回 `202 + queued`。维护任务与采集任务共用同一个单工作线程
+后台队列，避免采集和合并同时修改 Catalog 或物理文件。数据集详情负责展示最近维护任务，
+前端轮询 `GET /api/v1/maintenance-jobs?dataset_id=...`；排队任务可以取消，合并一旦开始则不
+允许中断，以免在文件替换临界区留下不确定状态。
+
+后台任务读取该年所有 delta 文件，写成一份年度 Parquet，登记新文件并把整年分区指向它，旧文件移动到
 `revisions/<dataset_id>/<year>/` 保留而不删除。合并的目的是减少小文件数量和读取时的
 文件打开次数，不提供版本回滚或历史快照能力——需要回滚时从 revisions 目录人工恢复。
 

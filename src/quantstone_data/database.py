@@ -113,7 +113,7 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             text(
                 "UPDATE datasets SET storage_policy = json(:storage_policy) "
                 "WHERE id = 'tushare.cn.stock.stock_basic' "
-                "AND storage_policy IS NULL"
+                "AND (storage_policy IS NULL OR json_type(storage_policy) = 'null')"
             ),
             {
                 "storage_policy": json.dumps(

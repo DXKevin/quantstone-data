@@ -1,3 +1,4 @@
+import time
 from datetime import date
 from pathlib import Path
 
@@ -65,6 +66,17 @@ def create_dataset(client: TestClient) -> None:
         },
     )
     assert response.status_code == 201, response.text
+    assert client.post(f"/api/v1/datasets/{DATASET_ID}/activate").status_code == 200
+
+
+def wait_maintenance_job(client: TestClient, job_id: str, timeout: float = 5):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/v1/maintenance-jobs/{job_id}")
+        if response.json()["status"] in {"succeeded", "failed", "cancelled"}:
+            return response
+        time.sleep(0.01)
+    raise AssertionError(f"maintenance job {job_id} did not finish")
 
 
 def write_partition(client: TestClient, partition_key: str, symbols: list[str]) -> None:
@@ -133,7 +145,7 @@ def test_read_rows_opens_each_file_once(tmp_path: Path) -> None:
     assert set(body["columns"]) == {"trade_date", "symbol", "close"}
 
 
-def test_read_limit_does_not_open_unneeded_files(tmp_path: Path) -> None:
+def test_filtered_read_scans_matching_files_to_report_total(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)
         write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
@@ -145,8 +157,10 @@ def test_read_limit_does_not_open_unneeded_files(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 200
-    assert response.json()["files_read"] == 1
+    assert response.json()["files_read"] == 2
     assert response.json()["row_count"] == 1
+    assert response.json()["matched_count"] == 4
+    assert response.json()["truncated"] is True
 
 
 def test_unfiltered_read_is_always_a_twenty_row_preview(tmp_path: Path) -> None:
@@ -264,11 +278,13 @@ def test_compaction_merges_daily_files_into_one(tmp_path: Path) -> None:
         write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
         write_partition(client, "2024-01-03", ["000001.SZ", "600000.SH"])
 
-        compacted = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
-        assert compacted.status_code == 200, compacted.text
-        assert compacted.json()["status"] == "compacted"
-        assert compacted.json()["partitions"] == 2
-        assert compacted.json()["rows"] == 4
+        submitted = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        compacted = wait_maintenance_job(client, submitted.json()["id"])
+        assert submitted.status_code == 202, submitted.text
+        assert compacted.json()["status"] == "succeeded"
+        assert compacted.json()["result"]["status"] == "compacted"
+        assert compacted.json()["result"]["partitions"] == 2
+        assert compacted.json()["result"]["rows"] == 4
 
         rows = client.get(
             f"/api/v1/datasets/{DATASET_ID}/rows",
@@ -286,7 +302,8 @@ def test_compaction_moves_replaced_files_to_revisions(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)
         write_partition(client, "2024-01-02", ["000001.SZ"])
-        client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        submitted = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        wait_maintenance_job(client, submitted.json()["id"])
         data_root = Path(client.app.state.data_root)
         revisions = data_root / "revisions" / DATASET_ID / "2024"
 
@@ -298,20 +315,23 @@ def test_recompaction_preserves_annual_rows_and_replaces_repaired_day(tmp_path: 
         create_dataset(client)
         write_partition(client, "2024-01-02", ["ORIGINAL-02"])
         write_partition(client, "2024-01-03", ["ORIGINAL-03"])
-        first = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
-        assert first.status_code == 200
+        first_submitted = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        first = wait_maintenance_job(client, first_submitted.json()["id"])
+        assert first.json()["status"] == "succeeded"
 
         write_partition(client, "2024-01-03", ["REPAIRED-03"])
-        second = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        second_submitted = client.post(f"/api/v1/datasets/{DATASET_ID}/compact?year=2024")
+        second = wait_maintenance_job(client, second_submitted.json()["id"])
         rows = client.get(
             f"/api/v1/datasets/{DATASET_ID}/rows",
             params={"start": "2024-01-01", "end": "2024-01-31", "limit": 10},
         )
 
     assert second.status_code == 200, second.text
-    assert second.json()["status"] == "compacted"
-    assert second.json()["source_files"] == 2
-    assert second.json()["rows"] == 2
+    assert second.json()["status"] == "succeeded"
+    assert second.json()["result"]["status"] == "compacted"
+    assert second.json()["result"]["source_files"] == 2
+    assert second.json()["result"]["rows"] == 2
     assert rows.status_code == 200
     symbols = {item["trade_date"]: item["symbol"] for item in rows.json()["rows"]}
     assert symbols == {

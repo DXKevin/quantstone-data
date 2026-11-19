@@ -18,6 +18,8 @@ from .database import (
     upgrade_sqlite_schema,
 )
 from .logging_config import configure_logging, log_event
+from .maintenance import recover_interrupted_maintenance_jobs
+from .maintenance import router as maintenance_router
 from .overview import router as overview_router
 from .registry import router as registry_router
 from .storage_api import router as storage_router
@@ -36,10 +38,16 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         upgrade_sqlite_schema(engine)
         with session_factory() as session:
             recovered_jobs = recover_interrupted_jobs(session)
-        if recovered_jobs:
-            log_event("interrupted_jobs_recovered", count=recovered_jobs, level=30)
+            recovered_maintenance = recover_interrupted_maintenance_jobs(session)
+        if recovered_jobs or recovered_maintenance:
+            log_event(
+                "interrupted_jobs_recovered",
+                collection_jobs=recovered_jobs,
+                maintenance_jobs=recovered_maintenance,
+                level=30,
+            )
         executor = BackgroundJobExecutor()
-        app.state.collection_executor = executor
+        app.state.background_executor = executor
         log_event("application_started", data_root=resolved_data_root)
         try:
             yield
@@ -56,6 +64,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
     app.include_router(collectors_router, prefix="/api/v1")
     app.include_router(overview_router, prefix="/api/v1")
     app.include_router(storage_router, prefix="/api/v1")
+    app.include_router(maintenance_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def log_http_request(request: Request, call_next):

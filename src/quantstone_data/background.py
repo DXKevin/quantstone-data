@@ -6,10 +6,10 @@ from concurrent.futures import Future, ThreadPoolExecutor
 
 
 class BackgroundJobExecutor:
-    """单进程采集任务队列；同一时刻只执行一个任务。"""
+    """单进程后台任务队列；同一时刻只执行一个任务。"""
 
     def __init__(self) -> None:
-        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="collection-job")
+        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="background-job")
         self._futures: dict[str, Future[None]] = {}
         self._lock = threading.Lock()
 

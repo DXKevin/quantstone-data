@@ -190,6 +190,20 @@ export interface CollectionLogs {
   entries: CollectionLogEntry[];
 }
 
+export type MaintenanceJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface MaintenanceJob {
+  id: string;
+  dataset_id: string;
+  operation: string;
+  parameters: Record<string, unknown>;
+  status: MaintenanceJobStatus;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CoverageDetail {
   row_count: number | null;
   file_path: string | null;
@@ -316,6 +330,14 @@ export const api = {
     request<CollectionLogs>(`/api/v1/collection-jobs/${jobId}/logs?limit=${limit}`),
   getCollectionReview: (jobId: string) =>
     request<CollectionReview>(`/api/v1/collection-jobs/${jobId}/review`),
+  listMaintenanceJobs: (datasetId?: string) => {
+    const query = datasetId ? `?dataset_id=${encodeURIComponent(datasetId)}` : "";
+    return request<MaintenanceJob[]>(`/api/v1/maintenance-jobs${query}`);
+  },
+  createCompactionJob: (datasetId: string, year: number) =>
+    request<MaintenanceJob>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact?year=${year}`, { method: "POST" }),
+  cancelMaintenanceJob: (jobId: string) =>
+    request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   getCoverage: (days: number) =>
     request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),

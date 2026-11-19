@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowLeft,
+  Ban,
   Check,
   ChevronRight,
   CircleHelp,
@@ -10,6 +11,7 @@ import {
   Layers3,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Trash2,
@@ -23,6 +25,7 @@ import {
   DatasetCreatePayload,
   DatasetDetail,
   DatasetSummary,
+  MaintenanceJob,
 } from "./api";
 import CollectionJobs from "./CollectionJobs";
 import DatasetPreview from "./DatasetPreview";
@@ -541,6 +544,8 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
 
       <DatasetPreview dataset={dataset} />
 
+      {dataset.storage_policy?.compaction === "yearly" && <DatasetMaintenance dataset={dataset} />}
+
       <section className="panel fields-detail">
         <div className="card-title"><div><h2>字段</h2><p>当前生效的 Schema v{dataset.schema.version}</p></div><span>{dataset.schema.fields.length} 个字段</span></div>
         <div className="schema-table">
@@ -552,6 +557,117 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
       </section>
     </div>
   );
+}
+
+const maintenanceStatusLabels: Record<MaintenanceJob["status"], string> = {
+  queued: "排队中",
+  running: "合并中",
+  succeeded: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
+  const [jobs, setJobs] = useState<MaintenanceJob[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear() - 1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const loadJobs = useCallback(async (silent = false) => {
+    if (!silent) setError(null);
+    try {
+      setJobs(await api.listMaintenanceJobs(dataset.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法读取维护任务");
+    }
+  }, [dataset.id]);
+
+  useEffect(() => {
+    void loadJobs();
+  }, [loadJobs]);
+
+  const active = jobs.some((job) => job.status === "queued" || job.status === "running");
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => void loadJobs(true), 2000);
+    return () => window.clearInterval(timer);
+  }, [active, loadJobs]);
+
+  async function submit() {
+    setSubmitting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const job = await api.createCompactionJob(dataset.id, year);
+      setJobs((current) => [job, ...current]);
+      setNotice(`${year} 年数据已提交后台合并。`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "提交合并任务失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function cancel(job: MaintenanceJob) {
+    setError(null);
+    try {
+      const cancelled = await api.cancelMaintenanceJob(job.id);
+      setJobs((current) => current.map((item) => item.id === job.id ? cancelled : item));
+      setNotice(`${String(job.parameters.year)} 年合并任务已取消。`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "取消维护任务失败");
+    }
+  }
+
+  return (
+    <section className="panel maintenance-panel">
+      <div className="card-title">
+        <div><h2>年度数据合并</h2><p>将该年度的日增量 Parquet 合并为一个年度文件；采集与合并共用同一后台队列。</p></div>
+        {active && <span><RefreshCw size={12} className="spin" />后台任务运行中</span>}
+      </div>
+      <div className="maintenance-controls">
+        <label><span>合并年份</span><input type="number" min="1990" max="2100" value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
+        <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting || dataset.status !== "active"}><RefreshCw size={15} className={submitting ? "spin" : ""} />{submitting ? "提交中…" : "开始后台合并"}</button>
+        {dataset.status !== "active" && <small>数据集启用后才能执行合并。</small>}
+      </div>
+      {notice && <div className="maintenance-notice">{notice}</div>}
+      {error && <div className="maintenance-error"><X size={14} />{error}</div>}
+      <div className="maintenance-list">
+        <div className="maintenance-row maintenance-head"><span>年份</span><span>状态</span><span>结果</span><span>更新时间</span><span>操作</span></div>
+        {jobs.slice(0, 8).map((job) => (
+          <div className="maintenance-row" key={job.id}>
+            <strong>{String(job.parameters.year)}</strong>
+            <span className={`maintenance-status maintenance-status-${job.status}`}>{maintenanceStatusLabels[job.status]}</span>
+            <span className={job.error ? "maintenance-job-error" : ""}>{job.error ?? describeMaintenanceResult(job.result)}</span>
+            <span>{formatMaintenanceTime(job.updated_at)}</span>
+            <span>{job.status === "queued" ? <button type="button" className="toolbar-button" onClick={() => void cancel(job)}><Ban size={13} />取消排队</button> : "—"}</span>
+          </div>
+        ))}
+        {!jobs.length && <p className="maintenance-empty">还没有年度合并记录。</p>}
+      </div>
+    </section>
+  );
+}
+
+function describeMaintenanceResult(result: Record<string, unknown> | null) {
+  if (!result) return "—";
+  if (result.status === "empty") return "该年份没有可合并分区";
+  if (result.status === "already_compacted") return "已经是年度文件";
+  const partitions = Number(result.partitions ?? 0).toLocaleString();
+  const rows = Number(result.rows ?? 0).toLocaleString();
+  return `${partitions} 个分区 · ${rows} 行`;
+}
+
+function formatMaintenanceTime(value: string) {
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`;
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(normalized));
 }
 
 function StatusBadge({ status }: { status: DatasetSummary["status"] }) {

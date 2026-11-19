@@ -8,11 +8,9 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .database import get_session
-from .logging_config import log_event
 from .models import Dataset
 from .storage import (
     MissingCatalogFilesError,
-    compact_year,
     export_dataset_rows,
     read_dataset_rows,
 )
@@ -131,31 +129,3 @@ def download_rows(
         headers={"X-Row-Count": str(result["row_count"])},
         background=background_tasks,
     )
-
-
-@router.post("/{dataset_id}/compact")
-def compact_dataset(
-    dataset_id: str,
-    request: Request,
-    session: SessionDep,
-    year: int,
-) -> dict:
-    try:
-        result = compact_year(
-            session,
-            request.app.state.data_root,
-            dataset_id,
-            year,
-        )
-    except KeyError as error:
-        raise HTTPException(status_code=404, detail="dataset not found") from error
-    log_event(
-        "dataset_compacted",
-        dataset_id=dataset_id,
-        year=year,
-        status=result["status"],
-        partitions=result.get("partitions", 0),
-        rows=result.get("rows"),
-        path=result.get("path"),
-    )
-    return result

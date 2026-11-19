@@ -90,6 +90,10 @@ GET    /api/v1/collection-jobs/{job_id}/progress
 POST   /api/v1/collection-jobs/{job_id}/execute
 POST   /api/v1/collection-jobs/{job_id}/cancel
 POST   /api/v1/collection-jobs/{job_id}/file
+GET    /api/v1/maintenance-jobs?dataset_id=...
+GET    /api/v1/maintenance-jobs/{job_id}
+POST   /api/v1/maintenance-jobs/{job_id}/cancel
+POST   /api/v1/datasets/{dataset_id}/compact?year=YYYY
 GET    /health
 ```
 
@@ -98,6 +102,8 @@ GET    /health
 项目从本地 `.env` 或进程环境变量读取 `TUSHARE_TOKEN`，密钥文件不会提交到 Git。
 采集任务的执行接口立即返回 `202 + queued`，后台单工作线程依次完成采集、审核和发布；
 前端通过任务状态、进度和日志接口持续更新，不需要保持原始执行请求。
+年度合并使用独立的维护任务记录，但与采集任务共用同一个后台工作线程，避免二者并发修改
+Catalog 和 Parquet 文件。
 
 `tushare.cn.stock.daily` 已走通第一个 Parquet 纵向闭环：按交易日建立 Run、写入
 staging Parquet、执行主键和分区审核、发布为日增量文件，并在 Catalog 登记逻辑分区。

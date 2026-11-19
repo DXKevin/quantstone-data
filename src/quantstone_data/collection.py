@@ -937,7 +937,7 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
         job.error = None
         session.commit()
         try:
-            request.app.state.collection_executor.submit(
+            request.app.state.background_executor.submit(
                 job.id,
                 partial(
                     _execute_collection_job_background,
@@ -1060,7 +1060,7 @@ def cancel_collection_job(job_id: str, request: Request, session: SessionDep) ->
             raise HTTPException(status_code=409, detail="任务正在发布，已无法安全取消")
 
         if job.id in _QUEUED_JOBS:
-            if request.app.state.collection_executor.cancel(job.id):
+            if request.app.state.background_executor.cancel(job.id):
                 _QUEUED_JOBS.discard(job.id)
                 job.status = CollectionJobStatus.CANCELLED.value
                 log_event(
