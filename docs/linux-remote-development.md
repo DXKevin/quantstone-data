@@ -50,16 +50,13 @@ export TUSHARE_TOKEN='...'
 开发阶段启动：
 
 ```bash
-cd /opt/quantstone-data
-.venv/bin/uvicorn quantstone_data.main:app --env-file .env --host 0.0.0.0 --port 8000
-
-cd /opt/quantstone-data/web
-npm run dev -- --host 0.0.0.0
+cd /home/quantadmin/project/quantstone-data
+./scripts/quantstone-dev.sh start
 ```
 
 同一内网的浏览器可访问 `http://<服务器内网IP>:5173`。Vite 已将 `/api` 和 `/health`
 代理到服务器本机 `127.0.0.1:8000`，浏览器不需要直接请求 8000 端口。防火墙只应向可信
-内网开放所需端口。
+内网开放 5173 端口。脚本还支持 `stop`、`restart`、`status` 和 `logs`。
 
 当前后台任务队列、取消集合和限流器都在进程内，因此后端只能运行一个 Uvicorn worker，
 不能使用 `--workers` 启动多进程。服务重启会把未完成任务标记失败，不能自动续跑。

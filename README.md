@@ -73,6 +73,18 @@ npm run dev
 
 管理界面默认位于 `http://127.0.0.1:5173`。
 
+Linux 可以使用管理脚本同时启动前后端，并允许同一局域网中的浏览器访问：
+
+```bash
+./scripts/quantstone-dev.sh start
+./scripts/quantstone-dev.sh status
+./scripts/quantstone-dev.sh logs
+./scripts/quantstone-dev.sh stop
+```
+
+脚本将前端和后端绑定到 `0.0.0.0`，前端默认使用 5173 端口。其他电脑访问
+`http://<服务器内网IP>:5173`；浏览器的 `/api` 请求由 Vite 转发到服务器本机 8000 端口。
+
 当前管理界面支持数据集管理、采集任务创建、任务记录查看，以及手动文件上传到 staging。
 
 运行测试：
