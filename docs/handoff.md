@@ -97,6 +97,7 @@
 - `tushare.cn.stock.stock_basic` 已升级到统一 CollectionResult 协议并接入 snapshot 正式发布；
 - `tushare.cn.stock.stock_basic` 首次和增量采集均合并 `L`、`D`、`P` 三种股票状态；
 - `tushare.cn.stock.stock_basic` 预置契约包含供应商接口的全部 17 个字段；
+- stock_basic 只对代理返回的浮点 `symbol` 用 `ts_code` 前缀恢复，代理返回的空值保持为空；
 - 旧股票信息数据集启动时自动补齐 snapshot 存储策略，审核通过后登记 Catalog 并可直接预览；
 - 采集任务详情新增“运行日志”页签，可查看采集、审核、发布、限流和重试事件，并在执行期间自动刷新；
 - 新增任务日志读取 API，默认返回最近 500 条；执行框架日志已携带 job_id，可正确进入任务日志文件；
@@ -172,6 +173,22 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
+
+### 2026-11-19 — DeepSeek Harness（stock_basic 空值保持为空）
+
+完成：
+
+- 代理返回空 `symbol` 时不再用 `ts_code` 前缀补值；只有浮点数等非空非字符串值才恢复；
+- 集成测试改为断言暂停上市样例的 `symbol` 为 null；
+- 同步更新架构文档中的代理兼容说明。
+
+验证：
+
+- `pytest -q`：61 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过。
+
+注意：Linux 当前已发布的 stock_basic 快照仍含旧逻辑补出的 `T600018`；如需按新规则落库，
+应重新执行一次增量快照采集。
 
 ### 2026-11-19 — Codex（代理类型问题与 TuShare SDK 分析，仅交接）
 

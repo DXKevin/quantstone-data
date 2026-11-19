@@ -447,7 +447,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert preview.json()["matched_count"] == 1
     assert preview.json()["rows"][0]["name"] == "平安银行"
     assert delisted_preview.json()["rows"][0]["symbol"] == "000003"
-    assert paused_preview.json()["rows"][0]["symbol"] == "000004"
+    assert paused_preview.json()["rows"][0]["symbol"] is None
 
 
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:

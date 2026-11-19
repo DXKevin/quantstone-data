@@ -129,8 +129,9 @@ def _source_value(row: dict, field: dict) -> Any:
     source_name = field.get("source_name") or field["name"]
     value = row.get(source_name)
     # 部分兼容 TuShare 的代理会把退市股票 symbol 经 DataFrame 序列化成 float，
-    # 直接转换既会留下“.0”，也会丢失代码前导零。ts_code 中保留了原始代码。
-    if source_name == "symbol" and not isinstance(value, str):
+    # 直接转换既会留下“.0”，也会丢失代码前导零。ts_code 中保留了原始代码；
+    # 供应商原本返回的空值保持为空，不用 ts_code 补值。
+    if source_name == "symbol" and value is not None and not isinstance(value, str):
         ts_code = row.get("ts_code")
         if isinstance(ts_code, str) and "." in ts_code:
             return ts_code.split(".", 1)[0]
