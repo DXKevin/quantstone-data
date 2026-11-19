@@ -110,7 +110,13 @@ def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
             nullable=True,
             source_name="无",
         ),
-        field("side", "string", "BS 标志；中泰源无此字段时为空", nullable=True, source_name="无"),
+        field(
+            "side",
+            "string",
+            "BS 标志；由买卖委托时间和序号还原，撤单为空",
+            nullable=True,
+            source_name="无",
+        ),
         field(
             "price",
             "int64",
