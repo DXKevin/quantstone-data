@@ -113,7 +113,7 @@ def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
         field(
             "side",
             "string",
-            "BS 标志；由买卖委托时间和序号还原，撤单为空",
+            "BS 标志；由买卖委托序号还原，撤单为空",
             nullable=True,
             source_name="无",
         ),
