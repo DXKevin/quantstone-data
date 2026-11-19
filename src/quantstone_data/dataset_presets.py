@@ -90,13 +90,13 @@ DATASET_PRESETS = (
                 {
                     "purpose": "initial",
                     "collector_key": "tushare_cn_stock",
-                    "operation": "stock_list_initial",
+                    "operation": "stock_basic_initial",
                     "parameters": {},
                 },
                 {
                     "purpose": "incremental",
                     "collector_key": "tushare_cn_stock",
-                    "operation": "stock_list_incremental",
+                    "operation": "stock_basic_incremental",
                     "parameters": {},
                 },
             ],

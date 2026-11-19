@@ -423,7 +423,7 @@ operation 参数定义校验。凭证、限流和重试不属于数据集绑定�
 限流与重试策略由 operation 注册声明，由执行框架统一执行。
 
 当前实现已经提供代码采集器注册表，并在数据集契约中按任务目的保存操作绑定。TuShare
-股票列表目前分别注册 `stock_list_initial` 和 `stock_list_incremental` 两个具体入口。每次快照分别
+股票列表目前分别注册 `stock_basic_initial` 和 `stock_basic_incremental` 两个具体入口。每次快照分别
 请求 `L`（上市）、`D`（退市）和 `P`（暂停上市）三种状态并合并，不能依赖空状态参数推测
 “全部”。首次采集与增量更新都生成包含全部状态的完整快照。项目预置契约保留 TuShare
 `stock_basic` 返回的 17 个字段；其中 `list_date` 和 `delist_date` 在落盘时技术标准化为日期类型，

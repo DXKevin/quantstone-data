@@ -99,6 +99,7 @@
 - `tushare.cn.stock.stock_basic` 预置契约包含供应商接口的全部 17 个字段；
 - stock_basic 只对代理返回的浮点 `symbol` 用 `ts_code` 前缀恢复，代理返回的空值保持为空；
 - 字段契约类型收敛为 8 个 Parquet 原生类型并在 Registry 校验，采集器共用 `field_types`；
+- 股票列表采集操作由 `stock_list_*` 更名为 `stock_basic_*`，启动时迁移已有绑定和历史任务；
 - 旧股票信息数据集启动时自动补齐 snapshot 存储策略，审核通过后登记 Catalog 并可直接预览；
 - 采集任务详情新增“运行日志”页签，可查看采集、审核、发布、限流和重试事件，并在执行期间自动刷新；
 - 新增任务日志读取 API，默认返回最近 500 条；执行框架日志已携带 job_id，可正确进入任务日志文件；
@@ -174,6 +175,23 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
+
+### 2026-11-19 — DeepSeek Harness（stock_basic 操作更名）
+
+完成：
+
+- `stock_list_initial` / `stock_list_incremental` 更名为 `stock_basic_initial` /
+  `stock_basic_incremental`，与 `daily_*`、`trade_cal_*` 的命名方式一致；
+- 同步修改预置契约、采集器注册、测试和架构文档；
+- `upgrade_sqlite_schema` 增加迁移：已有 `collection_bindings` 与历史任务的
+  `collector_operation` 会从旧名改为新名；
+- 重启服务后确认 Linux Registry 绑定、历史任务和采集能力接口均已使用新名。
+
+验证：
+
+- `pytest -q`：69 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- 后端 `/api/v1/collectors`、stock_basic 数据集绑定和 SQLite 记录均已核对。
 
 ### 2026-11-19 — DeepSeek Harness（字段类型收敛与 Parquet 映射）
 

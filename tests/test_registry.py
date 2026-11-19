@@ -17,7 +17,7 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
     collector = response.json()[0]
     assert collector["key"] == "tushare_cn_stock"
     operation = collector["operations"][0]
-    assert operation["key"] == "stock_list_initial"
+    assert operation["key"] == "stock_basic_initial"
     assert operation["purpose"] == "initial"
     assert operation["datasets"] == ["tushare.cn.stock.stock_basic"]
     assert operation["joint"] is False
@@ -87,6 +87,10 @@ def test_legacy_tushare_collector_key_is_migrated(tmp_path: Path) -> None:
     assert dataset.status_code == 200
     assert {item["collector_key"] for item in dataset.json()["collection_bindings"]} == {
         "tushare_cn_stock"
+    }
+    assert {item["operation"] for item in dataset.json()["collection_bindings"]} == {
+        "stock_basic_initial",
+        "stock_basic_incremental",
     }
     assert dataset.json()["storage_policy"] == {
         "logical_partition_field": None,

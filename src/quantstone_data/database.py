@@ -76,9 +76,9 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             text(
                 "UPDATE datasets SET collection_bindings = "
                 "'[ {\"purpose\":\"initial\",\"collector_key\":\"tushare_cn_stock\","
-                "\"operation\":\"stock_list_initial\"},"
+                "\"operation\":\"stock_basic_initial\"},"
                 "{\"purpose\":\"incremental\",\"collector_key\":\"tushare_cn_stock\","
-                "\"operation\":\"stock_list_incremental\"} ]' "
+                "\"operation\":\"stock_basic_incremental\"} ]' "
                 "WHERE id = 'tushare.cn.stock.stock_basic' "
                 "AND (collection_bindings IS NULL OR collection_bindings = '[]')"
             )
@@ -87,8 +87,8 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             text(
                 "UPDATE collection_jobs SET collector_key = 'tushare_cn_stock', "
                 "collector_operation = CASE "
-                "WHEN operation = 'incremental' THEN 'stock_list_incremental' "
-                "ELSE 'stock_list_initial' END "
+                "WHEN operation = 'incremental' THEN 'stock_basic_incremental' "
+                "ELSE 'stock_basic_initial' END "
                 "WHERE dataset_id = 'tushare.cn.stock.stock_basic' "
                 "AND input_method = 'collector' "
                 "AND (collector_operation IS NULL "
@@ -119,6 +119,30 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE collector_key = 'tushare'"
             )
         )
+        # stock_list_* 是早期命名，已统一为 stock_basic_*；迁移已有绑定和历史任务。
+        operation_renames = (
+            ("stock_list_initial", "stock_basic_initial"),
+            ("stock_list_incremental", "stock_basic_incremental"),
+        )
+        for binding_index in (0, 1):
+            for old_operation, new_operation in operation_renames:
+                connection.execute(
+                    text(
+                        "UPDATE datasets SET collection_bindings = "
+                        f"json_set(collection_bindings, '$[{binding_index}].operation', :new) "
+                        "WHERE json_extract(collection_bindings, "
+                        f"'$[{binding_index}].operation') = :old"
+                    ),
+                    {"old": old_operation, "new": new_operation},
+                )
+        for old_operation, new_operation in operation_renames:
+            connection.execute(
+                text(
+                    "UPDATE collection_jobs SET collector_operation = :new "
+                    "WHERE collector_operation = :old"
+                ),
+                {"old": old_operation, "new": new_operation},
+            )
         connection.execute(
             text(
                 "UPDATE datasets SET storage_policy = json(:storage_policy) "

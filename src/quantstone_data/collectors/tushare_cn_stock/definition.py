@@ -9,16 +9,16 @@ from .daily import (
     collect_daily_initial,
 )
 from .stock_basic import (
-    collect_incremental as collect_stock_list_incremental,
+    collect_incremental as collect_stock_basic_incremental,
 )
 from .stock_basic import (
-    collect_initial as collect_stock_list_initial,
+    collect_initial as collect_stock_basic_initial,
 )
 from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
-STOCK_LIST_DATASET_ID = "tushare.cn.stock.stock_basic"
+STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
 TRADE_CAL_DATASET_ID = "tushare.cn.stock.trade_cal"
 
 DATE_RANGE_PARAMETERS = (
@@ -35,22 +35,22 @@ DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
 
 OPERATIONS = (
     CollectorOperation(
-        key="stock_list_initial",
+        key="stock_basic_initial",
         name="股票列表首次采集",
         description="分别获取上市、退市和暂停上市股票，建立完整股票列表快照。",
         purpose="initial",
         parameters=(),
-        datasets=(STOCK_LIST_DATASET_ID,),
-        function=collect_stock_list_initial,
+        datasets=(STOCK_BASIC_DATASET_ID,),
+        function=collect_stock_basic_initial,
     ),
     CollectorOperation(
-        key="stock_list_incremental",
+        key="stock_basic_incremental",
         name="股票列表增量更新",
         description="重新获取上市、退市和暂停上市股票，替换完整股票列表快照。",
         purpose="incremental",
         parameters=(),
-        datasets=(STOCK_LIST_DATASET_ID,),
-        function=collect_stock_list_incremental,
+        datasets=(STOCK_BASIC_DATASET_ID,),
+        function=collect_stock_basic_incremental,
     ),
     CollectorOperation(
         key="daily_initial",

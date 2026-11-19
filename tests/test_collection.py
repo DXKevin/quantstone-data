@@ -266,12 +266,12 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             {
                 "purpose": "initial",
                 "collector_key": "tushare_cn_stock",
-                "operation": "stock_list_initial",
+                "operation": "stock_basic_initial",
             },
             {
                 "purpose": "incremental",
                 "collector_key": "tushare_cn_stock",
-                "operation": "stock_list_incremental",
+                "operation": "stock_basic_incremental",
             },
         ],
         "storage_policy": {
@@ -358,7 +358,7 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
         )
         assert created.status_code == 201
         assert created.json()["collector_key"] == "tushare_cn_stock"
-        assert created.json()["collector_operation"] == "stock_list_initial"
+        assert created.json()["collector_operation"] == "stock_basic_initial"
 
         submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
         executed = wait_for_job(client, created.json()["id"])
