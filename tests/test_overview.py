@@ -1,8 +1,18 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
+from quantstone_data.overview import _serialize_timestamp
+
+
+def test_overview_timestamp_keeps_utc_semantics_after_sqlite_round_trip() -> None:
+    naive_utc = datetime(2026, 11, 19, 5, 17, 37)
+    aware_utc = datetime(2026, 11, 19, 5, 17, 37, tzinfo=UTC)
+
+    assert _serialize_timestamp(naive_utc) == "2026-11-19T05:17:37+00:00"
+    assert _serialize_timestamp(aware_utc) == "2026-11-19T05:17:37+00:00"
 
 
 def test_overview_lists_datasets_with_empty_catalog(tmp_path: Path) -> None:

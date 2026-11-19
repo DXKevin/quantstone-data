@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -78,8 +78,13 @@ def _open_days(data_root, catalog: CatalogPartition | None) -> list[date]:
     return [row["cal_date"] for row in table.to_pylist() if row["is_open"] == 1]
 
 
-def _serialize_timestamp(value) -> str | None:
-    return value.isoformat() if value else None
+def _serialize_timestamp(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    # SQLite 会丢失 DateTime(timezone=True) 的时区信息；项目写入的时间均为 UTC。
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
 
 
 @router.get("/datasets")
