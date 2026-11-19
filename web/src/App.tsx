@@ -10,6 +10,8 @@ import {
   Database,
   LayoutGrid,
   Layers3,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -101,6 +103,7 @@ const granularityLabels: Record<TimeGranularity, string> = {
 
 function App() {
   const [area, setArea] = useState<Area>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem("qs-sidebar-collapsed") === "1");
   const [datasetSection, setDatasetSection] = useState<DatasetSection>("registry");
   const [collectionSection, setCollectionSection] = useState<CollectionSection>("jobs");
   const [collectionRequest, setCollectionRequest] = useState<CollectionRequest | null>(null);
@@ -140,6 +143,10 @@ function App() {
     void loadDatasets();
   }, [loadDatasets]);
 
+  useEffect(() => {
+    window.localStorage.setItem("qs-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
+
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return datasets;
@@ -165,20 +172,24 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark"><Layers3 size={20} strokeWidth={2.2} /></div>
-          <div><strong>QuantStone</strong><span>DATA</span></div>
+          <div className="brand-copy"><strong>QuantStone</strong><span>DATA</span></div>
         </div>
         <nav>
-          <button className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} />概览</button>
-          <button className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setDatasetSection("registry"); setView("list"); }}><Database size={17} />数据集</button>
-          <button className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} />采集</button>
+          <button title="概览" className={area === "overview" ? "nav-item active" : "nav-item"} onClick={() => setArea("overview")}><LayoutGrid size={17} /><span className="nav-label">概览</span></button>
+          <button title="数据集" className={area === "datasets" ? "nav-item active" : "nav-item"} onClick={() => { setArea("datasets"); setDatasetSection("registry"); setView("list"); }}><Database size={17} /><span className="nav-label">数据集</span></button>
+          <button title="采集" className={area === "collection" ? "nav-item active" : "nav-item"} onClick={() => setArea("collection")}><Activity size={17} /><span className="nav-label">采集</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="nav-item" disabled><CircleHelp size={17} />帮助</button>
-          <button className="nav-item" disabled><Settings size={17} />设置</button>
+          <button className="nav-item" disabled title="帮助"><CircleHelp size={17} /><span className="nav-label">帮助</span></button>
+          <button className="nav-item" disabled title="设置"><Settings size={17} /><span className="nav-label">设置</span></button>
+          <button type="button" className="nav-item sidebar-toggle" title={sidebarCollapsed ? "展开侧栏" : "收起侧栏"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
+            {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            <span className="nav-label">{sidebarCollapsed ? "展开侧栏" : "收起侧栏"}</span>
+          </button>
           <div className="version">QuantStone Data · v0.1.0</div>
         </div>
       </aside>
