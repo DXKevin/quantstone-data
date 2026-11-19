@@ -112,6 +112,8 @@ def _arrow_type(data_type: str) -> pa.DataType:
 def _convert(value: Any, data_type: str) -> Any:
     if value is None or value == "":
         return None
+    if data_type == "string":
+        return str(value)
     if data_type == "date":
         return datetime.strptime(str(value), "%Y%m%d").date()
     if data_type in {"float32", "float64"}:
@@ -120,6 +122,18 @@ def _convert(value: Any, data_type: str) -> Any:
         return int(value)
     if data_type == "boolean":
         return bool(value)
+    return value
+
+
+def _source_value(row: dict, field: dict) -> Any:
+    source_name = field.get("source_name") or field["name"]
+    value = row.get(source_name)
+    # 部分兼容 TuShare 的代理会把退市股票 symbol 经 DataFrame 序列化成 float，
+    # 直接转换既会留下“.0”，也会丢失代码前导零。ts_code 中保留了原始代码。
+    if source_name == "symbol" and not isinstance(value, str):
+        ts_code = row.get("ts_code")
+        if isinstance(ts_code, str) and "." in ts_code:
+            return ts_code.split(".", 1)[0]
     return value
 
 
@@ -136,7 +150,7 @@ def collect(
     normalized = [
         {
             field["name"]: _convert(
-                row.get(field.get("source_name") or field["name"]), field["data_type"]
+                _source_value(row, field), field["data_type"]
             )
             for field in field_contracts
         }

@@ -291,6 +291,12 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
                 "description": "TS代码",
             },
             {
+                "name": "symbol",
+                "data_type": "string",
+                "nullable": True,
+                "description": "股票代码",
+            },
+            {
                 "name": "name",
                 "data_type": "string",
                 "nullable": False,
@@ -310,9 +316,24 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     def fake_call(_token: str, list_status: str, _fields: list[str]) -> list[dict]:
         requested_statuses.append(list_status)
         rows = {
-            "L": {"ts_code": "000001.SZ", "name": "平安银行", "list_status": "L"},
-            "D": {"ts_code": "000003.SZ", "name": "退市样例", "list_status": "D"},
-            "P": {"ts_code": "000004.SZ", "name": "暂停样例", "list_status": "P"},
+            "L": {
+                "ts_code": "000001.SZ",
+                "symbol": "000001",
+                "name": "平安银行",
+                "list_status": "L",
+            },
+            "D": {
+                "ts_code": "000003.SZ",
+                "symbol": 3.0,
+                "name": "退市样例",
+                "list_status": "D",
+            },
+            "P": {
+                "ts_code": "000004.SZ",
+                "symbol": None,
+                "name": "暂停样例",
+                "list_status": "P",
+            },
         }
         return [rows[list_status]]
 
@@ -386,6 +407,14 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
             "/api/v1/datasets/tushare.cn.stock.stock_basic/rows",
             params={"ts_code": "000001.SZ"},
         )
+        delisted_preview = client.get(
+            "/api/v1/datasets/tushare.cn.stock.stock_basic/rows",
+            params={"ts_code": "000003.SZ"},
+        )
+        paused_preview = client.get(
+            "/api/v1/datasets/tushare.cn.stock.stock_basic/rows",
+            params={"ts_code": "000004.SZ"},
+        )
 
     assert submitted.status_code == 202
     assert executed.status_code == 200
@@ -417,6 +446,8 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert preview.status_code == 200
     assert preview.json()["matched_count"] == 1
     assert preview.json()["rows"][0]["name"] == "平安银行"
+    assert delisted_preview.json()["rows"][0]["symbol"] == "000003"
+    assert paused_preview.json()["rows"][0]["symbol"] == "000004"
 
 
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:
