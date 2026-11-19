@@ -272,6 +272,27 @@ export interface DatasetOverview {
   coverage_percent: number | null;
 }
 
+export interface DatasetDeletionReview {
+  dataset_ids: string[];
+  items: Array<{
+    dataset_id: string;
+    display_name: string;
+    status: DatasetStatus;
+    collection_jobs: number;
+    collection_runs: number;
+    maintenance_jobs: number;
+    catalog_files: number;
+    catalog_partitions: number;
+    rows: number;
+    physical_files: number;
+    physical_bytes: number;
+  }>;
+  blockers: string[];
+  confirmation_text: string;
+  review_token: string;
+  can_delete: boolean;
+}
+
 export interface CollectionReview {
   reviewer: string;
   passed: boolean;
@@ -356,8 +377,16 @@ export const api = {
     }),
   activateDataset: (id: string) =>
     request<DatasetDetail>(`/api/v1/datasets/${id}/activate`, { method: "POST" }),
-  deleteDataset: (id: string) =>
-    request<void>(`/api/v1/datasets/${id}`, { method: "DELETE" }),
+  reviewDatasetDeletion: (datasetIds: string[]) =>
+    request<DatasetDeletionReview>("/api/v1/datasets/deletion-review", {
+      method: "POST",
+      body: JSON.stringify({ dataset_ids: datasetIds }),
+    }),
+  deleteDatasets: (datasetIds: string[], reviewToken: string, confirmation: string) =>
+    request<{ deleted_dataset_ids: string[] }>("/api/v1/datasets/batch-delete", {
+      method: "POST",
+      body: JSON.stringify({ dataset_ids: datasetIds, review_token: reviewToken, confirmation }),
+    }),
   listCollectionJobs: () => request<CollectionJob[]>("/api/v1/collection-jobs"),
   getCollectionReadiness: (datasetId: string) =>
     request<CollectionReadiness>(`/api/v1/collection-jobs/readiness/${encodeURIComponent(datasetId)}`),

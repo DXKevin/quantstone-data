@@ -68,7 +68,11 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .table-head { min-height: 38px; background: #f8faf8; border-bottom: 1px solid var(--line); color: #75807b; font-size: 10px; }
 .data-row { width: 100%; border: 0; border-bottom: 1px solid #e8ece9; background: white; text-align: left; cursor: pointer; font-size: 12px; }
 .data-row:hover { background: #f7fbf8; }
+.data-row.selected { background: #fff5f5; box-shadow: inset 3px 0 #b44242; }
 .data-row:last-child { border-bottom: 0; }
+.dataset-cell { display: flex; align-items: center; gap: 11px; }
+.dataset-cell > span { min-width: 0; }
+.dataset-cell input { width: 16px; height: 16px; accent-color: #a43c3c; cursor: pointer; }
 .dataset-cell strong { display: block; margin-bottom: 5px; font-size: 13px; }
 .dataset-cell code { color: #65726c; font-size: 10px; }
 .row-arrow { color: #98a49e; text-align: right; }
@@ -478,6 +482,34 @@ body { font-size: 14px; }
 
 /* 数据集大类 */
 .dataset-list-toolbar { margin-bottom: 14px; }
+.deletion-selection-bar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; padding: 14px 18px; border-color: #e4c7c7; background: #fffafa; }
+.deletion-selection-bar > div { display: flex; flex-direction: column; gap: 5px; }
+.deletion-selection-bar strong { font-size: 12px; color: #8b3434; }
+.deletion-selection-bar span { color: #735f5f; font-size: 10.5px; }
+.modal-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(21, 31, 27, .52); }
+.deletion-dialog { width: min(720px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: 9px; background: white; box-shadow: 0 24px 70px rgba(0,0,0,.28); }
+.deletion-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+.deletion-dialog h2 { margin: 0; font-size: 19px; }
+.deletion-warning { display: flex; gap: 12px; margin: 18px 24px; padding: 13px 15px; border: 1px solid #e2bcbc; border-radius: 6px; background: #fff4f4; color: #9d3838; }
+.deletion-warning div { display: flex; flex-direction: column; gap: 4px; }
+.deletion-warning span { font-size: 11px; }
+.deletion-totals { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 24px 16px; border: 1px solid var(--line); }
+.deletion-totals div { padding: 12px; border-right: 1px solid var(--line); }
+.deletion-totals div:last-child { border: 0; }
+.deletion-totals span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; }
+.deletion-totals strong { font-size: 14px; }
+.deletion-items { margin: 0 24px 16px; border: 1px solid var(--line); }
+.deletion-items > div { display: grid; grid-template-columns: 1fr 1.6fr 1.2fr; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); align-items: center; }
+.deletion-items > div:first-child { border: 0; }
+.deletion-items strong { font-size: 11px; }
+.deletion-items code, .deletion-items span { color: #65716b; font-size: 9.5px; }
+.deletion-blockers { display: flex; flex-direction: column; gap: 6px; margin: 0 24px 16px; padding: 12px 14px; border: 1px solid #e5c276; background: #fff9e9; color: #805d0e; font-size: 11px; }
+.deletion-confirm { display: grid; gap: 7px; margin: 0 24px 18px; }
+.deletion-confirm > span { font-size: 11px; }
+.deletion-confirm code { padding: 9px 10px; border-radius: 4px; background: #f4f6f5; color: #8b3434; font-size: 10px; word-break: break-all; }
+.deletion-confirm input { min-height: 38px; border: 1px solid #d5b5b5; border-radius: 5px; padding: 0 10px; }
+.deletion-dialog .form-error { margin: 0 24px 16px; }
+.deletion-dialog > footer { display: flex; justify-content: flex-end; gap: 9px; padding: 16px 24px; border-top: 1px solid var(--line); }
 .dataset-group { margin-bottom: 14px; }
 .dataset-group-header { position: relative; min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
 .dataset-group-header h2 { margin: 0; font-size: 15px; }

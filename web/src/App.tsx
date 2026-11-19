@@ -26,6 +26,7 @@ import {
   CollectionPurpose,
   DatasetCategory,
   DatasetCreatePayload,
+  DatasetDeletionReview,
   DatasetDetail,
   DatasetPreset,
   DatasetSummary,
@@ -229,11 +230,6 @@ function App() {
               setCollectionSection("jobs");
               setArea("collection");
             }}
-            onDeleted={() => {
-              setSelected(null);
-              setView("list");
-              void loadDatasets();
-            }}
             onChanged={(data) => {
               setSelected(data);
               void loadDatasets();
@@ -396,6 +392,13 @@ function DatasetList(props: {
   onCategoriesChanged: () => void;
 }) {
   const [managingCategories, setManagingCategories] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deletionReview, setDeletionReview] = useState<DatasetDeletionReview | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [deletionError, setDeletionError] = useState<string | null>(null);
   const groups = [
     ...props.categories.map((category) => ({
       id: category.id,
@@ -411,12 +414,50 @@ function DatasetList(props: {
     },
   ].filter((group) => group.datasets.length > 0 || !props.query.trim());
 
+  function toggleDataset(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function reviewDeletion() {
+    setReviewing(true);
+    setDeletionError(null);
+    try {
+      setDeletionReview(await api.reviewDatasetDeletion([...selectedIds]));
+      setConfirmation("");
+    } catch (reason) {
+      setDeletionError(reason instanceof Error ? reason.message : "删除审查失败");
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  async function commitDeletion() {
+    if (!deletionReview) return;
+    setDeleting(true);
+    setDeletionError(null);
+    try {
+      await api.deleteDatasets(deletionReview.dataset_ids, deletionReview.review_token, confirmation);
+      setDeletionReview(null);
+      setSelectedIds(new Set());
+      setSelecting(false);
+      props.onCategoriesChanged();
+    } catch (reason) {
+      setDeletionError(reason instanceof Error ? reason.message : "删除失败，请重新审查");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="page">
       {props.navigation}
       <header className="page-header">
         <div><p className="eyebrow">DATASET REGISTRY</p><h1>数据集</h1><p className="subtitle">按大类组织并管理供应商数据集的字段契约与版本。</p></div>
-        <div className="header-actions"><button className="ghost-button" onClick={() => setManagingCategories((value) => !value)}><Layers3 size={16} />管理大类</button><button className="primary-button" onClick={props.onCreate}><Plus size={17} />创建数据集</button></div>
+        <div className="header-actions"><button className={selecting ? "danger-button" : "ghost-button"} onClick={() => { setSelecting((value) => !value); setSelectedIds(new Set()); setDeletionError(null); }}><Trash2 size={16} />{selecting ? "退出批量删除" : "批量删除"}</button><button className="ghost-button" onClick={() => setManagingCategories((value) => !value)}><Layers3 size={16} />管理大类</button><button className="primary-button" onClick={props.onCreate}><Plus size={17} />创建数据集</button></div>
       </header>
 
       <section className="summary-strip">
@@ -427,6 +468,9 @@ function DatasetList(props: {
       </section>
 
       {managingCategories && <DatasetCategoryManager categories={props.categories} datasets={props.allDatasets} onChanged={props.onCategoriesChanged} />}
+
+      {selecting && <section className="panel deletion-selection-bar"><div><strong>严格删除审查</strong><span>已选择 {selectedIds.size} 个数据集。删除将清除 Registry、任务、Catalog、日志、暂存和正式物理文件。</span></div><button className="danger-button" disabled={!selectedIds.size || reviewing} onClick={() => void reviewDeletion()}>{reviewing ? "正在审查…" : "审查删除影响"}</button></section>}
+      {deletionError && !deletionReview && <div className="form-error"><X size={17} />{deletionError}</div>}
 
       <section className="panel dataset-list-toolbar">
         <div className="panel-toolbar">
@@ -449,19 +493,32 @@ function DatasetList(props: {
           {group.datasets.length === 0 ? <div className="dataset-group-empty">该大类下还没有数据集。</div> : <div className="dataset-table">
             <div className="table-row table-head"><span>数据集</span><span>供应商</span><span>区域 / 品种</span><span>状态</span><span /></div>
             {group.datasets.map((dataset) => (
-              <button className="table-row data-row" key={dataset.id} onClick={() => props.onOpen(dataset.id)}>
-                <span className="dataset-cell"><strong>{dataset.display_name}</strong><code>{dataset.id}</code></span>
+              <div className={`table-row data-row${selectedIds.has(dataset.id) ? " selected" : ""}`} key={dataset.id} role="button" tabIndex={0} onClick={() => selecting ? toggleDataset(dataset.id) : props.onOpen(dataset.id)} onKeyDown={(event) => { if (event.key === "Enter") selecting ? toggleDataset(dataset.id) : props.onOpen(dataset.id); }}>
+                <span className="dataset-cell">{selecting && <input type="checkbox" checked={selectedIds.has(dataset.id)} onChange={() => toggleDataset(dataset.id)} onClick={(event) => event.stopPropagation()} aria-label={`选择 ${dataset.display_name}`} />}<span><strong>{dataset.display_name}</strong><code>{dataset.id}</code></span></span>
                 <span>{dataset.provider}</span>
                 <span>{dataset.region.toUpperCase()} / {dataset.instrument}{dataset.market ? ` / ${dataset.market.toUpperCase()}` : ""}</span>
                 <span><StatusBadge status={dataset.status} /></span>
                 <span className="row-arrow"><ChevronRight size={17} /></span>
-              </button>
+              </div>
             ))}
           </div>}
         </section>
       ))}
+      {deletionReview && <DatasetDeletionDialog review={deletionReview} confirmation={confirmation} error={deletionError} deleting={deleting} onConfirmation={setConfirmation} onCancel={() => { setDeletionReview(null); setDeletionError(null); }} onDelete={() => void commitDeletion()} />}
     </div>
   );
+}
+
+function DatasetDeletionDialog(props: { review: DatasetDeletionReview; confirmation: string; error: string | null; deleting: boolean; onConfirmation: (value: string) => void; onCancel: () => void; onDelete: () => void }) {
+  const totals = props.review.items.reduce((result, item) => ({ files: result.files + item.physical_files, bytes: result.bytes + item.physical_bytes, rows: result.rows + item.rows, jobs: result.jobs + item.collection_jobs + item.maintenance_jobs }), { files: 0, bytes: 0, rows: 0, jobs: 0 });
+  return <div className="modal-backdrop"><section className="deletion-dialog" role="dialog" aria-modal="true"><header><div><p className="eyebrow">DELETION REVIEW</p><h2>永久删除 {props.review.dataset_ids.length} 个数据集</h2></div><button className="icon-button" onClick={props.onCancel}><X size={17} /></button></header><div className="deletion-warning"><Trash2 size={20} /><div><strong>该操作不可撤销</strong><span>数据库记录和数据根目录中的相关文件都会被直接物理删除。</span></div></div><div className="deletion-totals"><div><span>数据行</span><strong>{totals.rows.toLocaleString()}</strong></div><div><span>物理文件</span><strong>{totals.files}</strong></div><div><span>占用空间</span><strong>{formatDeletionBytes(totals.bytes)}</strong></div><div><span>任务记录</span><strong>{totals.jobs}</strong></div></div><div className="deletion-items">{props.review.items.map((item) => <div key={item.dataset_id}><strong>{item.display_name}</strong><code>{item.dataset_id}</code><span>{item.catalog_partitions} 个分区 · {item.collection_jobs} 个采集任务 · {item.physical_files} 个文件</span></div>)}</div>{props.review.blockers.length > 0 && <div className="deletion-blockers"><strong>当前禁止删除</strong>{props.review.blockers.map((item) => <span key={item}>{item}</span>)}</div>}<label className="deletion-confirm"><span>请输入以下完整文字确认：</span><code>{props.review.confirmation_text}</code><input value={props.confirmation} onChange={(event) => props.onConfirmation(event.target.value)} disabled={!props.review.can_delete || props.deleting} /></label>{props.error && <div className="form-error"><X size={17} />{props.error}</div>}<footer><button className="ghost-button" onClick={props.onCancel}>取消</button><button className="danger-button" disabled={!props.review.can_delete || props.confirmation !== props.review.confirmation_text || props.deleting} onClick={props.onDelete}>{props.deleting ? "正在物理删除…" : "永久删除"}</button></footer></section></div>;
+}
+
+function formatDeletionBytes(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 ** 3) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+  return `${(value / 1024 ** 3).toFixed(2)} GB`;
 }
 
 function CategoryQuickAdd({ categoryId, datasets, onChanged }: { categoryId: string; datasets: DatasetSummary[]; onChanged: () => void }) {
@@ -854,9 +911,8 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
   );
 }
 
-function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetCategory[]; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onCollect: (operation: CollectionPurpose) => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
+function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetCategory[]; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onCollect: (operation: CollectionPurpose) => void; onChanged: (dataset: DatasetDetail) => void }) {
   const [activating, setActivating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function activate() {
@@ -871,25 +927,12 @@ function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetC
     }
   }
 
-  async function remove() {
-    if (!window.confirm(`确定删除草稿“${props.dataset.display_name}”吗？此操作无法撤销。`)) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await api.deleteDataset(props.dataset.id);
-      props.onDeleted();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "删除失败");
-      setDeleting(false);
-    }
-  }
-
   const dataset = props.dataset;
   return (
     <div className="page">
       <header className="page-header compact">
         <div><button className="back-button" onClick={props.onBack}><ArrowLeft size={16} />返回数据集</button><div className="title-line"><h1>{dataset.display_name}</h1><StatusBadge status={dataset.status} /></div><code className="large-id">{dataset.id}</code></div>
-        {dataset.status === "draft" ? <div className="header-actions"><button className="danger-button" onClick={() => void remove()} disabled={deleting}><Trash2 size={16} />{deleting ? "正在删除…" : "删除草稿"}</button><button className="ghost-button" onClick={props.onEdit}><Pencil size={16} />编辑</button><button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button></div> : <div className="header-actions"><button className="ghost-button" onClick={props.onEditMetadata}><Pencil size={16} />编辑基本信息</button></div>}
+        {dataset.status === "draft" ? <div className="header-actions"><button className="ghost-button" onClick={props.onEdit}><Pencil size={16} />编辑</button><button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button></div> : <div className="header-actions"><button className="ghost-button" onClick={props.onEditMetadata}><Pencil size={16} />编辑基本信息</button></div>}
       </header>
       {error && <div className="form-error"><X size={17} />{error}</div>}
 

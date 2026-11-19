@@ -179,7 +179,7 @@ def test_duplicate_dataset_is_rejected(tmp_path: Path) -> None:
     assert response.status_code == 409
 
 
-def test_draft_dataset_can_be_edited_and_deleted(tmp_path: Path) -> None:
+def test_draft_dataset_can_be_edited_but_direct_delete_requires_review(tmp_path: Path) -> None:
     app = create_app(
         f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
     )
@@ -199,8 +199,9 @@ def test_draft_dataset_can_be_edited_and_deleted(tmp_path: Path) -> None:
         assert updated.json()["description"] == payload["description"]
 
         deleted = client.delete(f"/api/v1/datasets/{created.json()['id']}")
-        assert deleted.status_code == 204
-        assert client.get(f"/api/v1/datasets/{created.json()['id']}").status_code == 404
+        assert deleted.status_code == 409
+        assert "批量删除审查" in deleted.json()["detail"]
+        assert client.get(f"/api/v1/datasets/{created.json()['id']}").status_code == 200
 
 
 def test_active_dataset_cannot_be_edited(tmp_path: Path) -> None:

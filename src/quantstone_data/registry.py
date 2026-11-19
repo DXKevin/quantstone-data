@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -262,13 +262,9 @@ def activate_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
     return serialize_dataset(dataset)
 
 
-@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_draft_dataset(dataset_id: str, session: SessionDep) -> Response:
+@router.delete("/{dataset_id}")
+def delete_draft_dataset(dataset_id: str, session: SessionDep) -> None:
     dataset = session.get(Dataset, dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="dataset not found")
-    if dataset.status != DatasetStatus.DRAFT.value:
-        raise HTTPException(status_code=409, detail="only draft datasets can be deleted")
-    session.delete(dataset)
-    session.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    raise HTTPException(status_code=409, detail="请使用数据集批量删除审查流程")
