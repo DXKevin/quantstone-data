@@ -87,7 +87,7 @@ Linux 可以使用管理脚本同时启动前后端，并允许同一局域网�
 转发到服务器本机 8000 端口。运行日志通过脚本的 `logs` 子命令读取，文件位于 `var/logs/`。
 
 当前管理界面支持数据集管理、采集任务创建、任务记录查看，以及手动文件上传到 staging。
-侧栏使用统一的“数据集”入口，页面内可在“数据集”和“预置契约”之间切换。
+侧栏使用统一的“数据集”入口，页面内可在“数据集”和“预置契约”之间切换。数据集支持由用户创建大类并手动归类；大类只用于目录组织，不改变数据契约、采集或存储。
 侧栏使用统一的“采集”入口，页面内可在“任务”和“采集能力”之间切换。
 
 运行测试：
@@ -102,6 +102,11 @@ pytest
 POST   /api/v1/datasets
 GET    /api/v1/datasets
 GET    /api/v1/dataset-presets
+GET    /api/v1/dataset-categories
+POST   /api/v1/dataset-categories
+PATCH  /api/v1/dataset-categories/{category_id}
+DELETE /api/v1/dataset-categories/{category_id}
+PUT    /api/v1/datasets/{dataset_id}/category
 GET    /api/v1/datasets/{dataset_id}
 PUT    /api/v1/datasets/{dataset_id}
 PATCH  /api/v1/datasets/{dataset_id}

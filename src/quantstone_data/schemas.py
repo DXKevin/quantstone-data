@@ -122,6 +122,28 @@ class DatasetUpdate(BaseModel):
         return self
 
 
+class DatasetCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+
+
+class DatasetCategoryUpdate(DatasetCategoryCreate):
+    pass
+
+
+class DatasetCategoryRead(BaseModel):
+    id: str
+    name: str
+    description: str | None
+    dataset_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetCategoryAssignment(BaseModel):
+    category_id: str | None = Field(default=None, max_length=36)
+
+
 class DatasetMetadataUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
     description: str | None = None
@@ -158,6 +180,7 @@ class DatasetRead(BaseModel):
     market: str | None
     display_name: str
     description: str | None
+    category_id: str | None
     collection_bindings: list[DatasetCollectionBinding]
     storage_policy: DatasetStoragePolicy | None
     status: DatasetStatus
@@ -176,6 +199,7 @@ class DatasetSummary(BaseModel):
     region: str
     instrument: str
     market: str | None
+    category_id: str | None
     status: DatasetStatus
     current_schema_version: int
     collection_bindings: list[DatasetCollectionBinding]

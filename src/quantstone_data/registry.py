@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from .collector_registry import get_operation, validate_operation_parameters
 from .database import get_session
-from .models import Dataset, DatasetField, DatasetSchemaVersion
+from .models import Dataset, DatasetCategory, DatasetField, DatasetSchemaVersion
 from .schemas import (
+    DatasetCategoryAssignment,
     DatasetCreate,
     DatasetFieldRead,
     DatasetMetadataUpdate,
@@ -41,6 +42,7 @@ def serialize_dataset(dataset: Dataset) -> DatasetRead:
         market=dataset.market,
         display_name=dataset.display_name,
         description=dataset.description,
+        category_id=dataset.category_id,
         collection_bindings=dataset.collection_bindings,
         storage_policy=dataset.storage_policy,
         status=DatasetStatus(dataset.status),
@@ -176,6 +178,25 @@ def update_dataset_metadata(
     dataset.description = payload.description
     session.commit()
 
+    stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    assert stored is not None
+    return serialize_dataset(stored)
+
+
+@router.put("/{dataset_id}/category", response_model=DatasetRead)
+def assign_dataset_category(
+    dataset_id: str, payload: DatasetCategoryAssignment, session: SessionDep
+) -> DatasetRead:
+    dataset = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    if (
+        payload.category_id is not None
+        and session.get(DatasetCategory, payload.category_id) is None
+    ):
+        raise HTTPException(status_code=404, detail="数据集大类不存在")
+    dataset.category_id = payload.category_id
+    session.commit()
     stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))
     assert stored is not None
     return serialize_dataset(stored)

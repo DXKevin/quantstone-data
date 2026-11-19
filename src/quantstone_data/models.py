@@ -23,6 +23,18 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class DatasetCategory(Base):
+    __tablename__ = "dataset_categories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class Dataset(Base):
     __tablename__ = "datasets"
 
@@ -34,6 +46,9 @@ class Dataset(Base):
     market: Mapped[str | None] = mapped_column(String(32), nullable=True)
     display_name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_id: Mapped[str | None] = mapped_column(
+        ForeignKey("dataset_categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     current_schema_version: Mapped[int] = mapped_column(Integer, default=1)
     collection_bindings: Mapped[list[dict]] = mapped_column(JSON, default=list)

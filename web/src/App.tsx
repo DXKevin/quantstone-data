@@ -24,6 +24,7 @@ import {
   CollectorDefinition,
   CollectionReadiness,
   CollectionPurpose,
+  DatasetCategory,
   DatasetCreatePayload,
   DatasetDetail,
   DatasetPreset,
@@ -85,6 +86,7 @@ function App() {
   const [collectionRequest, setCollectionRequest] = useState<CollectionRequest | null>(null);
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
+  const [categories, setCategories] = useState<DatasetCategory[]>([]);
   const [presets, setPresets] = useState<DatasetPreset[]>([]);
   const [collectors, setCollectors] = useState<CollectorDefinition[]>([]);
   const [selected, setSelected] = useState<DatasetDetail | null>(null);
@@ -96,14 +98,16 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const [datasetItems, collectorItems, presetItems] = await Promise.all([
+      const [datasetItems, collectorItems, presetItems, categoryItems] = await Promise.all([
         api.listDatasets(),
         api.listCollectors(),
         api.listDatasetPresets(),
+        api.listDatasetCategories(),
       ]);
       setDatasets(datasetItems);
       setCollectors(collectorItems);
       setPresets(presetItems);
+      setCategories(categoryItems);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载数据集");
     } finally {
@@ -199,6 +203,8 @@ function App() {
             onOpen={(id) => void openDataset(id)}
             onRetry={() => void loadDatasets()}
             navigation={<DatasetTabs selected="registry" onSelect={setDatasetSection} />}
+            categories={categories}
+            onCategoriesChanged={() => void loadDatasets()}
           />
         )}
         {area === "datasets" && datasetSection === "registry" && view === "create" && (
@@ -216,6 +222,7 @@ function App() {
             onBack={() => setView("list")}
             onEdit={() => setView("edit")}
             onEditMetadata={() => setView("metadata")}
+            categories={categories}
             onCollect={(operation) => {
               setCollectionRequest({ datasetId: selected.id, operation });
               setCollectionSection("jobs");
@@ -383,38 +390,63 @@ function DatasetList(props: {
   onOpen: (id: string) => void;
   onRetry: () => void;
   navigation: ReactNode;
+  categories: DatasetCategory[];
+  onCategoriesChanged: () => void;
 }) {
+  const [managingCategories, setManagingCategories] = useState(false);
+  const groups = [
+    ...props.categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description,
+      datasets: props.datasets.filter((dataset) => dataset.category_id === category.id),
+    })),
+    {
+      id: null,
+      name: "未分类",
+      description: "尚未归入任何数据集大类",
+      datasets: props.datasets.filter((dataset) => dataset.category_id === null),
+    },
+  ].filter((group) => group.datasets.length > 0 || !props.query.trim());
+
   return (
     <div className="page">
       {props.navigation}
       <header className="page-header">
-        <div><p className="eyebrow">DATASET REGISTRY</p><h1>数据集</h1><p className="subtitle">定义并管理供应商数据集的字段契约与版本。</p></div>
-        <button className="primary-button" onClick={props.onCreate}><Plus size={17} />创建数据集</button>
+        <div><p className="eyebrow">DATASET REGISTRY</p><h1>数据集</h1><p className="subtitle">按大类组织并管理供应商数据集的字段契约与版本。</p></div>
+        <div className="header-actions"><button className="ghost-button" onClick={() => setManagingCategories((value) => !value)}><Layers3 size={16} />管理大类</button><button className="primary-button" onClick={props.onCreate}><Plus size={17} />创建数据集</button></div>
       </header>
 
       <section className="summary-strip">
         <div><span>数据集总数</span><strong>{props.total}</strong></div>
+        <div><span>数据集大类</span><strong>{props.categories.length}</strong></div>
         <div><span>已启用</span><strong>{props.datasets.filter((item) => item.status === "active").length}</strong></div>
-        <div><span>草稿</span><strong>{props.datasets.filter((item) => item.status === "draft").length}</strong></div>
-        <div><span>当前模块</span><strong className="summary-text">注册中心</strong></div>
+        <div><span>未分类</span><strong>{props.datasets.filter((item) => item.category_id === null).length}</strong></div>
       </section>
 
-      <section className="panel">
+      {managingCategories && <DatasetCategoryManager categories={props.categories} onChanged={props.onCategoriesChanged} />}
+
+      <section className="panel dataset-list-toolbar">
         <div className="panel-toolbar">
-          <div><h2>全部数据集</h2><span>{props.total} 个数据集</span></div>
+          <div><h2>数据集目录</h2><span>{props.total} 个数据集</span></div>
           <label className="search-box"><Search size={16} /><input value={props.query} onChange={(event) => props.onQuery(event.target.value)} placeholder="搜索 ID 或名称" /></label>
         </div>
+      </section>
 
-        {props.error ? (
-          <div className="state-box error-state"><strong>无法连接 Registry API</strong><p>{props.error}</p><button onClick={props.onRetry}>重新加载</button></div>
-        ) : props.loading ? (
-          <div className="state-box"><div className="loader" /><p>正在加载数据集…</p></div>
-        ) : props.datasets.length === 0 ? (
-          <div className="state-box empty-state"><Database size={28} /><strong>还没有数据集</strong><p>创建第一个数据集，开始定义字段契约。</p><button className="secondary-button" onClick={props.onCreate}><Plus size={16} />创建数据集</button></div>
-        ) : (
-          <div className="dataset-table">
+      {props.error ? (
+        <div className="panel state-box error-state"><strong>无法连接 Registry API</strong><p>{props.error}</p><button onClick={props.onRetry}>重新加载</button></div>
+      ) : props.loading ? (
+        <div className="panel state-box"><div className="loader" /><p>正在加载数据集…</p></div>
+      ) : props.datasets.length === 0 && props.total === 0 ? (
+        <div className="panel state-box empty-state"><Database size={28} /><strong>还没有数据集</strong><p>创建第一个数据集，开始定义字段契约。</p><button className="secondary-button" onClick={props.onCreate}><Plus size={16} />创建数据集</button></div>
+      ) : groups.length === 0 ? (
+        <div className="panel state-box empty-state"><Search size={28} /><strong>没有匹配的数据集</strong><p>请调整搜索关键词。</p></div>
+      ) : groups.map((group) => (
+        <section className="panel dataset-group" key={group.id ?? "uncategorized"}>
+          <div className="dataset-group-header"><div><h2>{group.name}</h2><p>{group.description}</p></div><span>{group.datasets.length} 个数据集</span></div>
+          {group.datasets.length === 0 ? <div className="dataset-group-empty">该大类下还没有数据集。</div> : <div className="dataset-table">
             <div className="table-row table-head"><span>数据集</span><span>供应商</span><span>区域 / 品种</span><span>Schema</span><span>状态</span><span /></div>
-            {props.datasets.map((dataset) => (
+            {group.datasets.map((dataset) => (
               <button className="table-row data-row" key={dataset.id} onClick={() => props.onOpen(dataset.id)}>
                 <span className="dataset-cell"><strong>{dataset.display_name}</strong><code>{dataset.id}</code></span>
                 <span>{dataset.provider}</span>
@@ -424,10 +456,72 @@ function DatasetList(props: {
                 <span className="row-arrow"><ChevronRight size={17} /></span>
               </button>
             ))}
-          </div>
-        )}
-      </section>
+          </div>}
+        </section>
+      ))}
     </div>
+  );
+}
+
+function DatasetCategoryManager({ categories, onChanged }: { categories: DatasetCategory[]; onChanged: () => void }) {
+  const [editing, setEditing] = useState<DatasetCategory | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function reset() {
+    setEditing(null);
+    setName("");
+    setDescription("");
+    setError(null);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) return setError("请填写大类名称。");
+    setSubmitting(true);
+    setError(null);
+    try {
+      const payload = { name: name.trim(), description: description.trim() || null };
+      if (editing) await api.updateDatasetCategory(editing.id, payload);
+      else await api.createDatasetCategory(payload);
+      reset();
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存数据集大类失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function remove(category: DatasetCategory) {
+    if (!window.confirm(`确定删除空大类“${category.name}”吗？`)) return;
+    setError(null);
+    try {
+      await api.deleteDatasetCategory(category.id);
+      if (editing?.id === category.id) reset();
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除数据集大类失败");
+    }
+  }
+
+  return (
+    <section className="panel category-manager">
+      <div className="card-title"><div><h2>数据集大类</h2><p>大类只用于人工整理数据集，不影响契约和采集。</p></div><span>{categories.length} 个大类</span></div>
+      {error && <div className="maintenance-error"><X size={14} />{error}</div>}
+      <form className="category-form" onSubmit={(event) => void submit(event)}>
+        <label className="input-field"><span>大类名称<b>*</b></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：A股数据" /></label>
+        <label className="input-field"><span>说明</span><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="可选" /></label>
+        <button className="primary-button" disabled={submitting}>{submitting ? "保存中…" : editing ? "保存修改" : "创建大类"}</button>
+        {editing && <button type="button" className="ghost-button" onClick={reset}>取消编辑</button>}
+      </form>
+      <div className="category-list">
+        {categories.map((category) => <div className="category-row" key={category.id}><div><strong>{category.name}</strong><span>{category.description || "暂无说明"}</span></div><b>{category.dataset_count} 个数据集</b><button type="button" className="toolbar-button" onClick={() => { setEditing(category); setName(category.name); setDescription(category.description ?? ""); setError(null); }}><Pencil size={13} />编辑</button><button type="button" className="toolbar-button danger-mini" disabled={category.dataset_count > 0} onClick={() => void remove(category)}><Trash2 size={13} />删除</button></div>)}
+        {!categories.length && <div className="dataset-group-empty">还没有数据集大类。</div>}
+      </div>
+    </section>
   );
 }
 
@@ -688,7 +782,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
   );
 }
 
-function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onCollect: (operation: CollectionPurpose) => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
+function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetCategory[]; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onCollect: (operation: CollectionPurpose) => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
   const [activating, setActivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -732,6 +826,8 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
         <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
+      <DatasetCategoryAssignment dataset={dataset} categories={props.categories} onChanged={props.onChanged} />
+
       <DatasetCollectionActions dataset={dataset} onCollect={props.onCollect} />
 
       <DatasetPreview dataset={dataset} />
@@ -748,6 +844,35 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
         </div>
       </section>
     </div>
+  );
+}
+
+function DatasetCategoryAssignment({ dataset, categories, onChanged }: { dataset: DatasetDetail; categories: DatasetCategory[]; onChanged: (dataset: DatasetDetail) => void }) {
+  const [categoryId, setCategoryId] = useState(dataset.category_id ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setCategoryId(dataset.category_id ?? ""), [dataset.category_id]);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      onChanged(await api.assignDatasetCategory(dataset.id, categoryId || null));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存数据集大类失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="panel dataset-category-assignment">
+      <div><strong>数据集大类</strong><span>手动将该数据集归入一个大类，仅影响目录展示。</span></div>
+      <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">未分类</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+      <button type="button" className="primary-button" disabled={saving || categoryId === (dataset.category_id ?? "")} onClick={() => void save()}>{saving ? "保存中…" : "保存分类"}</button>
+      {error && <span className="category-assignment-error">{error}</span>}
+    </section>
   );
 }
 

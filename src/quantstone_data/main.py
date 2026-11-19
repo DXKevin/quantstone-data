@@ -17,6 +17,7 @@ from .database import (
     default_database_url,
     upgrade_sqlite_schema,
 )
+from .dataset_categories import router as dataset_categories_router
 from .dataset_presets import router as dataset_presets_router
 from .logging_config import configure_logging, log_event
 from .maintenance import recover_interrupted_maintenance_jobs
@@ -60,6 +61,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
     app.state.session_factory = session_factory
     app.state.data_root = resolved_data_root
     app.include_router(registry_router, prefix="/api/v1")
+    app.include_router(dataset_categories_router, prefix="/api/v1")
     app.include_router(dataset_presets_router, prefix="/api/v1")
     app.include_router(collection_router, prefix="/api/v1")
     app.include_router(catalog_router, prefix="/api/v1")

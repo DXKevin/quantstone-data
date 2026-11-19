@@ -36,6 +36,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
     dataset_columns = {item["name"] for item in inspector.get_columns("datasets")}
     job_columns = {item["name"] for item in inspector.get_columns("collection_jobs")}
     with engine.begin() as connection:
+        if "category_id" not in dataset_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE datasets ADD COLUMN category_id VARCHAR(36) "
+                    "REFERENCES dataset_categories(id) ON DELETE SET NULL"
+                )
+            )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_datasets_category_id ON datasets (category_id)")
+        )
         if "collection_bindings" not in dataset_columns:
             connection.execute(
                 text("ALTER TABLE datasets ADD COLUMN collection_bindings JSON DEFAULT '[]'")

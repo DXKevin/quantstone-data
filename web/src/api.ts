@@ -30,10 +30,20 @@ export interface DatasetSummary {
   region: string;
   instrument: string;
   market: string | null;
+  category_id: string | null;
   status: DatasetStatus;
   current_schema_version: number;
   collection_bindings: DatasetCollectionBinding[];
   storage_policy: DatasetStoragePolicy | null;
+}
+
+export interface DatasetCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  dataset_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DatasetField {
@@ -308,6 +318,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listDatasets: () => request<DatasetSummary[]>("/api/v1/datasets"),
+  listDatasetCategories: () => request<DatasetCategory[]>("/api/v1/dataset-categories"),
+  createDatasetCategory: (payload: { name: string; description: string | null }) =>
+    request<DatasetCategory>("/api/v1/dataset-categories", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateDatasetCategory: (id: string, payload: { name: string; description: string | null }) =>
+    request<DatasetCategory>(`/api/v1/dataset-categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteDatasetCategory: (id: string) =>
+    request<void>(`/api/v1/dataset-categories/${id}`, { method: "DELETE" }),
+  assignDatasetCategory: (datasetId: string, categoryId: string | null) =>
+    request<DatasetDetail>(`/api/v1/datasets/${datasetId}/category`, {
+      method: "PUT",
+      body: JSON.stringify({ category_id: categoryId }),
+    }),
   listDatasetPresets: () => request<DatasetPreset[]>("/api/v1/dataset-presets"),
   listCollectors: () => request<CollectorDefinition[]>("/api/v1/collectors"),
   getDataset: (id: string) => request<DatasetDetail>(`/api/v1/datasets/${id}`),
