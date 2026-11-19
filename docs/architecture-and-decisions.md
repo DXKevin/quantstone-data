@@ -202,11 +202,11 @@ zhongtai.cn.stock.l2_trade.sz
 `SecurityID -> symbol/exchange_code`、`TransactTime/tradetime -> event_time`、
 `ChannelNo -> channel_code`、`ApplSeqNum -> exchange_order_no/trade_no`、
 `OrderType` 的 `2/1/U -> 0/1/U`、`Side` 的 `1/2 -> B/S`、`Price*10000 -> int64`、
-`ExecType` 的 `F/4 -> 0(成交)/C(撤单)`。中泰 trade 没有 BS 标志，但可以用委托时间
-和序号还原：按 `ChannelNo + SecurityID + ApplSeqNum` 关联买卖委托，成交中较晚到达的
-委托方是主动方；同一毫秒内序号较大者较晚。用 Wind 的 `side` 对照验证，6,987 万笔成交
-100% 一致；中泰该字段可还原，撤单记录为空。`Side 1/2` 的映射同时用委托价与成交价
-复核。中泰数据设置为 `manual` 更新频率并标记历史数据集，仅作为历史补齐。
+`ExecType` 的 `F/4 -> 0(成交)/C(撤单)`。中泰 trade 没有 BS 标志，但 trade 记录自带
+`BidApplSeqNum` 和 `OfferApplSeqNum`；同一股票同一交易日委托在单一频道，直接比较两个
+委托 ID 大小即可还原主动方，不需要 join order 文件：买方 ID 更大为 B，卖方 ID 更大为
+S，撤单或任一 ID 为 0 时为空。用 Wind 的 `side` 对照验证，6,987 万笔成交 100% 一致；
+`Side 1/2` 的映射同时用委托价与成交价复核。中泰数据设置为 `manual` 更新频率并标记历史数据集，仅作为历史补齐。
 
 最终形成四个数据集：
 

@@ -216,7 +216,7 @@ OfferApplSeqNum   -> ask_order_no
 
 限制：
 
-- 中泰 trade 没有 BS 标志，但可按 `ChannelNo + SecurityID + ApplSeqNum` 关联委托，用较晚的委托方还原主动方；Wind 对照 6,987 万笔 100% 一致，撤单为空；
+- 中泰 trade 没有 BS 标志，但 trade 自带 `BidApplSeqNum`/`OfferApplSeqNum`，单频道下直接比较两个 ID 即可还原主动方，不需要 join order；Wind 对照 6,987 万笔 100% 一致，撤单为空；
 - 中泰 trade 没有委托代码，`order_code` 导入时填 0 或空；
 - `OrderType` 2/1/U 和 `Side` 1/2 的映射是读取归一化假设，需要按中泰源文档再确认；
 - 中泰转换脚本和扫描器操作尚未实现，当前只创建了契约。
