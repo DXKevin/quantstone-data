@@ -85,6 +85,7 @@ function App() {
   const [datasetSection, setDatasetSection] = useState<DatasetSection>("registry");
   const [collectionSection, setCollectionSection] = useState<CollectionSection>("jobs");
   const [collectionRequest, setCollectionRequest] = useState<CollectionRequest | null>(null);
+  const [collectionJobRequest, setCollectionJobRequest] = useState<string | null>(null);
   const [view, setView] = useState<View>("list");
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [categories, setCategories] = useState<DatasetCategory[]>([]);
@@ -164,7 +165,7 @@ function App() {
       </aside>
 
       <main className="main-area">
-        {area === "overview" && <OverviewPage datasets={datasets} collectors={collectors} onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} />}
+        {area === "overview" && <OverviewPage datasets={datasets} collectors={collectors} onOpen={(id) => { setArea("datasets"); setDatasetSection("registry"); void openDataset(id); }} onOpenCollectionJob={(jobId) => { setCollectionJobRequest(jobId); setCollectionSection("jobs"); setArea("collection"); }} />}
         {area === "collection" && collectionSection === "jobs" && (
           <CollectionJobs
             datasets={datasets}
@@ -172,6 +173,8 @@ function App() {
             navigation={<CollectionTabs selected="jobs" onSelect={setCollectionSection} />}
             requestedCollection={collectionRequest}
             onRequestHandled={() => setCollectionRequest(null)}
+            requestedJobId={collectionJobRequest}
+            onJobRequestHandled={() => setCollectionJobRequest(null)}
           />
         )}
         {area === "collection" && collectionSection === "capabilities" && (

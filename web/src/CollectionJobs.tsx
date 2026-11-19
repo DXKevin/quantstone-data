@@ -61,12 +61,14 @@ const runStatusLabels: Record<string, string> = {
   review_failed: "审核异常",
 };
 
-export default function CollectionJobs({ datasets, collectors, navigation, requestedCollection, onRequestHandled }: {
+export default function CollectionJobs({ datasets, collectors, navigation, requestedCollection, onRequestHandled, requestedJobId, onJobRequestHandled }: {
   datasets: DatasetSummary[];
   collectors: CollectorDefinition[];
   navigation?: ReactNode;
   requestedCollection?: { datasetId: string; operation: CollectionOperation } | null;
   onRequestHandled?: () => void;
+  requestedJobId?: string | null;
+  onJobRequestHandled?: () => void;
 }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
   const [jobTotal, setJobTotal] = useState(0);
@@ -128,6 +130,18 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     setView("create");
     onRequestHandled?.();
   }, [requestedCollection, onRequestHandled]);
+
+  useEffect(() => {
+    if (!requestedJobId) return;
+    setView("list");
+    setJobPage(0);
+    setExpandedJobId(requestedJobId);
+    setDetailTab("runs");
+    void loadJobs(false, 0);
+    void loadRuns(requestedJobId);
+    window.setTimeout(() => document.getElementById(`job-${requestedJobId}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 400);
+    onJobRequestHandled?.();
+  }, [requestedJobId]);
 
   useEffect(() => {
     jobsRef.current = jobs;
@@ -411,7 +425,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
               const jobRuns = runs[job.id] ?? [];
               const jobLogs = logs[job.id] ?? [];
               return (
-              <div className="job-block" key={job.id}>
+              <div className="job-block" key={job.id} id={`job-${job.id}`}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
                 <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · 创建于 {formatDateTime(job.created_at)}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}<small>{expanded ? "点击收起明细" : "点击查看明细"}</small></span>
                 <span>{operationLabels[job.operation]}</span>

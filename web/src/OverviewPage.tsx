@@ -45,7 +45,7 @@ type PendingStart = {
   values: Record<string, string>;
 };
 
-export default function OverviewPage({ datasets, collectors, onOpen }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; onOpen: (id: string) => void }) {
+export default function OverviewPage({ datasets, collectors, onOpen, onOpenCollectionJob }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; onOpen: (id: string) => void; onOpenCollectionJob: (jobId: string) => void }) {
   const [items, setItems] = useState<DatasetOverview[]>([]);
   const [collection, setCollection] = useState<CollectionOverview | null>(null);
   const [tasksExpanded, setTasksExpanded] = useState(false);
@@ -252,7 +252,7 @@ export default function OverviewPage({ datasets, collectors, onOpen }: { dataset
                   type="button"
                   className="recent-collection-row"
                   key={job.id}
-                  onClick={() => onOpen(job.dataset_id)}
+                  onClick={() => onOpenCollectionJob(job.id)}
                 >
                   <span className={`job-status job-status-${job.status}`}><i />{jobStatusLabels[job.status] ?? job.status}</span>
                   <span className="recent-collection-name">
