@@ -1,42 +1,16 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from typing import Any
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
+from ...field_types import arrow_type, normalize_value
 from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.daily"
-
-
-def _arrow_type(data_type: str) -> pa.DataType:
-    return {
-        "string": pa.string(),
-        "date": pa.date32(),
-        "int32": pa.int32(),
-        "int64": pa.int64(),
-        "float32": pa.float32(),
-        "float64": pa.float64(),
-        "boolean": pa.bool_(),
-        "timestamp": pa.timestamp("us"),
-    }[data_type]
-
-
-def _convert(value: Any, data_type: str) -> Any:
-    if value is None or value == "":
-        return None
-    if data_type == "date":
-        return datetime.strptime(str(value), "%Y%m%d").date()
-    if data_type in {"float32", "float64"}:
-        return float(value)
-    if data_type in {"int32", "int64"}:
-        return int(value)
-    return value
 
 
 def _call_daily(token: str, trade_date: str, fields: list[str]) -> list[dict]:
@@ -73,7 +47,7 @@ def _collect_daily(
     rows = _call_daily(context.token, trade_date.replace("-", ""), source_fields)
     normalized = [
         {
-            field["name"]: _convert(
+            field["name"]: normalize_value(
                 row.get(field.get("source_name") or field["name"]), field["data_type"]
             )
             for field in field_contracts
@@ -82,7 +56,7 @@ def _collect_daily(
     ]
     schema = pa.schema(
         [
-            pa.field(field["name"], _arrow_type(field["data_type"]), field["nullable"])
+            pa.field(field["name"], arrow_type(field["data_type"]), field["nullable"])
             for field in field_contracts
         ]
     )

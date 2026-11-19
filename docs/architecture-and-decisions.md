@@ -200,6 +200,34 @@ tb_l2.cn.stock.l2_trade.sz
 
 当前实现只覆盖其中的核心身份信息、Schema、字段、主键和时间字段。采集、分区、存储和质量策略将在后续模块中增加。
 
+### 6.1 字段类型
+
+字段契约的 `data_type` 是封闭枚举，当前只开放 Parquet 原生支持且语义明确的类型：
+
+- `string` → Parquet BYTE_ARRAY / UTF8；
+- `int32`、`int64` → INT32 / INT64；
+- `float32`、`float64` → FLOAT / DOUBLE；
+- `boolean` → BOOLEAN；
+- `date` → DATE（Arrow `date32`，只到天，无时间）；
+- `timestamp` → TIMESTAMP(MICROS)，表示无时区的交易所本地时间，例如
+  `2026-11-19 09:30:00`；带时区的值会被拒绝，不做静默换算。
+
+Registry 在创建和修改数据集时校验枚举，未知类型直接返回 422。采集器统一调用
+`field_types.normalize_value` 把供应商源值转换为契约类型，并由 `field_types.arrow_type`
+生成 Parquet Schema，不再各自维护一份类型映射。`date` 当前接受 `YYYYMMDD` 字符串、
+`datetime.date` 或 `datetime`，空值保持为空；`timestamp` 接受无时区的 `datetime` 或
+ISO 8601 字符串（日期与时间用空格或 `T` 分隔），带时区偏移的值直接拒绝。
+
+暂不开放的常见类型：
+
+- `decimal`：Parquet 支持 DECIMAL，但契约还需要精度和小数位定义；当前价格字段使用
+  `float64`；
+- 嵌套 `struct`、`list`、`map`：Parquet 支持，但当前字段编辑、预览和校验都按单列模型
+  设计，暂不开放。
+
+新增类型时必须同时修改共享类型模块、前端字段下拉、测试和本文档，不能只在单个采集器里
+增加映射。
+
 ## 7. Registry 与 Catalog
 
 这两个概念必须分开：

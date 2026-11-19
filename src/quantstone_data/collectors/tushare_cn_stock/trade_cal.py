@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
+from ...field_types import arrow_type, normalize_value
 from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.trade_cal"
@@ -42,22 +43,6 @@ def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[s
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]
 
 
-def _convert(value, data_type: str):
-    if value is None or value == "":
-        return None
-    if data_type == "date":
-        return datetime.strptime(str(value), "%Y%m%d").date()
-    if data_type in {"int32", "int64"}:
-        return int(value)
-    return value
-
-
-def _arrow_type(data_type: str) -> pa.DataType:
-    return {"string": pa.string(), "date": pa.date32(), "int32": pa.int32(), "int64": pa.int64()}[
-        data_type
-    ]
-
-
 def _collect(
     context: CollectionContext, start_date: date, end_date: date, field_contracts: list[dict]
 ) -> CollectionResult:
@@ -65,7 +50,7 @@ def _collect(
     rows = _call_trade_cal(context.token, start_date, end_date, source_fields)
     normalized = [
         {
-            field["name"]: _convert(
+            field["name"]: normalize_value(
                 row.get(field.get("source_name") or field["name"]), field["data_type"]
             )
             for field in field_contracts
@@ -75,7 +60,7 @@ def _collect(
     normalized.sort(key=lambda row: (row["cal_date"], row["exchange"]))
     schema = pa.schema(
         [
-            pa.field(field["name"], _arrow_type(field["data_type"]), field["nullable"])
+            pa.field(field["name"], arrow_type(field["data_type"]), field["nullable"])
             for field in field_contracts
         ]
     )

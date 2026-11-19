@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterable
-from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
 from urllib.parse import urlparse
@@ -18,6 +17,7 @@ from ...collection_protocol import (
     DatasetArtifact,
     RateLimitExceeded,
 )
+from ...field_types import arrow_type, normalize_value
 
 DEFAULT_API_URL = "https://api.tushare.pro"
 # TuShare stock_basic 需要分别请求三种状态；空值不会稳定返回完整股票范围。
@@ -96,35 +96,6 @@ def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
     return [dict(zip(returned_fields, item, strict=False)) for item in data.get("items") or []]
 
 
-def _arrow_type(data_type: str) -> pa.DataType:
-    return {
-        "string": pa.string(),
-        "date": pa.date32(),
-        "int32": pa.int32(),
-        "int64": pa.int64(),
-        "float32": pa.float32(),
-        "float64": pa.float64(),
-        "boolean": pa.bool_(),
-        "timestamp": pa.timestamp("us"),
-    }[data_type]
-
-
-def _convert(value: Any, data_type: str) -> Any:
-    if value is None or value == "":
-        return None
-    if data_type == "string":
-        return str(value)
-    if data_type == "date":
-        return datetime.strptime(str(value), "%Y%m%d").date()
-    if data_type in {"float32", "float64"}:
-        return float(value)
-    if data_type in {"int32", "int64"}:
-        return int(value)
-    if data_type == "boolean":
-        return bool(value)
-    return value
-
-
 def _source_value(row: dict, field: dict) -> Any:
     source_name = field.get("source_name") or field["name"]
     value = row.get(source_name)
@@ -150,7 +121,7 @@ def collect(
 
     normalized = [
         {
-            field["name"]: _convert(
+            field["name"]: normalize_value(
                 _source_value(row, field), field["data_type"]
             )
             for field in field_contracts
@@ -162,7 +133,7 @@ def collect(
         normalized.sort(key=lambda row: row[primary_sort] or "")
     schema = pa.schema(
         [
-            pa.field(field["name"], _arrow_type(field["data_type"]), field["nullable"])
+            pa.field(field["name"], arrow_type(field["data_type"]), field["nullable"])
             for field in field_contracts
         ]
     )

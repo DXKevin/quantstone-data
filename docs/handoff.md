@@ -98,6 +98,7 @@
 - `tushare.cn.stock.stock_basic` 首次和增量采集均合并 `L`、`D`、`P` 三种股票状态；
 - `tushare.cn.stock.stock_basic` 预置契约包含供应商接口的全部 17 个字段；
 - stock_basic 只对代理返回的浮点 `symbol` 用 `ts_code` 前缀恢复，代理返回的空值保持为空；
+- 字段契约类型收敛为 8 个 Parquet 原生类型并在 Registry 校验，采集器共用 `field_types`；
 - 旧股票信息数据集启动时自动补齐 snapshot 存储策略，审核通过后登记 Catalog 并可直接预览；
 - 采集任务详情新增“运行日志”页签，可查看采集、审核、发布、限流和重试事件，并在执行期间自动刷新；
 - 新增任务日志读取 API，默认返回最近 500 条；执行框架日志已携带 job_id，可正确进入任务日志文件；
@@ -173,6 +174,25 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 筛选下载会在服务端生成完整临时文件，前端 `fetch` 仍会把下载 Blob 放入浏览器内存，超大导出后续应改为浏览器原生流式下载；
 
 ## 最近一次交接记录
+
+### 2026-11-19 — DeepSeek Harness（字段类型收敛与 Parquet 映射）
+
+完成：
+
+- 新增 `field_types.py`，统一 `string`、`int32`、`int64`、`float32`、`float64`、
+  `boolean`、`date`、`timestamp` 的归一化与 Parquet 映射；
+- `DatasetFieldCreate` 校验类型枚举，未知类型返回 422；
+- 三个 TuShare 采集器删除各自的 `_convert` / `_arrow_type`，改用共享实现；
+- `date` 接受 `YYYYMMDD`、`date`、`datetime`；`timestamp` 表示无时区的交易所本地时间，
+  带时区的值会被拒绝；
+- 新增 Parquet 往返、日期/时间转换、API 拒绝未知类型等测试；
+- 架构文档补充字段类型、Parquet 映射和暂不开放范围。
+
+验证：
+
+- `pytest -q`：68 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- `npm run build`：通过。
 
 ### 2026-11-19 — DeepSeek Harness（stock_basic 空值保持为空）
 

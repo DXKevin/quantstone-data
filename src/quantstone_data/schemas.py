@@ -3,7 +3,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .field_types import DATA_TYPE_NAMES
 
 ID_SEGMENT = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -54,6 +56,14 @@ class DatasetFieldCreate(BaseModel):
     description: str = Field(min_length=1)
     unit: str | None = Field(default=None, max_length=64)
     source_name: str | None = Field(default=None, max_length=128)
+
+    @field_validator("data_type")
+    @classmethod
+    def validate_data_type(cls, value: str) -> str:
+        if value not in DATA_TYPE_NAMES:
+            options = ", ".join(DATA_TYPE_NAMES)
+            raise ValueError(f"不支持的数据类型：{value}；可选类型：{options}")
+        return value
 
 
 class DatasetCreate(BaseModel):
