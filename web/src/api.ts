@@ -314,11 +314,6 @@ export interface CatalogPartitionItem {
   dataset_id: string;
   partition_key: string;
   file_path: string;
-  row_count: number;
-  size_bytes: number;
-  sha256: string;
-  collection_run_id: string;
-  published_at: string;
 }
 
 export interface AutoCompactionResult {
@@ -585,10 +580,8 @@ export const api = {
     request<MaintenanceJob>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact?year=${year}`, { method: "POST" }),
   compactAllYears: (datasetId: string) =>
     request<AutoCompactionResult>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact-all`, { method: "POST" }),
-  listCatalogPartitions: (datasetId?: string) => {
-    const query = datasetId ? `?dataset_id=${encodeURIComponent(datasetId)}` : "";
-    return request<CatalogPartitionItem[]>(`/api/v1/catalog/partitions${query}`);
-  },
+  listCatalogPartitions: (datasetId: string) =>
+    request<CatalogPartitionItem[]>(`/api/v1/catalog/partitions?dataset_id=${encodeURIComponent(datasetId)}`),
   cancelMaintenanceJob: (jobId: string) =>
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   listScanners: () => request<ScannerDefinition[]>("/api/v1/scanners"),
