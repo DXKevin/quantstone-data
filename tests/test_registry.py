@@ -221,3 +221,27 @@ def test_active_dataset_cannot_be_edited(tmp_path: Path) -> None:
         response = client.put(f"/api/v1/datasets/{created['id']}", json=payload)
 
     assert response.status_code == 409
+
+
+def test_active_dataset_metadata_can_be_edited(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
+    with TestClient(app) as client:
+        created = client.post("/api/v1/datasets", json=dataset_payload()).json()
+        client.post(f"/api/v1/datasets/{created['id']}/activate")
+
+        response = client.patch(
+            f"/api/v1/datasets/{created['id']}",
+            json={
+                "display_name": "上海逐笔委托",
+                "description": "启用后更新的说明",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "上海逐笔委托"
+    assert response.json()["description"] == "启用后更新的说明"
+    assert response.json()["status"] == "active"
+    assert response.json()["current_schema_version"] == 1
+    assert response.json()["schema"]["fields"] == created["schema"]["fields"]

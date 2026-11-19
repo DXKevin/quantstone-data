@@ -122,6 +122,11 @@ class DatasetUpdate(BaseModel):
         return self
 
 
+class DatasetMetadataUpdate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+
 class DatasetFieldRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

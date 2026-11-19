@@ -10,6 +10,7 @@ from .models import Dataset, DatasetField, DatasetSchemaVersion
 from .schemas import (
     DatasetCreate,
     DatasetFieldRead,
+    DatasetMetadataUpdate,
     DatasetRead,
     DatasetSchemaRead,
     DatasetStatus,
@@ -156,6 +157,23 @@ def update_draft_dataset(
         )
         for position, field in enumerate(payload.fields)
     ]
+    session.commit()
+
+    stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    assert stored is not None
+    return serialize_dataset(stored)
+
+
+@router.patch("/{dataset_id}", response_model=DatasetRead)
+def update_dataset_metadata(
+    dataset_id: str, payload: DatasetMetadataUpdate, session: SessionDep
+) -> DatasetRead:
+    dataset = session.scalar(dataset_query().where(Dataset.id == dataset_id))
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+
+    dataset.display_name = payload.display_name
+    dataset.description = payload.description
     session.commit()
 
     stored = session.scalar(dataset_query().where(Dataset.id == dataset_id))

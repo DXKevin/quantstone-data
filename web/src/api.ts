@@ -94,6 +94,11 @@ export type DatasetUpdatePayload = Pick<
   | "fields"
 >;
 
+export type DatasetMetadataUpdatePayload = Pick<
+  DatasetCreatePayload,
+  "display_name" | "description"
+>;
+
 export interface CollectorParameter {
   name: string;
   data_type: string;
@@ -302,6 +307,11 @@ export const api = {
   updateDataset: (id: string, payload: DatasetUpdatePayload) =>
     request<DatasetDetail>(`/api/v1/datasets/${id}`, {
       method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  updateDatasetMetadata: (id: string, payload: DatasetMetadataUpdatePayload) =>
+    request<DatasetDetail>(`/api/v1/datasets/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
   activateDataset: (id: string) =>

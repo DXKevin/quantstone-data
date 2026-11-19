@@ -31,7 +31,7 @@ import CollectionJobs from "./CollectionJobs";
 import DatasetPreview from "./DatasetPreview";
 import OverviewPage from "./OverviewPage";
 
-type View = "list" | "create" | "edit" | "detail";
+type View = "list" | "create" | "edit" | "metadata" | "detail";
 type Area = "overview" | "datasets" | "collectors" | "collection";
 
 interface FieldDraft {
@@ -170,11 +170,15 @@ function App() {
         {area === "datasets" && view === "edit" && selected && (
           <DatasetForm collectors={collectors} datasets={datasets} dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
         )}
+        {area === "datasets" && view === "metadata" && selected && (
+          <DatasetMetadataForm dataset={selected} onCancel={() => setView("detail")} onSaved={(data) => void handleSaved(data)} />
+        )}
         {area === "datasets" && view === "detail" && selected && (
           <DatasetDetailView
             dataset={selected}
             onBack={() => setView("list")}
             onEdit={() => setView("edit")}
+            onEditMetadata={() => setView("metadata")}
             onDeleted={() => {
               setSelected(null);
               setView("list");
@@ -498,7 +502,57 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
   );
 }
 
-function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
+function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
+  const [displayName, setDisplayName] = useState(props.dataset.display_name);
+  const [description, setDescription] = useState(props.dataset.description ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (!displayName.trim()) {
+      setError("请填写显示名称。");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      props.onSaved(await api.updateDatasetMetadata(props.dataset.id, {
+        display_name: displayName.trim(),
+        description: description.trim() || null,
+      }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="page create-page" onSubmit={(event) => void submit(event)}>
+      <header className="page-header compact">
+        <div><button type="button" className="back-button" onClick={props.onCancel}><ArrowLeft size={16} />返回数据集</button><h1>编辑基本信息</h1><p className="subtitle">修改展示信息，不改变数据集身份、Schema 或已发布数据。</p></div>
+        <div className="header-actions"><button type="button" className="ghost-button" onClick={props.onCancel}>取消</button><button className="primary-button" disabled={submitting}>{submitting ? "正在保存…" : "保存修改"}</button></div>
+      </header>
+
+      {error && <div className="form-error"><X size={17} />{error}</div>}
+
+      <section className="form-section">
+        <div className="section-number">01</div><div className="section-intro"><h2>展示信息</h2><p>已启用数据集可以更新名称和说明。</p></div>
+        <div className="form-content">
+          <div className="id-preview"><span>数据集 ID（不可修改）</span><code>{props.dataset.id}</code></div>
+          <div className="form-grid two-columns">
+            <Input label="显示名称" value={displayName} onChange={setDisplayName} placeholder="数据集显示名称" required />
+            <Input label="说明" value={description} onChange={setDescription} placeholder="说明数据来源、内容和用途" />
+          </div>
+          <div className="operation-help">字段、主键、采集绑定和存储策略仍使用当前 Schema v{props.dataset.schema.version}；后续将通过版本化流程变更。</div>
+        </div>
+      </section>
+    </form>
+  );
+}
+
+function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; onEdit: () => void; onEditMetadata: () => void; onDeleted: () => void; onChanged: (dataset: DatasetDetail) => void }) {
   const [activating, setActivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -533,7 +587,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; onBack: () => void; 
     <div className="page">
       <header className="page-header compact">
         <div><button className="back-button" onClick={props.onBack}><ArrowLeft size={16} />返回数据集</button><div className="title-line"><h1>{dataset.display_name}</h1><StatusBadge status={dataset.status} /></div><code className="large-id">{dataset.id}</code></div>
-        {dataset.status === "draft" && <div className="header-actions"><button className="danger-button" onClick={() => void remove()} disabled={deleting}><Trash2 size={16} />{deleting ? "正在删除…" : "删除草稿"}</button><button className="ghost-button" onClick={props.onEdit}><Pencil size={16} />编辑</button><button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button></div>}
+        {dataset.status === "draft" ? <div className="header-actions"><button className="danger-button" onClick={() => void remove()} disabled={deleting}><Trash2 size={16} />{deleting ? "正在删除…" : "删除草稿"}</button><button className="ghost-button" onClick={props.onEdit}><Pencil size={16} />编辑</button><button className="primary-button" onClick={() => void activate()} disabled={activating}><Check size={17} />{activating ? "正在启用…" : "启用数据集"}</button></div> : <div className="header-actions"><button className="ghost-button" onClick={props.onEditMetadata}><Pencil size={16} />编辑基本信息</button></div>}
       </header>
       {error && <div className="form-error"><X size={17} />{error}</div>}
 

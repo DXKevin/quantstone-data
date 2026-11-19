@@ -101,6 +101,7 @@ POST   /api/v1/datasets
 GET    /api/v1/datasets
 GET    /api/v1/datasets/{dataset_id}
 PUT    /api/v1/datasets/{dataset_id}
+PATCH  /api/v1/datasets/{dataset_id}
 POST   /api/v1/datasets/{dataset_id}/activate
 DELETE /api/v1/datasets/{dataset_id}
 GET    /api/v1/collectors
@@ -121,6 +122,8 @@ POST   /api/v1/maintenance-jobs/{job_id}/cancel
 POST   /api/v1/datasets/{dataset_id}/compact?year=YYYY
 GET    /health
 ```
+
+`PUT` 仅用于修改草稿的完整数据契约；`PATCH` 用于修改显示名称和说明，已启用数据集也可使用。
 
 手动文件入库采用两步流程：先创建 `input_method=file_import` 的采集任务，再将文件上传到该任务的 `/file` 接口。文件只会进入外部数据根目录的 staging 区，不会直接发布为正式数据。
 
