@@ -56,7 +56,8 @@ cd /home/quantadmin/project/quantstone-data
 
 同一内网的浏览器可访问 `http://<服务器内网IP>:5173`。Vite 已将 `/api` 和 `/health`
 代理到服务器本机 `127.0.0.1:8000`，浏览器不需要直接请求 8000 端口。防火墙只应向可信
-内网开放 5173 端口。脚本还支持 `stop`、`restart`、`status` 和 `logs`。
+内网开放 5173 端口。脚本通过用户级 systemd 持续运行服务，并支持 `stop`、`restart`、
+`status` 和 `logs`；当前用户未启用 linger，因此服务器重启后的自动启动仍需另行配置。
 
 当前后台任务队列、取消集合和限流器都在进程内，因此后端只能运行一个 Uvicorn worker，
 不能使用 `--workers` 启动多进程。服务重启会把未完成任务标记失败，不能自动续跑。

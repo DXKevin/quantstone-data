@@ -3,46 +3,60 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-RUNTIME_DIR="$PROJECT_ROOT/var/run"
 LOG_DIR="$PROJECT_ROOT/var/logs"
-BACKEND_PID_FILE="$RUNTIME_DIR/backend.pid"
-FRONTEND_PID_FILE="$RUNTIME_DIR/frontend.pid"
 BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
+BACKEND_UNIT="quantstone-data-backend.service"
+FRONTEND_UNIT="quantstone-data-frontend.service"
 BACKEND_PORT="${QUANTSTONE_BACKEND_PORT:-8000}"
 FRONTEND_PORT="${QUANTSTONE_FRONTEND_PORT:-5173}"
 
-is_running() {
-    local pid_file="$1"
-    [[ -f "$pid_file" ]] || return 1
-    local pid
-    pid="$(<"$pid_file")"
-    [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null
+unit_is_active() {
+    systemctl --user is-active --quiet "$1"
 }
 
-remove_stale_pid() {
-    local pid_file="$1"
-    if [[ -f "$pid_file" ]] && ! is_running "$pid_file"; then
-        rm -f "$pid_file"
-    fi
+require_runtime() {
+    command -v systemd-run >/dev/null 2>&1 || {
+        echo "当前系统缺少 systemd-run，无法持久运行服务。" >&2
+        exit 1
+    }
+    systemctl --user show-environment >/dev/null 2>&1 || {
+        echo "用户级 systemd 不可用，请先确认用户会话状态。" >&2
+        exit 1
+    }
+    [[ -x "$PROJECT_ROOT/.venv/bin/uvicorn" ]] || {
+        echo "缺少后端环境，请先安装 Python 依赖。" >&2
+        exit 1
+    }
+    [[ -x "$PROJECT_ROOT/web/node_modules/.bin/vite" ]] || {
+        echo "缺少前端环境，请先在 web 目录运行 npm install。" >&2
+        exit 1
+    }
+    [[ -f "$PROJECT_ROOT/.env" ]] || {
+        echo "缺少 $PROJECT_ROOT/.env。" >&2
+        exit 1
+    }
 }
 
 wait_for_url() {
     local name="$1"
     local url="$2"
-    local pid_file="$3"
-    local log_file="$4"
+    local unit="$3"
     for _ in {1..40}; do
         if curl --fail --silent --output /dev/null "$url"; then
             return 0
         fi
-        if ! is_running "$pid_file"; then
+        if ! unit_is_active "$unit"; then
             break
         fi
         sleep 0.5
     done
     echo "$name 启动失败，最近日志：" >&2
-    tail -n 30 "$log_file" >&2 || true
+    if [[ "$unit" == "$BACKEND_UNIT" ]]; then
+        tail -n 30 "$BACKEND_LOG" >&2 || true
+    else
+        tail -n 30 "$FRONTEND_LOG" >&2 || true
+    fi
     return 1
 }
 
@@ -72,102 +86,102 @@ print_access_urls() {
     fi
 }
 
+start_backend() {
+    if unit_is_active "$BACKEND_UNIT"; then
+        return
+    fi
+    systemctl --user reset-failed "$BACKEND_UNIT" 2>/dev/null || true
+    systemd-run --user \
+        --unit "$BACKEND_UNIT" \
+        --collect \
+        --property "Description=QuantStone Data backend" \
+        --property "WorkingDirectory=$PROJECT_ROOT" \
+        --property "Restart=on-failure" \
+        --property "RestartSec=2s" \
+        --property "StandardOutput=append:$BACKEND_LOG" \
+        --property "StandardError=append:$BACKEND_LOG" \
+        "$PROJECT_ROOT/.venv/bin/uvicorn" quantstone_data.main:app \
+        --env-file "$PROJECT_ROOT/.env" \
+        --host 0.0.0.0 \
+        --port "$BACKEND_PORT" \
+        >/dev/null
+}
+
+start_frontend() {
+    if unit_is_active "$FRONTEND_UNIT"; then
+        return
+    fi
+    systemctl --user reset-failed "$FRONTEND_UNIT" 2>/dev/null || true
+    systemd-run --user \
+        --unit "$FRONTEND_UNIT" \
+        --collect \
+        --property "Description=QuantStone Data frontend" \
+        --property "WorkingDirectory=$PROJECT_ROOT/web" \
+        --property "Restart=on-failure" \
+        --property "RestartSec=2s" \
+        --property "StandardOutput=append:$FRONTEND_LOG" \
+        --property "StandardError=append:$FRONTEND_LOG" \
+        "$PROJECT_ROOT/web/node_modules/.bin/vite" \
+        --host 0.0.0.0 \
+        --port "$FRONTEND_PORT" \
+        --strictPort \
+        >/dev/null
+}
+
 start_services() {
-    mkdir -p "$RUNTIME_DIR" "$LOG_DIR"
-    remove_stale_pid "$BACKEND_PID_FILE"
-    remove_stale_pid "$FRONTEND_PID_FILE"
-
-    [[ -x "$PROJECT_ROOT/.venv/bin/uvicorn" ]] || {
-        echo "缺少后端环境，请先安装 Python 依赖。" >&2
-        exit 1
-    }
-    [[ -x "$PROJECT_ROOT/web/node_modules/.bin/vite" ]] || {
-        echo "缺少前端环境，请先在 web 目录运行 npm install。" >&2
-        exit 1
-    }
-    [[ -f "$PROJECT_ROOT/.env" ]] || {
-        echo "缺少 $PROJECT_ROOT/.env。" >&2
-        exit 1
-    }
-
-    if ! is_running "$BACKEND_PID_FILE"; then
-        (
-            cd "$PROJECT_ROOT"
-            nohup "$PROJECT_ROOT/.venv/bin/uvicorn" quantstone_data.main:app \
-                --env-file "$PROJECT_ROOT/.env" \
-                --host 0.0.0.0 \
-                --port "$BACKEND_PORT" \
-                >"$BACKEND_LOG" 2>&1 &
-            echo "$!" >"$BACKEND_PID_FILE"
-        )
-    fi
-    if ! wait_for_url "后端" "http://127.0.0.1:$BACKEND_PORT/health" "$BACKEND_PID_FILE" "$BACKEND_LOG"; then
+    require_runtime
+    mkdir -p "$LOG_DIR"
+    start_backend
+    if ! wait_for_url "后端" "http://127.0.0.1:$BACKEND_PORT/health" "$BACKEND_UNIT"; then
         stop_services
         exit 1
     fi
-
-    if ! is_running "$FRONTEND_PID_FILE"; then
-        (
-            cd "$PROJECT_ROOT/web"
-            nohup "$PROJECT_ROOT/web/node_modules/.bin/vite" \
-                --host 0.0.0.0 \
-                --port "$FRONTEND_PORT" \
-                --strictPort \
-                >"$FRONTEND_LOG" 2>&1 &
-            echo "$!" >"$FRONTEND_PID_FILE"
-        )
-    fi
-    if ! wait_for_url "前端" "http://127.0.0.1:$FRONTEND_PORT" "$FRONTEND_PID_FILE" "$FRONTEND_LOG"; then
+    start_frontend
+    if ! wait_for_url "前端" "http://127.0.0.1:$FRONTEND_PORT" "$FRONTEND_UNIT"; then
         stop_services
         exit 1
     fi
-
     echo "QuantStone Data 已启动。"
     echo "本机前端：http://127.0.0.1:$FRONTEND_PORT"
     echo "后端接口：http://127.0.0.1:$BACKEND_PORT/docs"
     print_access_urls
 }
 
-stop_process() {
+stop_unit() {
     local name="$1"
-    local pid_file="$2"
-    if ! is_running "$pid_file"; then
-        rm -f "$pid_file"
+    local unit="$2"
+    if unit_is_active "$unit"; then
+        systemctl --user stop "$unit"
+        echo "$name 已停止。"
+    else
         echo "$name 未运行。"
-        return
     fi
-    local pid
-    pid="$(<"$pid_file")"
-    kill "$pid"
-    for _ in {1..25}; do
-        if ! kill -0 "$pid" 2>/dev/null; then
-            rm -f "$pid_file"
-            echo "$name 已停止。"
-            return
-        fi
-        sleep 0.2
-    done
-    kill -KILL "$pid" 2>/dev/null || true
-    rm -f "$pid_file"
-    echo "$name 已强制停止。"
+    systemctl --user reset-failed "$unit" 2>/dev/null || true
 }
 
 stop_services() {
-    stop_process "前端" "$FRONTEND_PID_FILE"
-    stop_process "后端" "$BACKEND_PID_FILE"
+    stop_unit "前端" "$FRONTEND_UNIT"
+    stop_unit "后端" "$BACKEND_UNIT"
+}
+
+show_unit_status() {
+    local name="$1"
+    local unit="$2"
+    local port="$3"
+    if unit_is_active "$unit"; then
+        local pid
+        pid="$(systemctl --user show "$unit" --property MainPID --value)"
+        echo "$name：运行中，PID $pid，端口 $port"
+    else
+        echo "$name：未运行"
+    fi
 }
 
 show_status() {
-    if is_running "$BACKEND_PID_FILE"; then
-        echo "后端：运行中，PID $(<"$BACKEND_PID_FILE")，端口 $BACKEND_PORT"
-    else
-        echo "后端：未运行"
-    fi
-    if is_running "$FRONTEND_PID_FILE"; then
-        echo "前端：运行中，PID $(<"$FRONTEND_PID_FILE")，端口 $FRONTEND_PORT"
+    show_unit_status "后端" "$BACKEND_UNIT" "$BACKEND_PORT"
+    show_unit_status "前端" "$FRONTEND_UNIT" "$FRONTEND_PORT"
+    if unit_is_active "$FRONTEND_UNIT"; then
         print_access_urls
-    else
-        echo "前端：未运行"
     fi
 }
 
