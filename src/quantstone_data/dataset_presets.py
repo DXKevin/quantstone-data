@@ -200,7 +200,7 @@ DATASET_PRESETS = (
             display_name="Wind A股逐笔委托（深市）",
             description=(
                 "Wind A股 L2 逐笔委托（深市），源文件 SZ/YYYYMMDD/order.parquet。"
-                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数，交易所代码按字符串保存。"
+                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数；交易所代码和频道代码按字符串保存。"
             ),
             update_frequency="daily",
             time_granularity="tick",
@@ -212,7 +212,12 @@ DATASET_PRESETS = (
                 "write_strategy": "replace_partition",
                 "compaction": None,
             },
-            primary_key=["trade_date", "symbol", "exchange_order_no"],
+            primary_key=[
+                "trade_date",
+                "symbol",
+                "channel_code",
+                "exchange_order_no",
+            ],
             time_field="event_time",
             fields=[
                 field(
@@ -245,9 +250,9 @@ DATASET_PRESETS = (
                     source_name="时间",
                 ),
                 field(
-                    "order_seq",
-                    "int64",
-                    "委托编号；当前样本恒为 0，原样保留",
+                    "channel_code",
+                    "string",
+                    "频道代码，原始字段为 char(1)；合并 Parquet 可能误推为整数，按字符串保存",
                     nullable=False,
                     source_name="委托编号",
                 ),
@@ -261,7 +266,7 @@ DATASET_PRESETS = (
                 field(
                     "order_type",
                     "string",
-                    "委托类型；深市样本值为 0/1/U，原样保留",
+                    "委托类型；深市 0=限价、1=市价、U=本方最优；与委托代码组合为 0B/0S/1B/1S/UB/US",
                     nullable=False,
                     source_name="委托类型",
                 ),
@@ -304,7 +309,8 @@ DATASET_PRESETS = (
             display_name="Wind A股逐笔成交（深市）",
             description=(
                 "Wind A股 L2 逐笔成交（深市），源文件 SZ/YYYYMMDD/trade.parquet。"
-                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数，交易所代码按字符串保存；"
+                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数；"
+                "交易所代码、成交代码和委托代码按字符串保存。"
                 "成交代码 C 表示撤单，0 或空表示成交，原始记录全部保留。"
             ),
             update_frequency="daily",
@@ -360,14 +366,15 @@ DATASET_PRESETS = (
                     "trade_code",
                     "string",
                     "成交代码；C 表示撤单，0 或空表示成交；C 记录价格 0 且 BS 标志为空",
-                    nullable=False,
+                    nullable=True,
                     source_name="成交代码",
                 ),
                 field(
                     "order_code",
-                    "float64",
-                    "委托代码，源值为浮点数；当前样本恒为 0.0，原样保留",
-                    nullable=False,
+                    "string",
+                    "委托代码，原始字段为 char(1) 保留字段；"
+                    "合并 Parquet 可能误推为浮点 0.0，按字符串保存",
+                    nullable=True,
                     source_name="委托代码",
                 ),
                 field(

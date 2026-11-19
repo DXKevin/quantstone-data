@@ -176,16 +176,19 @@ wind.cn.stock.l2_trade.sz
 ```
 
 源文件为 `SZ/YYYYMMDD/order.parquet` 和 `SZ/YYYYMMDD/trade.parquet`。`symbol` 和
-`exchange_code` 都按字符串保存；`event_time` 为 `HHMMSSmmm` 整数；价格保存为放大
-10,000 倍的整数。`l2_order` 主键为 `trade_date + symbol + exchange_order_no`，
-`l2_trade` 主键为 `trade_date + symbol + trade_no`，两者都按交易日做日分区发布。深市
-两个数据集每日约 1.24 GB / 1.70 GB，分别约 1.16 亿 / 1.04 亿行。沪市字段值域不同且
-当前样本只有 order 文件，需单独建立契约。
+`exchange_code` 都按字符串保存；`channel_code`（源字段“委托编号”）和 trade 的
+`order_code`（源字段“委托代码”）原始规范都是 `char(1)`，必须按字符串保存。`event_time`
+为 `HHMMSSmmm` 整数；价格保存为放大 10,000 倍的整数。`l2_order` 主键为
+`trade_date + symbol + channel_code + exchange_order_no`，`l2_trade` 主键为
+`trade_date + symbol + trade_no`，两者都按交易日做日分区发布。深市两个数据集每日约
+1.24 GB / 1.70 GB，分别约 1.16 亿 / 1.04 亿行。沪市字段值域不同且当前样本只有 order
+文件，需单独建立契约。
 
-`l2_trade.trade_code` 的语义是：`C` 表示撤单，`0` 或空表示成交；撤单记录的价格为 0、
-`BS标志` 为空。当前契约原样保留源值，不丢弃撤单记录。由于原始数据不够规范，后续重写
-迁移时应把该语义显式化，例如增加 `is_cancel` 布尔字段或在扫描器中规范化 `trade_code`，
-同时保留原始值；`order_type` 等按市场不同的值域也应在扫描器中分别校验。
+原始 Wind 规范还说明：`l2_order.order_type` 深市为 `0=限价、1=市价、U=本方最优`，
+与 `side` 组合为 `0B/0S/1B/1S/UB/US`；沪市则使用 `A=正常委托、D=撤单`。
+`l2_trade.trade_code` 深市 `C` 表示撤单，空表示成交；9:15 前成交价格为 0。合并后的
+Parquet 会出现 `0.0` 浮点、`0` 字符串等类型漂移，后续重写迁移必须按原始 `char(1)`
+规范恢复为字符串，不能把合并文件的推断类型当作契约。
 
 最终形成四个数据集：
 

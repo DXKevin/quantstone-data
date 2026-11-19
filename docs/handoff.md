@@ -185,22 +185,23 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 完成：
 
-- 读取并分析 `/home/ssd_data/stock_database/stock_a_quote/stock_day_a_l2_wind/data/SZ/20261118`；
-- 创建并启用 `wind.cn.stock.l2_order.sz` 和 `wind.cn.stock.l2_trade.sz`；
+- 读取并分析 `/home/ssd_data/stock_database/stock_a_quote/stock_day_a_l2_wind/data/SZ/20261118` 和原始 Wind PDF 说明；
+- 首次创建后用户删除了两个数据集；按 PDF 修正契约后，已用预置契约重新创建并启用；
 - 两个数据集的 `symbol`、`exchange_code` 都使用 `string`；`event_time` 使用
   `HHMMSSmmm` 的 `int32`；价格使用 0.0001 元的 `int64`；
-- `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + exchange_order_no`；
+- 按原始 PDF 修正：`委托编号`（频道代码）和 trade 的 `委托代码` 都是 `char(1)`，统一
+  使用 `string`；合并 Parquet 中的 `0.0` 浮点是类型推断漂移，不代表原始类型；
+- `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + channel_code + exchange_order_no`；
 - `l2_trade` 保留源文件 12 个字段，主键 `trade_date + symbol + trade_no`；`BS标志`
-  可为空，`成交代码=C` 的记录原样保留；
+  可为空；`成交代码=C` 表示撤单，`0` 或空表示成交，原样保留；
 - 两个数据集均为日分区、日更、逐笔颗粒，交易日历绑定 `tushare.cn.stock.trade_cal`；
-- 预置契约同步加入两个深市数据集。
+- 预置契约同步加入两个深市数据集；后端重启后预置页可见。
 
 待办：
 
 - 两个数据集的 `collection_bindings` 为空，等待目录扫描器实现后再绑定；
-- `trade_code = C` 表示撤单，`0` 或空表示成交；当前原样保留，后续重写迁移时增加
-  `is_cancel` 或在扫描器中规范化，同时保留原始值；
-- 沪市目录当前只有 `order.parquet`，且 `委托类型` 等值域与深市不同，需单独建契约。
+- 沪市目录当前只有 `order.parquet`，且 `委托类型` 等值域与深市不同，需单独建契约；
+- 重写迁移时按原始 PDF 的 `char(1)` 类型恢复字符串，不依据合并 Parquet 的推断类型。
 
 ### 2026-11-19 — DeepSeek Harness（左侧导航可收起）
 
