@@ -445,7 +445,7 @@ function DatasetList(props: {
         <div className="panel state-box empty-state"><Search size={28} /><strong>没有匹配的数据集</strong><p>请调整搜索关键词。</p></div>
       ) : groups.map((group) => (
         <section className="panel dataset-group" key={group.id ?? "uncategorized"}>
-          <div className="dataset-group-header"><div><h2>{group.name}</h2><p>{group.description}</p></div><span>{group.datasets.length} 个数据集</span></div>
+          <div className="dataset-group-header"><div><h2>{group.name}</h2><p>{group.description}</p></div><div className="dataset-group-actions"><span>{group.datasets.length} 个数据集</span>{group.id && <CategoryQuickAdd categoryId={group.id} datasets={props.allDatasets} onChanged={props.onCategoriesChanged} />}</div></div>
           {group.datasets.length === 0 ? <div className="dataset-group-empty">该大类下还没有数据集。</div> : <div className="dataset-table">
             <div className="table-row table-head"><span>数据集</span><span>供应商</span><span>区域 / 品种</span><span>Schema</span><span>状态</span><span /></div>
             {group.datasets.map((dataset) => (
@@ -463,6 +463,40 @@ function DatasetList(props: {
       ))}
     </div>
   );
+}
+
+function CategoryQuickAdd({ categoryId, datasets, onChanged }: { categoryId: string; datasets: DatasetSummary[]; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [datasetId, setDatasetId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const candidates = datasets.filter((dataset) => dataset.category_id !== categoryId);
+
+  async function add() {
+    if (!datasetId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.assignDatasetCategory(datasetId, categoryId);
+      setDatasetId("");
+      setOpen(false);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "添加数据集失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <div className="category-quick-add">
+    <button type="button" className="secondary-button" onClick={() => { setOpen((value) => !value); setError(null); }}><Plus size={14} />添加数据集</button>
+    {open && <div className="category-quick-popover">
+      <strong>添加到该大类</strong>
+      <select value={datasetId} disabled={saving || !candidates.length} onChange={(event) => setDatasetId(event.target.value)}><option value="">{candidates.length ? "选择数据集" : "没有可添加的数据集"}</option>{candidates.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name}{dataset.category_id ? "（从其他大类移动）" : "（未分类）"}</option>)}</select>
+      <div><button type="button" className="ghost-button" onClick={() => setOpen(false)}>取消</button><button type="button" className="primary-button" disabled={saving || !datasetId} onClick={() => void add()}>{saving ? "添加中…" : "确认添加"}</button></div>
+      {error && <span>{error}</span>}
+    </div>}
+  </div>;
 }
 
 function DatasetCategoryManager({ categories, datasets, onChanged }: { categories: DatasetCategory[]; datasets: DatasetSummary[]; onChanged: () => void }) {
