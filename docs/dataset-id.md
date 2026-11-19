@@ -28,4 +28,4 @@ tb_l2.cn.stock.l2_trade.sh
 tb_l2.cn.stock.l2_trade.sz
 ```
 
-数据集 ID 是稳定标识符。数据结构发生变化时应增加 Schema 版本，而不是修改数据集 ID。
+数据集 ID 是稳定标识符。已启用数据集的契约发生实质变化时，不覆盖原契约，也不在原数据集下创建跨版本关系，而是创建拥有独立采集器绑定、审核规则、Catalog 和物理文件的新数据集。新 ID 优先使用能表达差异的语义名称，例如 `daily_adjusted` 或 `daily_extended`；没有合适语义名称时可以使用 `daily_v2`。旧数据集按需保留或停用。

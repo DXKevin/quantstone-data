@@ -447,13 +447,12 @@ function DatasetList(props: {
         <section className="panel dataset-group" key={group.id ?? "uncategorized"}>
           <div className="dataset-group-header"><div><h2>{group.name}</h2><p>{group.description}</p></div><div className="dataset-group-actions"><span>{group.datasets.length} 个数据集</span>{group.id && <CategoryQuickAdd categoryId={group.id} datasets={props.allDatasets} onChanged={props.onCategoriesChanged} />}</div></div>
           {group.datasets.length === 0 ? <div className="dataset-group-empty">该大类下还没有数据集。</div> : <div className="dataset-table">
-            <div className="table-row table-head"><span>数据集</span><span>供应商</span><span>区域 / 品种</span><span>Schema</span><span>状态</span><span /></div>
+            <div className="table-row table-head"><span>数据集</span><span>供应商</span><span>区域 / 品种</span><span>状态</span><span /></div>
             {group.datasets.map((dataset) => (
               <button className="table-row data-row" key={dataset.id} onClick={() => props.onOpen(dataset.id)}>
                 <span className="dataset-cell"><strong>{dataset.display_name}</strong><code>{dataset.id}</code></span>
                 <span>{dataset.provider}</span>
                 <span>{dataset.region.toUpperCase()} / {dataset.instrument}{dataset.market ? ` / ${dataset.market.toUpperCase()}` : ""}</span>
-                <span>v{dataset.current_schema_version}</span>
                 <span><StatusBadge status={dataset.status} /></span>
                 <span className="row-arrow"><ChevronRight size={17} /></span>
               </button>
@@ -727,14 +726,14 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
   return (
     <form className="page create-page" onSubmit={(event) => void submit(event)}>
       <header className="page-header compact">
-        <div><button type="button" className="back-button" onClick={props.onCancel}><ArrowLeft size={16} />返回数据集</button><h1>{editing ? "编辑数据集" : "创建数据集"}</h1><p className="subtitle">{editing ? "修改草稿的数据契约，数据集 ID 保持不变。" : "定义供应商数据集的身份与首个 Schema 版本。"}</p></div>
+        <div><button type="button" className="back-button" onClick={props.onCancel}><ArrowLeft size={16} />返回数据集</button><h1>{editing ? "编辑数据集" : "创建数据集"}</h1><p className="subtitle">{editing ? "修改草稿的数据契约，数据集 ID 保持不变。" : "定义供应商数据集的身份与数据契约。"}</p></div>
         <div className="header-actions"><button type="button" className="ghost-button" onClick={props.onCancel}>取消</button><button className="primary-button" disabled={submitting}>{submitting ? "正在保存…" : editing ? "保存修改" : "创建草稿"}</button></div>
       </header>
 
       {error && <div className="form-error"><X size={17} />{error}</div>}
 
       <section className="form-section">
-        <div className="section-number">01</div><div className="section-intro"><h2>数据集身份</h2><p>ID 创建后保持稳定，结构变化使用 Schema 版本表示。</p></div>
+        <div className="section-number">01</div><div className="section-intro"><h2>数据集身份</h2><p>ID 创建后保持稳定；已启用契约需要实质变化时，请创建独立的新数据集。</p></div>
         <div className="form-content">
           <div className="form-grid five-columns">
             <Input label="供应商" value={provider} onChange={setProvider} placeholder="tushare" required idSegment disabled={editing} />
@@ -848,7 +847,7 @@ function DatasetMetadataForm(props: { dataset: DatasetDetail; onCancel: () => vo
             <Input label="显示名称" value={displayName} onChange={setDisplayName} placeholder="数据集显示名称" required />
             <Input label="说明" value={description} onChange={setDescription} placeholder="说明数据来源、内容和用途" />
           </div>
-          <div className="operation-help">字段、主键、采集绑定和存储策略仍使用当前 Schema v{props.dataset.schema.version}；后续将通过版本化流程变更。</div>
+          <div className="operation-help">字段、主键、采集绑定和存储策略属于当前数据集契约；如需实质变更，请创建独立的新数据集。</div>
         </div>
       </section>
     </form>
@@ -895,7 +894,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetC
       {error && <div className="form-error"><X size={17} />{error}</div>}
 
       <section className="detail-grid">
-        <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2><span>Schema v{dataset.schema.version}</span></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
+        <div className="panel detail-card span-two"><div className="card-title"><h2>基本信息</h2></div><dl className="metadata-grid"><div><dt>供应商</dt><dd>{dataset.provider}</dd></div><div><dt>区域</dt><dd>{dataset.region.toUpperCase()}</dd></div><div><dt>品种</dt><dd>{dataset.instrument}</dd></div><div><dt>市场</dt><dd>{dataset.market?.toUpperCase() || "不限定"}</dd></div><div className="wide"><dt>说明</dt><dd>{dataset.description || "暂无说明"}</dd></div></dl></div>
         <div className="panel detail-card"><div className="card-title"><h2>数据契约</h2></div><dl className="contract-list"><div><dt>字段数量</dt><dd>{dataset.schema.fields.length}</dd></div><div><dt>主键</dt><dd>{dataset.schema.primary_key.join(" + ")}</dd></div><div><dt>时间字段</dt><dd>{dataset.schema.time_field || "未指定"}</dd></div><div><dt>存储布局</dt><dd>{dataset.storage_policy?.layout || "未配置"}</dd></div>{dataset.storage_policy?.calendar_dataset_id && <div><dt>交易日历</dt><dd>{dataset.storage_policy.calendar_dataset_id}</dd></div>}{dataset.collection_bindings.map((binding) => <div key={binding.purpose}><dt>{purposeLabels[binding.purpose]}</dt><dd>{binding.collector_key} · {binding.operation}</dd></div>)}{!dataset.collection_bindings.length && <div><dt>采集绑定</dt><dd>未绑定</dd></div>}</dl></div>
       </section>
 
@@ -908,7 +907,7 @@ function DatasetDetailView(props: { dataset: DatasetDetail; categories: DatasetC
       {dataset.storage_policy?.compaction === "yearly" && <DatasetMaintenance dataset={dataset} />}
 
       <section className="panel fields-detail">
-        <div className="card-title"><div><h2>字段</h2><p>当前生效的 Schema v{dataset.schema.version}</p></div><span>{dataset.schema.fields.length} 个字段</span></div>
+        <div className="card-title"><div><h2>字段</h2><p>当前数据集契约</p></div><span>{dataset.schema.fields.length} 个字段</span></div>
         <div className="schema-table">
           <div className="schema-row schema-head"><span>序号</span><span>字段名</span><span>类型</span><span>说明</span><span>约束</span></div>
           {dataset.schema.fields.map((field, index) => (
