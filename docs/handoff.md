@@ -196,7 +196,7 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 验证：
 
-- `pytest -q`：69 项通过（1 条 Starlette/httpx 弃用警告）；
+- `pytest -q`：70 项通过（1 条 Starlette/httpx 弃用警告）；
 - `ruff check .`：通过；
 - `npm run build`：通过；
 - 重启后确认旧任务被标记失败、取消终态任务返回 409、日志级别过滤接口可用。
