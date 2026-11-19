@@ -15,6 +15,7 @@ class CollectionOperation(StrEnum):
 class InputMethod(StrEnum):
     COLLECTOR = "collector"
     FILE_IMPORT = "file_import"
+    DIRECTORY_IMPORT = "directory_import"
 
 
 class CollectionJobStatus(StrEnum):

@@ -135,3 +135,10 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert len(partitions.json()) == 1
         assert partitions.json()[0]["row_count"] == 2
         assert partitions.json()[0]["partition_key"] == "20261118"
+
+        collection_jobs = client.get("/api/v1/collection-jobs")
+        assert collection_jobs.status_code == 200
+        assert any(
+            item["input_method"] == "directory_import"
+            for item in collection_jobs.json()["items"]
+        )

@@ -196,7 +196,9 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 已把 `20261118` 的 order/trade 从 `imports/wind_l2_test` 扫描并导入 Catalog：
   两个数据集各有 1 个分区，行数与转换输出一致；
 - 导入任务与采集/合并共用单工作线程，源目录限制在 `imports/` 或
-  `QUANTSTONE_IMPORT_ROOTS`。
+  `QUANTSTONE_IMPORT_ROOTS`；
+- 修复采集任务列表 500：`InputMethod` 增加 `directory_import`，导入任务生成的
+  CollectionJob 可以正常序列化；前端采集页输入方式显示“目录导入”。
 
 验证：
 

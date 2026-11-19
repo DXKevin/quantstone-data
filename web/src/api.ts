@@ -3,7 +3,7 @@ export type UpdateFrequency = "daily" | "weekly" | "monthly" | "manual";
 export type TimeGranularity = "tick" | "second_3" | "second" | "minute" | "hour" | "day" | "none";
 export type CollectionOperation = "initial" | "incremental" | "repair" | "replace";
 export type CollectionPurpose = CollectionOperation;
-export type CollectionInputMethod = "collector" | "file_import";
+export type CollectionInputMethod = "collector" | "file_import" | "directory_import";
 export type CollectionJobStatus =
   | "created"
   | "queued"
