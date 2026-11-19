@@ -186,6 +186,8 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - `date` 接受 `YYYYMMDD`、`date`、`datetime`；`timestamp` 表示无时区的交易所本地时间，
   带时区的值会被拒绝；
 - 新增 Parquet 往返、日期/时间转换、API 拒绝未知类型等测试；
+- 明确 L2 以基本类型交付时，逐笔时间使用 `int32` / `int64` 并在字段说明中写明编码，
+  不强制转换成 `timestamp`；`trade_date` 保持 `date`；
 - 架构文档补充字段类型、Parquet 映射和暂不开放范围。
 
 验证：

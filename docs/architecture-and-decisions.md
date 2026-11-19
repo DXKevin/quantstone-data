@@ -163,7 +163,10 @@ tb_l2.cn.stock.l2_trade.sz
 - 上海、深圳需要不同数据契约，因此拆分数据集；
 - 逐笔委托使用 `l2_order`；
 - 逐笔成交使用 `l2_trade`，不使用含义不够清晰的 `tran`；
-- 上海使用 `sh`，深圳使用 `sz`。
+- 上海使用 `sh`，深圳使用 `sz`；
+- 供应商文件以基本类型交付时，逐笔时间按整数类型声明（例如 `HHMMSSmmm`、自零点起的
+  毫秒/微秒计数），并在字段说明和单位中写明编码，不为了统一转换成 `timestamp`；
+  `trade_date` 仍使用 `date`，以支持交易日历、逻辑分区和覆盖计算。
 
 最终形成四个数据集：
 
@@ -216,7 +219,9 @@ Registry 在创建和修改数据集时校验枚举，未知类型直接返回 4
 `field_types.normalize_value` 把供应商源值转换为契约类型，并由 `field_types.arrow_type`
 生成 Parquet Schema，不再各自维护一份类型映射。`date` 当前接受 `YYYYMMDD` 字符串、
 `datetime.date` 或 `datetime`，空值保持为空；`timestamp` 接受无时区的 `datetime` 或
-ISO 8601 字符串（日期与时间用空格或 `T` 分隔），带时区偏移的值直接拒绝。
+ISO 8601 字符串（日期与时间用空格或 `T` 分隔），带时区偏移的值直接拒绝。供应商原生以
+整数编码的时间（例如 L2 逐笔时间）保留为 `int32` / `int64`，不强制转换成 `timestamp`；
+只有确实表示“日期 + 时间”的字段才使用 `timestamp`。
 
 暂不开放的常见类型：
 
