@@ -193,8 +193,8 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
   使用 `string`；合并 Parquet 中的 `0.0` 浮点是类型推断漂移，不代表原始类型；
 - `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + exchange_order_no`；
   `channel_code` 只保留为普通字段，不进入主键；
-- `l2_trade` 保留源文件 12 个字段，主键 `trade_date + symbol + trade_no`；`BS标志`
-  可为空；`成交代码=C` 表示撤单，`0` 或空表示成交，原样保留；
+- `l2_trade` 保留源文件 12 个字段，主键 `trade_date + symbol + trade_no`；`channel_code`
+  只保留为普通字段，不进入主键；字段说明只保留字段语义，不再写 C 行价格/BS 空等数据事实；
 - 两个数据集均为日分区、日更、逐笔颗粒，交易日历绑定 `tushare.cn.stock.trade_cal`；
 - 预置契约同步加入两个深市数据集；后端重启后预置页可见。
 
@@ -202,7 +202,9 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 - 两个数据集的 `collection_bindings` 为空，等待目录扫描器实现后再绑定；
 - 沪市目录当前只有 `order.parquet`，且 `委托类型` 等值域与深市不同，需单独建契约；
-- 重写迁移时按原始 PDF 的 `char(1)` 类型恢复字符串，不依据合并 Parquet 的推断类型。
+- 重写迁移时按原始 PDF 的 `char(1)` 类型恢复字符串，不依据合并 Parquet 的推断类型；
+- 推送状态：当前 `main` 领先 `origin/main` 1 个提交；GitHub SSH 连接被重置，尚未推送，
+  待网络恢复后执行 `git push origin main`。
 
 ### 2026-11-19 — DeepSeek Harness（左侧导航可收起）
 

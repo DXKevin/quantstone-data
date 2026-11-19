@@ -200,7 +200,7 @@ DATASET_PRESETS = (
             display_name="Wind A股逐笔委托（深市）",
             description=(
                 "Wind A股 L2 逐笔委托（深市），源文件 SZ/YYYYMMDD/order.parquet。"
-                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数；交易所代码和频道代码按字符串保存。"
+                "时间格式 HHMMSSmmm，价格精度 0.0001 元。"
             ),
             update_frequency="daily",
             time_granularity="tick",
@@ -218,14 +218,14 @@ DATASET_PRESETS = (
                 field(
                     "symbol",
                     "string",
-                    "万得证券代码，例如 000001.SZ",
+                    "万得证券代码",
                     nullable=False,
                     source_name="万得代码",
                 ),
                 field(
                     "exchange_code",
                     "string",
-                    "交易所数字证券代码，按字符串保存；000001.SZ 的源值为 1",
+                    "交易所数字证券代码",
                     nullable=False,
                     source_name="交易所代码",
                 ),
@@ -239,7 +239,7 @@ DATASET_PRESETS = (
                 field(
                     "event_time",
                     "int32",
-                    "事件时间，HHMMSSmmm 整数",
+                    "事件时间，HHMMSSmmm",
                     nullable=False,
                     unit="HHMMSSmmm",
                     source_name="时间",
@@ -247,35 +247,35 @@ DATASET_PRESETS = (
                 field(
                     "channel_code",
                     "string",
-                    "频道代码，原始字段为 char(1)；合并 Parquet 可能误推为整数，按字符串保存",
+                    "频道代码",
                     nullable=False,
                     source_name="委托编号",
                 ),
                 field(
                     "exchange_order_no",
                     "int64",
-                    "交易所委托号，同一交易日同一证券内唯一",
+                    "交易所委托号",
                     nullable=False,
                     source_name="交易所委托号",
                 ),
                 field(
                     "order_type",
                     "string",
-                    "委托类型；深市 0=限价、1=市价、U=本方最优；与委托代码组合为 0B/0S/1B/1S/UB/US",
+                    "委托类型；0=限价，1=市价，U=本方最优",
                     nullable=False,
                     source_name="委托类型",
                 ),
                 field(
                     "side",
                     "string",
-                    "买卖方向，源值 B/S",
+                    "买卖方向，B=买入，S=卖出",
                     nullable=False,
                     source_name="委托代码",
                 ),
                 field(
                     "price",
                     "int64",
-                    "委托价格，单位 0.0001 元；例如 120300 表示 12.03 元",
+                    "委托价格，精度 0.0001 元",
                     nullable=False,
                     unit="0.0001 元",
                     source_name="委托价格",
@@ -304,9 +304,8 @@ DATASET_PRESETS = (
             display_name="Wind A股逐笔成交（深市）",
             description=(
                 "Wind A股 L2 逐笔成交（深市），源文件 SZ/YYYYMMDD/trade.parquet。"
-                "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数；"
-                "交易所代码、成交代码和委托代码按字符串保存。"
-                "成交代码 C 表示撤单，0 或空表示成交，原始记录全部保留。"
+                "时间格式 HHMMSSmmm，价格精度 0.0001 元。"
+                "成交代码 C=撤单，0 或空=成交。"
             ),
             update_frequency="daily",
             time_granularity="tick",
@@ -324,14 +323,14 @@ DATASET_PRESETS = (
                 field(
                     "symbol",
                     "string",
-                    "万得证券代码，例如 000001.SZ",
+                    "万得证券代码",
                     nullable=False,
                     source_name="万得代码",
                 ),
                 field(
                     "exchange_code",
                     "string",
-                    "交易所数字证券代码，按字符串保存；000001.SZ 的源值为 1",
+                    "交易所数字证券代码",
                     nullable=False,
                     source_name="交易所代码",
                 ),
@@ -345,7 +344,7 @@ DATASET_PRESETS = (
                 field(
                     "event_time",
                     "int32",
-                    "事件时间，HHMMSSmmm 整数",
+                    "事件时间，HHMMSSmmm",
                     nullable=False,
                     unit="HHMMSSmmm",
                     source_name="时间",
@@ -353,36 +352,35 @@ DATASET_PRESETS = (
                 field(
                     "trade_no",
                     "int64",
-                    "成交编号，同一交易日同一证券内唯一",
+                    "成交编号",
                     nullable=False,
                     source_name="成交编号",
                 ),
                 field(
                     "trade_code",
                     "string",
-                    "成交代码；C 表示撤单，0 或空表示成交；C 记录价格 0 且 BS 标志为空",
+                    "成交代码；C=撤单，0 或空=成交",
                     nullable=True,
                     source_name="成交代码",
                 ),
                 field(
                     "order_code",
                     "string",
-                    "委托代码，原始字段为 char(1) 保留字段；"
-                    "合并 Parquet 可能误推为浮点 0.0，按字符串保存",
+                    "委托代码（保留字段）",
                     nullable=True,
                     source_name="委托代码",
                 ),
                 field(
                     "side",
                     "string",
-                    "BS 标志，源值 B/S；成交代码 C 的记录为空",
+                    "BS 标志，B=买入，S=卖出",
                     nullable=True,
                     source_name="BS标志",
                 ),
                 field(
                     "price",
                     "int64",
-                    "成交价格，单位 0.0001 元；成交代码 C 的记录为 0",
+                    "成交价格，精度 0.0001 元",
                     nullable=False,
                     unit="0.0001 元",
                     source_name="成交价格",
