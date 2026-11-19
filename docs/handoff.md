@@ -103,7 +103,7 @@
 - 排队任务支持直接取消，后台开始处理后进入 `running` 并沿用协作式取消；
 - 新增独立的 `MaintenanceJob` 模型，年度合并改为 `202 + queued` 后台维护任务；
 - 采集和年度合并共用单工作线程，避免同时修改 Catalog 和物理文件；数据集详情新增年度合并入口、任务状态轮询和排队取消；
-- Linux 开发环境已完成初始化：代码位于 `/home/quantadmin/project/quantstone-data`，数据根目录为 `/home/hhd_data`；
+- Linux 开发环境已完成初始化：代码位于 `/home/quantadmin/project/quantstone-data`，数据根目录为 `/home/hhd_data/quantstone-data`；
 - 使用 Python 3.12 建立 `.venv`，前后端依赖已安装，并从空 Catalog 初始化 `var/quantstone-data.db`；
 
 尚未实现：
@@ -167,7 +167,7 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - 确认当前 Linux 工作区为 `/home/quantadmin/project/quantstone-data`，分支与 `origin/main` 一致；
 - 使用系统 Python 3.12 创建 `.venv`，安装项目开发依赖；
 - 安装前端 npm 依赖并生成生产构建；
-- 将本地 `.env` 的 `QUANTSTONE_DATA_ROOT` 配置为 `/home/hhd_data`；
+- 将本地 `.env` 的 `QUANTSTONE_DATA_ROOT` 配置为 `/home/hhd_data/quantstone-data`；
 - 创建正式数据、staging、quarantine、revisions 和日志目录；
 - 从空 Catalog 初始化 `var/quantstone-data.db`，实际启动后端并确认数据根目录配置生效；
 - 更新 Linux 接管文档和 README 中的 Linux 启动命令。
@@ -178,7 +178,8 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 - `ruff check .`：通过；
 - 前端 `npm run build`：通过；
 - 后端使用 `--env-file .env` 启动成功，`GET /health` 返回 `{"status":"ok"}`；
-- `/home/hhd_data/logs/application.log` 记录的 `data_root` 为 `/home/hhd_data`；验证后后端已关闭。
+- `/home/hhd_data/quantstone-data/logs/application.log` 记录的 `data_root` 为
+  `/home/hhd_data/quantstone-data`；验证后后端已关闭。
 
 下一步：
 

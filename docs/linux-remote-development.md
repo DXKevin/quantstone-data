@@ -6,7 +6,8 @@
 真实金融数据、SQLite Catalog、密钥和运行日志不进入 Git。
 
 Linux 开发环境已于 2026-11-19 完成初始化。当前代码目录为
-`/home/quantadmin/project/quantstone-data`，正式数据根目录为 `/home/hhd_data`。本轮从空
+`/home/quantadmin/project/quantstone-data`，正式数据根目录为
+`/home/hhd_data/quantstone-data`。本轮从空
 Catalog 开始，尚未迁移 Windows 上的 SQLite Catalog 或真实数据，也尚未配置常驻服务。
 
 ## 推荐目录
@@ -42,7 +43,7 @@ Linux 应重新安装 Python 3.11+、Node.js 和项目依赖。
 密钥由 Linux 进程环境变量或仓库根目录下未提交的 `.env` 提供：
 
 ```bash
-export QUANTSTONE_DATA_ROOT=/home/hhd_data
+export QUANTSTONE_DATA_ROOT=/home/hhd_data/quantstone-data
 export TUSHARE_TOKEN='...'
 ```
 
@@ -102,7 +103,7 @@ npm run dev -- --host 0.0.0.0
 1. 在 Linux 使用 `main` 工作区接管项目；
 2. 使用 Python 3.12 创建 `.venv` 并安装开发依赖；
 3. 安装前端依赖并通过生产构建；
-4. 在本地 `.env` 配置 `QUANTSTONE_DATA_ROOT=/home/hhd_data`；
+4. 在本地 `.env` 配置 `QUANTSTONE_DATA_ROOT=/home/hhd_data/quantstone-data`；
 5. 创建数据根目录的 `datasets`、`staging`、`quarantine`、`revisions` 和 `logs` 子目录；
 6. 从空 Catalog 初始化 `var/quantstone-data.db`；
 7. 完成全量测试并验证后端健康接口和日志写入。
