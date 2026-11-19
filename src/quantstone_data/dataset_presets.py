@@ -305,7 +305,7 @@ DATASET_PRESETS = (
             description=(
                 "Wind A股 L2 逐笔成交（深市），源文件 SZ/YYYYMMDD/trade.parquet。"
                 "时间为 HHMMSSmmm 整数，价格为 0.0001 元整数，交易所代码按字符串保存；"
-                "成交代码 C 记录原样保留。"
+                "成交代码 C 表示撤单，0 或空表示成交，原始记录全部保留。"
             ),
             update_frequency="daily",
             time_granularity="tick",
@@ -359,7 +359,7 @@ DATASET_PRESETS = (
                 field(
                     "trade_code",
                     "string",
-                    "成交代码；深市样本值为 0/C，C 记录价格 0 且 BS 标志为空",
+                    "成交代码；C 表示撤单，0 或空表示成交；C 记录价格 0 且 BS 标志为空",
                     nullable=False,
                     source_name="成交代码",
                 ),
