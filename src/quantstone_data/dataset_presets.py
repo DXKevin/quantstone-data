@@ -31,6 +31,102 @@ def field(
     }
 
 
+def _zhongtai_order_fields() -> list[dict[str, str | bool | None]]:
+    return [
+        field("symbol", "string", "证券代码", nullable=False, source_name="SecurityID"),
+        field(
+            "exchange_code",
+            "string",
+            "交易所数字证券代码",
+            nullable=False,
+            source_name="SecurityID",
+        ),
+        field("trade_date", "date", "交易日", nullable=False, source_name="tradedate"),
+        field(
+            "event_time",
+            "int32",
+            "事件时间，HHMMSSmmm",
+            nullable=False,
+            unit="HHMMSSmmm",
+            source_name="TransactTime",
+        ),
+        field("channel_code", "string", "频道代码", nullable=False, source_name="ChannelNo"),
+        field(
+            "exchange_order_no", "int64", "交易所委托号", nullable=False, source_name="ApplSeqNum"
+        ),
+        field(
+            "order_type",
+            "string",
+            "委托类型；0=限价，1=市价，U=本方最优",
+            nullable=False,
+            source_name="OrderType",
+        ),
+        field("side", "string", "买卖方向，B=买入，S=卖出", nullable=False, source_name="Side"),
+        field(
+            "price",
+            "int64",
+            "委托价格，精度 0.0001 元",
+            nullable=False,
+            unit="0.0001 元",
+            source_name="Price",
+        ),
+        field(
+            "volume", "int64", "委托数量，单位股", nullable=False, unit="股", source_name="OrderQty"
+        ),
+    ]
+
+
+def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
+    return [
+        field("symbol", "string", "证券代码", nullable=False, source_name="SecurityID"),
+        field(
+            "exchange_code",
+            "string",
+            "交易所数字证券代码",
+            nullable=False,
+            source_name="SecurityID",
+        ),
+        field("trade_date", "date", "交易日", nullable=False, source_name="tradedate"),
+        field(
+            "event_time",
+            "int32",
+            "事件时间，HHMMSSmmm",
+            nullable=False,
+            unit="HHMMSSmmm",
+            source_name="tradetime",
+        ),
+        field("trade_no", "int64", "成交编号", nullable=False, source_name="ApplSeqNum"),
+        field(
+            "trade_code",
+            "string",
+            "成交代码；C=撤单，0 或空=成交",
+            nullable=True,
+            source_name="ExecType",
+        ),
+        field(
+            "order_code",
+            "string",
+            "委托代码（中泰源无对应字段，导入时填 0 或空）",
+            nullable=True,
+            source_name="无",
+        ),
+        field("side", "string", "BS 标志；中泰源无此字段时为空", nullable=True, source_name="无"),
+        field(
+            "price",
+            "int64",
+            "成交价格，精度 0.0001 元",
+            nullable=False,
+            unit="0.0001 元",
+            source_name="Price",
+        ),
+        field(
+            "volume", "int64", "成交数量，单位股", nullable=False, unit="股", source_name="TradeQty"
+        ),
+        field("ask_order_no", "int64", "叫卖序号", nullable=False, source_name="OfferApplSeqNum"),
+        field("bid_order_no", "int64", "叫买序号", nullable=False, source_name="BidApplSeqNum"),
+    ]
+
+
 DATASET_PRESETS = (
     DatasetPreset(
         key="tushare_trade_cal",
@@ -408,6 +504,66 @@ DATASET_PRESETS = (
                     source_name="叫买序号",
                 ),
             ],
+        ),
+    ),
+    DatasetPreset(
+        key="zhongtai_l2_order_sz",
+        category="中泰 · A股 L2",
+        contract=DatasetCreate(
+            id="zhongtai.cn.stock.l2_order.sz",
+            provider="zhongtai",
+            region="cn",
+            instrument="stock",
+            dataset_name="l2_order",
+            market="sz",
+            display_name="中泰证券 A股逐笔委托（深市）",
+            description=(
+                "中泰证券历史 L2 逐笔委托（深市），仅历史数据，不再更新；"
+                "字段已对齐 Wind 深市 L2 契约。"
+            ),
+            update_frequency="manual",
+            time_granularity="tick",
+            collection_bindings=[],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "daily",
+                "write_strategy": "replace_partition",
+                "compaction": None,
+            },
+            primary_key=["trade_date", "symbol", "exchange_order_no"],
+            time_field="event_time",
+            fields=_zhongtai_order_fields(),
+        ),
+    ),
+    DatasetPreset(
+        key="zhongtai_l2_trade_sz",
+        category="中泰 · A股 L2",
+        contract=DatasetCreate(
+            id="zhongtai.cn.stock.l2_trade.sz",
+            provider="zhongtai",
+            region="cn",
+            instrument="stock",
+            dataset_name="l2_trade",
+            market="sz",
+            display_name="中泰证券 A股逐笔成交（深市）",
+            description=(
+                "中泰证券历史 L2 逐笔成交（深市），仅历史数据，不再更新；"
+                "字段已对齐 Wind 深市 L2 契约。"
+            ),
+            update_frequency="manual",
+            time_granularity="tick",
+            collection_bindings=[],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "daily",
+                "write_strategy": "replace_partition",
+                "compaction": None,
+            },
+            primary_key=["trade_date", "symbol", "trade_no"],
+            time_field="event_time",
+            fields=_zhongtai_trade_fields(),
         ),
     ),
 )

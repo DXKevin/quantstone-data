@@ -191,6 +191,21 @@ wind.cn.stock.l2_trade.sz
 Parquet 会出现 `0.0` 浮点、`0` 字符串等类型漂移，后续重写迁移必须按原始 `char(1)`
 规范恢复为字符串，不能把合并文件的推断类型当作契约。
 
+中泰证券历史 L2 深市数据也建立了独立契约：
+
+```text
+zhongtai.cn.stock.l2_order.sz
+zhongtai.cn.stock.l2_trade.sz
+```
+
+它们与 Wind 深市 L2 使用完全相同的字段名、类型和主键，转换时做值映射：
+`SecurityID -> symbol/exchange_code`、`TransactTime/tradetime -> event_time`、
+`ChannelNo -> channel_code`、`ApplSeqNum -> exchange_order_no/trade_no`、
+`OrderType` 的 `2/1/U -> 0/1/U`、`Side` 的 `1/2 -> B/S`、`Price*10000 -> int64`、
+`ExecType` 的 `F/4 -> 0(成交)/C(撤单)`。中泰 trade 没有 BS 标志，`side` 留空；
+中泰 `OrderType` 与 `Side` 的映射是为读取一致做的规范化。中泰数据设置为 `manual`
+更新频率，仅作为历史补齐，不进入日更统计。
+
 最终形成四个数据集：
 
 ```text

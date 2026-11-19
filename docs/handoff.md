@@ -181,6 +181,45 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — DeepSeek Harness（中泰 L2 契约与 Wind 对齐评估）
+
+完成：
+
+- 分析 `/home/ssd_data/stock_database/stock_a_quote/stock_day_a_l2/SZ/{order,trade}/20260323`；
+- 创建并启用 `zhongtai.cn.stock.l2_order.sz`、`zhongtai.cn.stock.l2_trade.sz`；
+- 两个契约与 Wind 深市 L2 使用完全相同的字段名/类型/主键，读取时可复用同一套列解析；
+- 中泰设为 `manual` 更新频率，只作为历史补齐，不进入日更统计；
+- 预置契约页新增两个中泰数据集。
+
+映射结论：
+
+```text
+SecurityID        -> symbol（加 .SZ）和 exchange_code
+tradedate         -> trade_date
+TransactTime/     -> event_time（HHMMSSmmm）
+tradetime
+ChannelNo         -> channel_code（string）
+ApplSeqNum        -> exchange_order_no / trade_no
+OrderType 2/1/U   -> 0/1/U
+Side 1/2          -> B/S
+Price * 10000     -> price（int64）
+OrderQty/TradeQty -> volume
+ExecType F/4      -> 0(成交)/C(撤单)
+BidApplSeqNum     -> bid_order_no
+OfferApplSeqNum   -> ask_order_no
+```
+
+已核对：20260323 order 104,585,828 行、trade 93,981,175 行；`(SecurityID, ApplSeqNum)`
+在 order/trade 内均无重复；中泰全量约 2,246 个交易日（2017-01 至 2026-03），源约
+809 GB order + 1.1 TB trade。
+
+限制：
+
+- 中泰 trade 没有 BS 标志，`side` 留空；
+- 中泰 trade 没有委托代码，`order_code` 导入时填 0 或空；
+- `OrderType` 2/1/U 和 `Side` 1/2 的映射是读取归一化假设，需要按中泰源文档再确认；
+- 中泰转换脚本和扫描器操作尚未实现，当前只创建了契约。
+
 ### 2026-11-19 — DeepSeek Harness（Wind L2 迁移脚本与目录导入）
 
 完成：
