@@ -52,6 +52,7 @@ def test_overview_lists_datasets_with_empty_catalog(tmp_path: Path) -> None:
         )
         assert created.status_code == 201, created.text
         response = client.get("/api/v1/overview/datasets")
+        daily = client.get("/api/v1/overview/daily-completion")
 
     assert response.status_code == 200
     items = response.json()
@@ -62,6 +63,9 @@ def test_overview_lists_datasets_with_empty_catalog(tmp_path: Path) -> None:
     assert item["rows"] == 0
     assert item["coverage_percent"] is None
     assert item["latest_partition"] is None
+    assert daily.status_code == 200
+    assert daily.json()["days"] == 30
+    assert daily.json()["datasets"] == []
 
 
 def test_collection_overview_counts_jobs(tmp_path: Path) -> None:

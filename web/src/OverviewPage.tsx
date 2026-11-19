@@ -1,6 +1,6 @@
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, type CollectionJobCreatePayload, type CollectionOverview, type CollectionPurpose, type CollectorDefinition, type CollectorOperation, type CollectorParameter, type DatasetOverview, type DatasetStatus, type DatasetSummary } from "./api";
+import { api, type CollectionJobCreatePayload, type CollectionOverview, type CollectionPurpose, type CollectorDefinition, type CollectorOperation, type CollectorParameter, type DailyCompletion, type DatasetOverview, type DatasetStatus, type DatasetSummary } from "./api";
 import CoverageHeatmap from "./CoverageHeatmap";
 
 const statusLabels: Record<DatasetStatus, string> = {
@@ -31,6 +31,15 @@ const operationLabels: Record<string, string> = {
   replace: "范围重建",
 };
 
+const dailyStatusLabels: Record<string, string> = {
+  complete: "已更新",
+  missing: "缺失",
+  failed: "采集失败",
+  abnormal: "文件异常",
+  pending: "待采集",
+  none: "—",
+};
+
 const layoutLabels: Record<string, string> = {
   daily: "单日文件",
   yearly_with_delta: "年度主文件 + 日增量",
@@ -48,6 +57,7 @@ type PendingStart = {
 export default function OverviewPage({ datasets, collectors, onOpen, onOpenCollectionJob }: { datasets: DatasetSummary[]; collectors: CollectorDefinition[]; onOpen: (id: string) => void; onOpenCollectionJob: (jobId: string) => void }) {
   const [items, setItems] = useState<DatasetOverview[]>([]);
   const [collection, setCollection] = useState<CollectionOverview | null>(null);
+  const [dailyCompletion, setDailyCompletion] = useState<DailyCompletion | null>(null);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +70,14 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
     setLoading(true);
     setError(null);
     try {
-      const [datasets, collectionData] = await Promise.all([
+      const [datasets, collectionData, dailyData] = await Promise.all([
         api.getDatasetOverview(),
         api.getCollectionOverview(),
+        api.getDailyCompletion(30),
       ]);
       setItems(datasets);
       setCollection(collectionData);
+      setDailyCompletion(dailyData);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载概览");
     } finally {
@@ -216,6 +228,39 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
         <div><span>总行数</span><strong>{totals.rows.toLocaleString()}</strong></div>
         <div><span>总体积</span><strong>{formatBytes(totals.bytes)}</strong></div>
       </section>
+
+      {dailyCompletion && dailyCompletion.datasets.length > 0 && (
+        <section className="panel daily-completion-panel">
+          <div className="panel-toolbar">
+            <div>
+              <h2>日更数据完成率</h2>
+              <span>最近 {dailyCompletion.days} 个交易日 · {dailyCompletion.today}</span>
+            </div>
+          </div>
+          <div className="daily-completion-list">
+            {dailyCompletion.datasets.map((row) => (
+              <div className="daily-completion-row" key={row.dataset_id}>
+                <div className="daily-completion-name">
+                  <strong>{row.display_name}</strong>
+                  <code>{row.dataset_id}</code>
+                </div>
+                <span className={`daily-status daily-status-${row.latest_status ?? "none"}`}>
+                  {row.latest_trade_date ? `${row.latest_trade_date} · ${dailyStatusLabels[row.latest_status ?? "none"]}` : "无交易日"}
+                </span>
+                <div className="daily-completion-progress">
+                  <div className="coverage-bar">
+                    <i style={{ width: `${Math.min(row.completion_percent ?? 0, 100)}%` }} />
+                  </div>
+                  <small>{row.complete} / {row.expected} 个交易日 · {row.completion_percent ?? "—"}%</small>
+                </div>
+                <span className="daily-completion-gaps">
+                  缺失 {row.missing} · 失败 {row.failed + row.abnormal}{row.pending ? ` · 待采集 ${row.pending}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {collection && (
         <section className="panel collection-overview-panel">

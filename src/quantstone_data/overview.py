@@ -20,6 +20,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 FAILED_RUN_STATUSES = ("failed", "review_failed")
 COVERAGE_DEFAULT_DAYS = 90
+DAILY_COMPLETION_DEFAULT_DAYS = 30
 COVERAGE_MIN_DAYS = 7
 COVERAGE_MAX_DAYS = 400
 
@@ -289,6 +290,53 @@ def build_coverage_cells(
         # 当天尚未采集属于正常状态，不算缺口。
         cells[key] = "pending" if day == today else "missing"
     return cells, details
+
+
+@router.get("/daily-completion")
+def daily_completion(
+    request: Request,
+    session: SessionDep,
+    days: int = DAILY_COMPLETION_DEFAULT_DAYS,
+) -> dict:
+    """按日分区数据集的最近 N 个交易日汇总完成率。"""
+    days = max(COVERAGE_MIN_DAYS, min(days, COVERAGE_MAX_DAYS))
+    coverage = dataset_coverage(request, session, days)
+    rows: list[dict] = []
+    for item in coverage["datasets"]:
+        cells: dict[str, str] = item["cells"]
+        summary: dict[str, int] = item["summary"]
+        latest_date = max(cells) if cells else None
+        expected = (
+            summary.get("complete", 0)
+            + summary.get("missing", 0)
+            + summary.get("failed", 0)
+            + summary.get("abnormal", 0)
+        )
+        rows.append(
+            {
+                "dataset_id": item["dataset_id"],
+                "display_name": item["display_name"],
+                "latest_trade_date": latest_date,
+                "latest_status": cells.get(latest_date) if latest_date else None,
+                "complete": summary.get("complete", 0),
+                "expected": expected,
+                "completion_percent": (
+                    round(summary.get("complete", 0) * 100 / expected, 1)
+                    if expected
+                    else None
+                ),
+                "missing": summary.get("missing", 0),
+                "failed": summary.get("failed", 0),
+                "abnormal": summary.get("abnormal", 0),
+                "pending": summary.get("pending", 0),
+            }
+        )
+    return {
+        "today": coverage["today"],
+        "days": days,
+        "dates": coverage["dates"],
+        "datasets": rows,
+    }
 
 
 @router.get("/coverage")

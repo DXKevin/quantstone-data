@@ -282,6 +282,27 @@ export interface CoverageResponse {
   datasets: CoverageDataset[];
 }
 
+export interface DailyCompletionRow {
+  dataset_id: string;
+  display_name: string;
+  latest_trade_date: string | null;
+  latest_status: "complete" | "missing" | "failed" | "abnormal" | "pending" | null;
+  complete: number;
+  expected: number;
+  completion_percent: number | null;
+  missing: number;
+  failed: number;
+  abnormal: number;
+  pending: number;
+}
+
+export interface DailyCompletion {
+  today: string;
+  days: number;
+  dates: string[];
+  datasets: DailyCompletionRow[];
+}
+
 export interface CollectionOverviewJob {
   id: string;
   dataset_id: string;
@@ -491,6 +512,8 @@ export const api = {
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
   getCollectionOverview: () => request<CollectionOverview>("/api/v1/overview/collection"),
+  getDailyCompletion: (days = 30) =>
+    request<DailyCompletion>(`/api/v1/overview/daily-completion?days=${days}`),
   getCoverage: (days: number) =>
     request<CoverageResponse>(`/api/v1/overview/coverage?days=${days}`),
   readDatasetRows: (datasetId: string, filters: Record<string, string> = {}, limit = 20) => {

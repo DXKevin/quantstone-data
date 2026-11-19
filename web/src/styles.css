@@ -76,6 +76,21 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .recent-collection-name code { color: #607068; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-collection-row time { color: #6d7872; font-size: 11px; }
 .recent-collection-empty { margin: 0; padding: 16px 20px; color: var(--muted); font-size: 11px; }
+.daily-completion-panel { margin-bottom: 20px; }
+.daily-completion-list { display: flex; flex-direction: column; }
+.daily-completion-row { display: grid; grid-template-columns: minmax(190px, 1.2fr) 190px minmax(180px, 1fr) auto; gap: 16px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #eef2ef; font-size: 11px; }
+.daily-completion-row:last-child { border-bottom: 0; }
+.daily-completion-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.daily-completion-name strong { color: #263d33; font-size: 12px; }
+.daily-completion-name code { color: #607068; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.daily-status { width: max-content; padding: 3px 8px; border-radius: 999px; background: #edf0ee; color: #606c66; font-size: 10px; }
+.daily-status-complete { background: #dcf4e7; color: #087851; }
+.daily-status-missing { background: #fde8e8; color: #a33b3b; }
+.daily-status-failed { background: #fff0e8; color: #a44e20; }
+.daily-status-abnormal { background: #f3e8f8; color: #7b3f9e; }
+.daily-status-pending, .daily-status-none { background: #f1f3f2; color: #6d7872; }
+.daily-completion-progress { display: grid; gap: 5px; }
+.daily-completion-progress small, .daily-completion-gaps { color: #6d7872; font-size: 10px; }
 .panel { background: var(--panel); border: 1px solid var(--line); }
 .panel-toolbar { min-height: 72px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
 .panel-toolbar h2, .card-title h2 { display: inline; margin: 0; font-size: 14px; }
@@ -596,4 +611,5 @@ body { font-size: 14px; }
   .dataset-category-assignment { grid-template-columns: 1fr; }
   .dataset-category-assignment .category-assignment-error { grid-column: 1; }
   .collection-metrics { grid-template-columns: repeat(2, 1fr); }
+  .daily-completion-row { grid-template-columns: 1fr; gap: 8px; }
 }
