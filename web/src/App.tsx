@@ -1086,11 +1086,39 @@ function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
     setError(null);
     setNotice(null);
     try {
-      const result = await api.compactAllYears(dataset.id);
-      setJobs((current) => [...result.jobs, ...current]);
-      const skipped = result.skipped_years.length;
+      const partitions = await api.listCatalogPartitions(dataset.id);
+      const annualOnly = new Map<string, boolean>();
+      for (const item of partitions) {
+        const itemYear = item.partition_key.slice(0, 4);
+        if (!/^\d{4}$/.test(itemYear)) continue;
+        const target = `datasets/${dataset.id}/annual/${itemYear}.parquet`;
+        annualOnly.set(itemYear, (annualOnly.get(itemYear) ?? true) && item.file_path === target);
+      }
+      const years = [...annualOnly.entries()]
+        .filter(([, only]) => !only)
+        .map(([itemYear]) => Number(itemYear))
+        .sort((left, right) => left - right);
+      if (!years.length) {
+        setError("没有需要合并的年份");
+        return;
+      }
+      const created: MaintenanceJob[] = [];
+      let skipped = 0;
+      let lastError: unknown = null;
+      for (const targetYear of years) {
+        try {
+          created.push(await api.createCompactionJob(dataset.id, targetYear));
+        } catch (reason) {
+          skipped += 1;
+          lastError = reason;
+        }
+      }
+      if (!created.length) {
+        throw lastError ?? new Error("没有创建合并任务");
+      }
+      setJobs((current) => [...created, ...current]);
       setNotice(
-        `已提交 ${result.jobs.length} 个年度合并任务${skipped ? `，跳过 ${skipped} 个已有任务` : ""}。`,
+        `已提交 ${created.length} 个年度合并任务${skipped ? `，跳过 ${skipped} 个已有任务` : ""}。`,
       );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交自动合并任务失败");

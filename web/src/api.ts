@@ -238,6 +238,12 @@ export interface CollectionLogs {
 
 export type MaintenanceJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
+export interface CatalogPartitionItem {
+  dataset_id: string;
+  partition_key: string;
+  file_path: string;
+}
+
 export interface AutoCompactionResult {
   jobs: MaintenanceJob[];
   skipped_years: number[];
@@ -479,6 +485,8 @@ export const api = {
     request<MaintenanceJob>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact?year=${year}`, { method: "POST" }),
   compactAllYears: (datasetId: string) =>
     request<AutoCompactionResult>(`/api/v1/datasets/${encodeURIComponent(datasetId)}/compact-all`, { method: "POST" }),
+  listCatalogPartitions: (datasetId: string) =>
+    request<CatalogPartitionItem[]>(`/api/v1/catalog/partitions?dataset_id=${encodeURIComponent(datasetId)}`),
   cancelMaintenanceJob: (jobId: string) =>
     request<MaintenanceJob>(`/api/v1/maintenance-jobs/${jobId}/cancel`, { method: "POST" }),
   getDatasetOverview: () => request<DatasetOverview[]>("/api/v1/overview/datasets"),
