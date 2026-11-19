@@ -194,6 +194,7 @@ function App() {
         {area === "datasets" && datasetSection === "registry" && view === "list" && (
           <DatasetList
             datasets={filtered}
+            allDatasets={datasets}
             total={datasets.length}
             loading={loading}
             error={error}
@@ -381,6 +382,7 @@ function groupCollectorOperations(collector: CollectorDefinition) {
 
 function DatasetList(props: {
   datasets: DatasetSummary[];
+  allDatasets: DatasetSummary[];
   total: number;
   loading: boolean;
   error: string | null;
@@ -424,7 +426,7 @@ function DatasetList(props: {
         <div><span>未分类</span><strong>{props.datasets.filter((item) => item.category_id === null).length}</strong></div>
       </section>
 
-      {managingCategories && <DatasetCategoryManager categories={props.categories} onChanged={props.onCategoriesChanged} />}
+      {managingCategories && <DatasetCategoryManager categories={props.categories} datasets={props.allDatasets} onChanged={props.onCategoriesChanged} />}
 
       <section className="panel dataset-list-toolbar">
         <div className="panel-toolbar">
@@ -463,7 +465,7 @@ function DatasetList(props: {
   );
 }
 
-function DatasetCategoryManager({ categories, onChanged }: { categories: DatasetCategory[]; onChanged: () => void }) {
+function DatasetCategoryManager({ categories, datasets, onChanged }: { categories: DatasetCategory[]; datasets: DatasetSummary[]; onChanged: () => void }) {
   const [editing, setEditing] = useState<DatasetCategory | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -518,11 +520,48 @@ function DatasetCategoryManager({ categories, onChanged }: { categories: Dataset
         {editing && <button type="button" className="ghost-button" onClick={reset}>取消编辑</button>}
       </form>
       <div className="category-list">
-        {categories.map((category) => <div className="category-row" key={category.id}><div><strong>{category.name}</strong><span>{category.description || "暂无说明"}</span></div><b>{category.dataset_count} 个数据集</b><button type="button" className="toolbar-button" onClick={() => { setEditing(category); setName(category.name); setDescription(category.description ?? ""); setError(null); }}><Pencil size={13} />编辑</button><button type="button" className="toolbar-button danger-mini" disabled={category.dataset_count > 0} onClick={() => void remove(category)}><Trash2 size={13} />删除</button></div>)}
+        {categories.map((category) => <div className="category-block" key={category.id}>
+          <div className="category-row"><div><strong>{category.name}</strong><span>{category.description || "暂无说明"}</span></div><b>{category.dataset_count} 个数据集</b><button type="button" className="toolbar-button" onClick={() => { setEditing(category); setName(category.name); setDescription(category.description ?? ""); setError(null); }}><Pencil size={13} />编辑</button><button type="button" className="toolbar-button danger-mini" disabled={category.dataset_count > 0} onClick={() => void remove(category)}><Trash2 size={13} />删除</button></div>
+          <CategoryDatasetEditor category={category} datasets={datasets} onChanged={onChanged} />
+        </div>)}
         {!categories.length && <div className="dataset-group-empty">还没有数据集大类。</div>}
       </div>
     </section>
   );
+}
+
+function CategoryDatasetEditor({ category, datasets, onChanged }: { category: DatasetCategory; datasets: DatasetSummary[]; onChanged: () => void }) {
+  const [datasetId, setDatasetId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const members = datasets.filter((dataset) => dataset.category_id === category.id);
+  const candidates = datasets.filter((dataset) => dataset.category_id !== category.id);
+
+  async function assign(targetDatasetId: string, targetCategoryId: string | null) {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.assignDatasetCategory(targetDatasetId, targetCategoryId);
+      setDatasetId("");
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "调整数据集大类失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <div className="category-datasets">
+    <div className="category-members">
+      {members.map((dataset) => <span className="category-member" key={dataset.id}><span><strong>{dataset.display_name}</strong><code>{dataset.id}</code></span><button type="button" disabled={saving} title="移出大类" onClick={() => void assign(dataset.id, null)}><X size={13} /></button></span>)}
+      {!members.length && <span className="category-no-members">该大类下还没有数据集。</span>}
+    </div>
+    <div className="category-add-dataset">
+      <select value={datasetId} disabled={saving || !candidates.length} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择要添加的数据集</option>{candidates.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name}{dataset.category_id ? "（从其他大类移动）" : "（未分类）"}</option>)}</select>
+      <button type="button" className="secondary-button" disabled={saving || !datasetId} onClick={() => void assign(datasetId, category.id)}><Plus size={14} />{saving ? "保存中…" : "添加数据集"}</button>
+    </div>
+    {error && <span className="category-editor-error">{error}</span>}
+  </div>;
 }
 
 function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: DatasetSummary[]; dataset?: DatasetDetail; onCancel: () => void; onSaved: (dataset: DatasetDetail) => void }) {
