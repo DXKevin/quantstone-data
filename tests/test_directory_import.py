@@ -12,6 +12,7 @@ from quantstone_data.field_types import arrow_type
 from quantstone_data.main import create_app
 
 ORDER_ID = "wind.cn.stock.l2_order.sz"
+TRADE_ID = "zhongtai.cn.stock.l2_trade.sz"
 
 
 def _write_order_file(path: Path) -> None:
@@ -142,3 +143,110 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
             item["input_method"] == "directory_import"
             for item in collection_jobs.json()["items"]
         )
+
+def _write_zhongtai_trade_file(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    schema = pa.schema(
+        [
+            pa.field("symbol", arrow_type("string"), nullable=False),
+            pa.field("exchange_code", arrow_type("string"), nullable=False),
+            pa.field("trade_date", arrow_type("date"), nullable=False),
+            pa.field("event_time", arrow_type("int32"), nullable=False),
+            pa.field("trade_no", arrow_type("int64"), nullable=False),
+            pa.field("trade_code", arrow_type("string"), nullable=True),
+            pa.field("order_code", arrow_type("string"), nullable=True),
+            pa.field("side", arrow_type("string"), nullable=True),
+            pa.field("price", arrow_type("int64"), nullable=False),
+            pa.field("volume", arrow_type("int64"), nullable=False),
+            pa.field("ask_order_no", arrow_type("int64"), nullable=False),
+            pa.field("bid_order_no", arrow_type("int64"), nullable=False),
+        ]
+    )
+    rows = [
+        {
+            "symbol": "000001.SZ",
+            "exchange_code": "000001",
+            "trade_date": date(2026, 3, 23),
+            "event_time": 93000000,
+            "trade_no": 10,
+            "trade_code": "C",
+            "order_code": "0",
+            "side": None,
+            "price": 0,
+            "volume": 100,
+            "ask_order_no": 0,
+            "bid_order_no": 9,
+        },
+        {
+            "symbol": "000001.SZ",
+            "exchange_code": "000001",
+            "trade_date": date(2026, 3, 23),
+            "event_time": 93000100,
+            "trade_no": 11,
+            "trade_code": "0",
+            "order_code": "0",
+            "side": "B",
+            "price": 120000,
+            "volume": 200,
+            "ask_order_no": 8,
+            "bid_order_no": 12,
+        },
+    ]
+    table = pa.Table.from_pylist(rows, schema=schema)
+    pq.write_table(table, path, compression="zstd")
+
+
+def test_zhongtai_trade_directory_import(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
+        data_root=tmp_path / "data",
+    )
+    with TestClient(app) as client:
+        presets = {
+            item["contract"]["id"]: item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+        }
+        calendar = presets["tushare.cn.stock.trade_cal"]
+        assert client.post("/api/v1/datasets", json=calendar).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code
+            == 200
+        )
+        trade = presets[TRADE_ID]
+        assert client.post("/api/v1/datasets", json=trade).status_code == 201
+        assert client.post(f"/api/v1/datasets/{TRADE_ID}/activate").status_code == 200
+
+        source = (
+            tmp_path
+            / "data"
+            / "imports"
+            / "zhongtai_l2"
+            / "sz"
+            / "20260323"
+            / "l2_trade.parquet"
+        )
+        _write_zhongtai_trade_file(source)
+
+        created = client.post(
+            "/api/v1/import-jobs",
+            json={
+                "dataset_id": TRADE_ID,
+                "scanner_key": "zhongtai_l2_sz",
+                "operation": "import_trade",
+                "source_root": str(source.parent.parent),
+            },
+        )
+        assert created.status_code == 202, created.text
+        job_id = created.json()["id"]
+        ready = _wait_status(client, job_id, {"review_ready"})
+        assert ready["summary"]["ready"] == 1
+
+        executed = client.post(f"/api/v1/import-jobs/{job_id}/execute")
+        assert executed.status_code == 200
+        completed = _wait_status(client, job_id, {"succeeded", "failed"})
+        assert completed["status"] == "succeeded", completed["error"]
+
+        partitions = client.get(f"/api/v1/catalog/partitions?dataset_id={TRADE_ID}")
+        assert partitions.status_code == 200
+        assert partitions.json()[0]["row_count"] == 2
+

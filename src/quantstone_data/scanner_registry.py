@@ -1,5 +1,6 @@
 from .scanner_types import ScannerDefinition, ScannerOperation
 from .scanners.wind_l2_sz.definition import SCANNERS as WIND_SCANNERS
+from .scanners.zhongtai_l2_sz.definition import SCANNERS as ZHONGTAI_SCANNERS
 
 
 def _build_scanner_registry(
@@ -24,7 +25,7 @@ def _build_scanner_registry(
     return registry
 
 
-SCANNERS = _build_scanner_registry(WIND_SCANNERS)
+SCANNERS = _build_scanner_registry((*WIND_SCANNERS, *ZHONGTAI_SCANNERS))
 
 
 def get_scanner(key: str) -> ScannerDefinition | None:

@@ -219,7 +219,10 @@ OfferApplSeqNum   -> ask_order_no
 - 中泰 trade 没有 BS 标志，但 trade 自带 `BidApplSeqNum`/`OfferApplSeqNum`，单频道下直接比较两个 ID 即可还原主动方，不需要 join order；Wind 对照 6,987 万笔 100% 一致，撤单为空；
 - 中泰 trade 没有委托代码，`order_code` 导入时填 0 或空；
 - `OrderType` 2/1/U 和 `Side` 1/2 的映射是读取归一化假设，需要按中泰源文档再确认；
-- 中泰转换脚本和扫描器操作尚未实现，当前只创建了契约。
+- 中泰临时转换脚本已写：`/home/quantadmin/l2_migration/convert_zhongtai_l2.py`，
+  仅保留股票前缀，trade 的 `side` 直接比较 `BidApplSeqNum`/`OfferApplSeqNum`，未跑数据；
+- 中泰扫描器 `zhongtai_l2_sz` 已注册，包含 `import_order`/`import_trade`；
+- 中泰契约和扫描器的小数据集成测试已通过，真实数据尚未转换/导入。
 
 ### 2026-11-19 — DeepSeek Harness（Wind L2 迁移脚本与目录导入）
 

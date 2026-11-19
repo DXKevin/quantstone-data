@@ -4,6 +4,8 @@ from .reviewers.tushare.cn.stock.stock_basic import REVIEWER as TUSHARE_STOCK_BA
 from .reviewers.tushare.cn.stock.trade_cal import REVIEWER as TUSHARE_TRADE_CAL
 from .reviewers.wind.l2 import ORDER_REVIEWER as WIND_L2_ORDER
 from .reviewers.wind.l2 import TRADE_REVIEWER as WIND_L2_TRADE
+from .reviewers.wind.l2 import ZHONGTAI_ORDER_REVIEWER as ZHONGTAI_L2_ORDER
+from .reviewers.wind.l2 import ZHONGTAI_TRADE_REVIEWER as ZHONGTAI_L2_TRADE
 
 
 def _build_registry(
@@ -26,6 +28,8 @@ REVIEWERS = _build_registry(
         TUSHARE_TRADE_CAL,
         WIND_L2_ORDER,
         WIND_L2_TRADE,
+        ZHONGTAI_L2_ORDER,
+        ZHONGTAI_L2_TRADE,
     )
 )
 

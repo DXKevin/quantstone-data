@@ -129,3 +129,11 @@ TRADE_REVIEWER = ReviewerDefinition(
     dataset_id="wind.cn.stock.l2_trade.sz",
     function=lambda context: _review(context, "wind.cn.stock.l2_trade.sz"),
 )
+ZHONGTAI_ORDER_REVIEWER = ReviewerDefinition(
+    dataset_id="zhongtai.cn.stock.l2_order.sz",
+    function=lambda context: _review(context, "zhongtai.cn.stock.l2_order.sz"),
+)
+ZHONGTAI_TRADE_REVIEWER = ReviewerDefinition(
+    dataset_id="zhongtai.cn.stock.l2_trade.sz",
+    function=lambda context: _review(context, "zhongtai.cn.stock.l2_trade.sz"),
+)

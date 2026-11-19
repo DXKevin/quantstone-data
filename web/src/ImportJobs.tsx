@@ -33,6 +33,13 @@ const fileStatusLabels: Record<string, string> = {
   invalid: "校验失败",
 };
 
+const defaultSourceRoots: Record<string, string> = {
+  "wind.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+  "wind.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+  "zhongtai.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
+  "zhongtai.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
+};
+
 export default function ImportJobs({
   datasets,
   navigation,
@@ -114,6 +121,17 @@ export default function ImportJobs({
       setOperation(operations[0].key);
     }
   }, [operations, operation]);
+
+  useEffect(() => {
+    const next = defaultSourceRoots[datasetId];
+    if (next) {
+      setSourceRoot((current) =>
+        current === "" || Object.values(defaultSourceRoots).includes(current)
+          ? next
+          : current,
+      );
+    }
+  }, [datasetId]);
 
   const hasActive = jobs.some((job) => ACTIVE_STATUSES.includes(job.status));
   useEffect(() => {

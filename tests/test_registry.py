@@ -41,7 +41,27 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
         "tushare.cn.stock.trade_cal",
         "wind.cn.stock.l2_order.sz",
         "wind.cn.stock.l2_trade.sz",
+        "zhongtai.cn.stock.l2_order.sz",
+        "zhongtai.cn.stock.l2_trade.sz",
     }
+
+
+def test_scanner_registry_lists_wind_and_zhongtai(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}", data_root=tmp_path / "data"
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/scanners")
+
+    assert response.status_code == 200
+    scanners = {item["key"]: item for item in response.json()}
+    assert set(scanners) == {"wind_l2_sz", "zhongtai_l2_sz"}
+    assert {
+        item["key"] for item in scanners["zhongtai_l2_sz"]["operations"]
+    } == {"import_order", "import_trade"}
+    assert {
+        item["dataset_id"] for item in scanners["zhongtai_l2_sz"]["operations"]
+    } == {"zhongtai.cn.stock.l2_order.sz", "zhongtai.cn.stock.l2_trade.sz"}
 
 
 def test_legacy_tushare_collector_key_is_migrated(tmp_path: Path) -> None:
