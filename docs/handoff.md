@@ -181,6 +181,25 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — DeepSeek Harness（创建深市 Wind L2 数据集）
+
+完成：
+
+- 读取并分析 `/home/ssd_data/stock_database/stock_a_quote/stock_day_a_l2_wind/data/SZ/20261118`；
+- 创建并启用 `wind.cn.stock.l2_order.sz` 和 `wind.cn.stock.l2_trade.sz`；
+- 两个数据集的 `symbol`、`exchange_code` 都使用 `string`；`event_time` 使用
+  `HHMMSSmmm` 的 `int32`；价格使用 0.0001 元的 `int64`；
+- `l2_order` 保留源文件 10 个字段，主键 `trade_date + symbol + exchange_order_no`；
+- `l2_trade` 保留源文件 12 个字段，主键 `trade_date + symbol + trade_no`；`BS标志`
+  可为空，`成交代码=C` 的记录原样保留；
+- 两个数据集均为日分区、日更、逐笔颗粒，交易日历绑定 `tushare.cn.stock.trade_cal`；
+- 预置契约同步加入两个深市数据集。
+
+待办：
+
+- 两个数据集的 `collection_bindings` 为空，等待目录扫描器实现后再绑定；
+- 沪市目录当前只有 `order.parquet`，且 `委托类型` 等值域与深市不同，需单独建契约。
+
 ### 2026-11-19 — DeepSeek Harness（左侧导航可收起）
 
 完成：

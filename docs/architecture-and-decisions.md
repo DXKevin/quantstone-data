@@ -168,6 +168,20 @@ tb_l2.cn.stock.l2_trade.sz
   毫秒/微秒计数），并在字段说明和单位中写明编码，不为了统一转换成 `timestamp`；
   `trade_date` 仍使用 `date`，以支持交易日历、逻辑分区和覆盖计算。
 
+深市 Wind L2 已完成首个实测契约：
+
+```text
+wind.cn.stock.l2_order.sz
+wind.cn.stock.l2_trade.sz
+```
+
+源文件为 `SZ/YYYYMMDD/order.parquet` 和 `SZ/YYYYMMDD/trade.parquet`。`symbol` 和
+`exchange_code` 都按字符串保存；`event_time` 为 `HHMMSSmmm` 整数；价格保存为放大
+10,000 倍的整数。`l2_order` 主键为 `trade_date + symbol + exchange_order_no`，
+`l2_trade` 主键为 `trade_date + symbol + trade_no`，两者都按交易日做日分区发布。深市
+两个数据集每日约 1.24 GB / 1.70 GB，分别约 1.16 亿 / 1.04 亿行。沪市字段值域不同且
+当前样本只有 order 文件，需单独建立契约。
+
 最终形成四个数据集：
 
 ```text
