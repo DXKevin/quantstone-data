@@ -9,7 +9,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
-from .stock_basic import API_URL, raise_api_error
+from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.daily"
 
@@ -49,7 +49,7 @@ def _call_daily(token: str, trade_date: str, fields: list[str]) -> list[dict]:
         }
     ).encode("utf-8")
     request = Request(
-        API_URL,
+        load_api_url(),
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -98,7 +98,7 @@ def _collect_daily(
     )
     return CollectionResult(
         outputs={DATASET_ID: [artifact]},
-        provenance={"api": "daily", "trade_date": trade_date},
+        provenance={"api": "daily", "api_url": load_api_url(), "trade_date": trade_date},
     )
 
 

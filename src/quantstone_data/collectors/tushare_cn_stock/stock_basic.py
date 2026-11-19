@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
@@ -18,7 +19,7 @@ from ...collection_protocol import (
     RateLimitExceeded,
 )
 
-API_URL = "https://api.tushare.pro"
+DEFAULT_API_URL = "https://api.tushare.pro"
 DEFAULT_LIST_STATUSES = ("L",)
 RATE_LIMIT_CODES = {40203, -40203}
 RATE_LIMIT_KEYWORDS = ("每分钟", "每小时", "频率", "超过限制", "访问次数")
@@ -40,17 +41,34 @@ def raise_api_error(body: dict, fallback: str) -> NoReturn:
     raise CollectionError(message)
 
 
-def load_token(project_root: Path | None = None) -> str:
-    token = os.environ.get("TUSHARE_TOKEN")
-    if token:
-        return token
+def _load_setting(name: str, project_root: Path | None = None) -> str | None:
+    value = os.environ.get(name)
+    if value:
+        return value.strip()
     env_path = (project_root or Path.cwd()) / ".env"
     if env_path.exists():
         for line in env_path.read_text(encoding="utf-8").splitlines():
             key, separator, value = line.partition("=")
-            if separator and key.strip() == "TUSHARE_TOKEN" and value.strip():
+            if separator and key.strip() == name and value.strip():
                 return value.strip()
+    return None
+
+
+def load_token(project_root: Path | None = None) -> str:
+    token = _load_setting("TUSHARE_TOKEN", project_root)
+    if token:
+        return token
     raise CollectionError("未配置 TUSHARE_TOKEN")
+
+
+def load_api_url(project_root: Path | None = None) -> str:
+    url = _load_setting("TUSHARE_API_URL", project_root) or DEFAULT_API_URL
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise CollectionError("TUSHARE_API_URL 必须是有效的 http 或 https 地址")
+    if parsed.username or parsed.password:
+        raise CollectionError("TUSHARE_API_URL 不能包含用户名或密码")
+    return url
 
 
 def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
@@ -63,7 +81,7 @@ def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
         }
     ).encode("utf-8")
     request = Request(
-        API_URL,
+        load_api_url(),
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -139,7 +157,11 @@ def collect(
     artifact = DatasetArtifact(DATASET_ID, target, {}, table.num_rows)
     return CollectionResult(
         outputs={DATASET_ID: [artifact]},
-        provenance={"api": "stock_basic", "list_statuses": list(statuses)},
+        provenance={
+            "api": "stock_basic",
+            "api_url": load_api_url(),
+            "list_statuses": list(statuses),
+        },
     )
 
 

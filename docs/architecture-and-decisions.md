@@ -398,6 +398,10 @@ TuShare A 股交易日历使用数据集 ID `tushare.cn.stock.trade_cal`，默�
 接受起止日期，增量更新重新生成完整快照。当前账号的 `trade_cal` 权限限制为每小时一次，
 不得按年份拆成高频连续请求。
 
+TuShare 网络入口由可选环境变量 `TUSHARE_API_URL` 统一配置，默认使用官方
+`https://api.tushare.pro`。代理入口只改变传输路径，不改变供应商身份；`stock_basic`、`daily`
+和 `trade_cal` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得记录 Token。
+
 所有以日期作为逻辑分区的数据集都必须在存储策略中显式配置 `calendar_dataset_id`。系统不再
 用“周一至周五”推测交易日，也不通过数据集名称隐式寻找日历。启用日期分区数据集时，所引用
 的交易日历必须已创建、已启用，并且契约至少包含 `cal_date` 与 `is_open` 字段；创建采集或

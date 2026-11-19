@@ -45,7 +45,12 @@ Linux 应重新安装 Python 3.11+、Node.js 和项目依赖。
 ```bash
 export QUANTSTONE_DATA_ROOT=/home/hhd_data/quantstone-data
 export TUSHARE_TOKEN='...'
+export TUSHARE_API_URL='http://proxy.example:32817'  # 可选，默认 https://api.tushare.pro
 ```
+
+`TUSHARE_API_URL` 必须是兼容 TuShare POST 协议的完整 HTTP(S) 地址。它只改变网络入口，数据集
+供应商仍为 TuShare，不改变数据集 ID、契约、审核器或存储路径。项目的三个 TuShare 采集器
+统一读取该配置，避免部分接口仍访问官方域名。
 
 开发阶段启动：
 

@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
-from .stock_basic import API_URL, raise_api_error
+from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.trade_cal"
 FULL_HISTORY_START = date(1990, 1, 1)
@@ -28,7 +28,10 @@ def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[s
         }
     ).encode("utf-8")
     request = Request(
-        API_URL, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+        load_api_url(),
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     with urlopen(request, timeout=60) as response:  # noqa: S310
         body = json.load(response)
@@ -85,6 +88,7 @@ def _collect(
         outputs={DATASET_ID: [artifact]},
         provenance={
             "api": "trade_cal",
+            "api_url": load_api_url(),
             "exchange": "SSE",
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),

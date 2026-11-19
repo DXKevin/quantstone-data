@@ -169,6 +169,27 @@ Linux 内网远程开发环境已经接管完成。下一步确认服务器目�
 
 ## 最近一次交接记录
 
+### 2026-11-19 — Codex（可配置 TuShare API 入口）
+
+完成：
+
+- 新增可选配置 `TUSHARE_API_URL`，默认使用 TuShare 官方地址；
+- `stock_basic`、`daily` 和 `trade_cal` 三个采集器统一读取运行时配置；
+- 校验 API URL 仅允许不含账号密码的 HTTP(S) 地址；
+- CollectionResult provenance 记录实际 API URL，不记录 Token；
+- 当前 Linux 本机 `.env` 已配置用户提供的代理地址，该文件保持忽略且不提交。
+
+验证：
+
+- TuShare API 地址配置测试：5 项通过；
+- `pytest -q`：60 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过；
+- 当前代理 `stock_basic` 只读连通性验证成功，返回 5,580 行。
+
+下一步：
+
+- 无。
+
 ### 2026-11-19 — Codex（修正禁用按钮光标）
 
 完成：

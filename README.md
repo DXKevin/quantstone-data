@@ -142,7 +142,9 @@ GET    /health
 
 手动文件入库采用两步流程：先创建 `input_method=file_import` 的采集任务，再将文件上传到该任务的 `/file` 接口。文件只会进入外部数据根目录的 staging 区，不会直接发布为正式数据。
 
-项目从本地 `.env` 或进程环境变量读取 `TUSHARE_TOKEN`，密钥文件不会提交到 Git。
+项目从本地 `.env` 或进程环境变量读取 `TUSHARE_TOKEN`。可选的 `TUSHARE_API_URL` 用于把
+`stock_basic`、`daily` 和 `trade_cal` 统一切换到兼容 TuShare 协议的代理地址；未配置时使用
+官方 `https://api.tushare.pro`。配置只接受不含用户名和密码的 HTTP(S) URL。密钥文件不会提交到 Git。
 采集任务的执行接口立即返回 `202 + queued`，后台单工作线程依次完成采集、审核和发布；
 前端通过任务状态、进度和日志接口持续更新，不需要保持原始执行请求。
 年度合并使用独立的维护任务记录，但与采集任务共用同一个后台工作线程，避免二者并发修改
