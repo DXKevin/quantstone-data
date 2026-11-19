@@ -57,6 +57,12 @@ def test_unsupported_type_is_rejected() -> None:
         normalize_value("1.23", "decimal")
 
 
+def test_timestamp_accepts_minute_data_format() -> None:
+    value = normalize_value("2023-08-25 09:00:00", "timestamp")
+    assert value == datetime(2023, 8, 25, 9, 0)
+    assert value.tzinfo is None
+
+
 def test_timestamp_rejects_timezone_aware_values() -> None:
     with pytest.raises(ValueError, match="无时区"):
         normalize_value("2026-11-19T09:30:00+08:00", "timestamp")
