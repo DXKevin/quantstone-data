@@ -25,6 +25,14 @@ COVERAGE_MIN_DAYS = 7
 COVERAGE_MAX_DAYS = 400
 
 
+def _coverage_percent(completed: int, expected: int) -> float | None:
+    if expected <= 0:
+        return None
+    if completed >= expected:
+        return 100.0
+    return min(round(completed * 100 / expected, 1), 99.9)
+
+
 def describe_review_errors(errors: list[dict]) -> str:
     """把审核规则错误压缩成一句可读的中文说明。"""
     parts: list[str] = []
@@ -222,8 +230,7 @@ def dataset_overview(request: Request, session: SessionDep) -> list[dict]:
             if start is not None:
                 upper = min(today, max(open_days))
                 expected_partitions = sum(1 for item in open_days if start <= item <= upper)
-                if expected_partitions:
-                    coverage_percent = round(partitions * 100 / expected_partitions, 1)
+                coverage_percent = _coverage_percent(partitions, expected_partitions)
 
         overview.append(
             {

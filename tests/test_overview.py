@@ -4,7 +4,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
-from quantstone_data.overview import _serialize_timestamp
+from quantstone_data.overview import _coverage_percent, _serialize_timestamp
+
+
+def test_coverage_percent_reserves_100_for_complete_coverage() -> None:
+    assert _coverage_percent(2886, 2887) == 99.9
+    assert _coverage_percent(2887, 2887) == 100.0
+    assert _coverage_percent(0, 0) is None
 
 
 def test_overview_timestamp_keeps_utc_semantics_after_sqlite_round_trip() -> None:
