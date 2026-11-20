@@ -424,7 +424,9 @@ created → scanning → review_ready → importing → succeeded/failed
 行数、分区日期和契约要求的非空字段，生成不可变清单 `imports/jobs/<job_id>/manifest.json`。
 已有 Catalog 分区的日期标记为 `duplicate`，导入时跳过。执行导入前重新校验源文件大小和
 mtime；文件先复制到 staging，再由 L2 审核器复核，最后复用 `publish_partition` 写正式
-目录和 Catalog。导入任务和采集、合并共用同一个后台单工作线程。
+目录和 Catalog。源目录沿用 `YYYYMMDD` 命名，Manifest、Catalog 和 Collection Run 的日期
+分区键统一保存为 ISO `YYYY-MM-DD`，以便与交易日历和覆盖热力图直接匹配；物理文件路径
+不作为分区键格式的依据。导入任务和采集、合并共用同一个后台单工作线程。
 
 当前 L2 审核器检查 Schema、空值、行数和分区日期，不对上亿行的主键组合做全量唯一性扫描；
 主键唯一性应在转换脚本或一次性离线校验中确认。

@@ -4,7 +4,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy import Engine, bindparam, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -312,6 +312,36 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE catalog_files.path = catalog_partitions.file_path"
                 ") WHERE file_id IS NULL"
             )
+        )
+
+        # L2 源目录使用 YYYYMMDD，但 Catalog 的日期分区键统一保存为 ISO YYYY-MM-DD。
+        # 只修改元数据键；正式 Parquet 的既有相对路径保持不变，避免移动大文件。
+        l2_dataset_ids = (
+            "wind.cn.stock.l2_order.sz",
+            "wind.cn.stock.l2_trade.sz",
+            "zhongtai.cn.stock.l2_order.sz",
+            "zhongtai.cn.stock.l2_trade.sz",
+        )
+        compact_date_pattern = "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]"
+        iso_date_sql = (
+            "substr(partition_key, 1, 4) || '-' || substr(partition_key, 5, 2) || '-' || "
+            "substr(partition_key, 7, 2)"
+        )
+        connection.execute(
+            text(
+                f"UPDATE catalog_partitions SET partition_key = {iso_date_sql} "
+                "WHERE dataset_id IN :dataset_ids AND length(partition_key) = 8 "
+                "AND partition_key GLOB :date_pattern"
+            ).bindparams(bindparam("dataset_ids", expanding=True)),
+            {"dataset_ids": l2_dataset_ids, "date_pattern": compact_date_pattern},
+        )
+        connection.execute(
+            text(
+                f"UPDATE collection_runs SET partition_key = {iso_date_sql} "
+                "WHERE job_id IN (SELECT id FROM collection_jobs WHERE dataset_id IN :dataset_ids) "
+                "AND length(partition_key) = 8 AND partition_key GLOB :date_pattern"
+            ).bindparams(bindparam("dataset_ids", expanding=True)),
+            {"dataset_ids": l2_dataset_ids, "date_pattern": compact_date_pattern},
         )
 
 

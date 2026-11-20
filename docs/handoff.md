@@ -20,14 +20,15 @@
 - 工作分支：`main`，工作区干净，最新提交见 `git log -1`（交接提交已推送）
 - 代码目录：`/home/quantadmin/project/quantstone-data`
 - 数据根目录：`/home/hhd_data/quantstone-data`
-- SQLite：`var/quantstone-data.db`（约 3.8 MB，2,890 个 Catalog 分区）
+- SQLite：`var/quantstone-data.db`（Wind 委托全量导入后至少新增 170 个 Catalog 分区）
 - 服务：`./scripts/quantstone-dev.sh status|restart|logs`，后端 8000，前端 5173
 - 当前 7 个数据集均为 active：TuShare 3 个、Wind L2 2 个、中泰 L2 2 个。
 
 本轮完成：
 
 - Wind 深市 L2 `wind.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用；
-- 20261118 一天已转换并导入 Catalog：order 116,393,103 行、trade 104,411,003 行；
+- Wind 20260311–20261119 共 171 天已完成 order 转换和 Catalog 导入，合计
+  23,478,980,276 行；trade 已转换 171 天，但 Catalog 目前只导入 20261118 一天、104,411,003 行；
 - 正式目录导入功能已实现：`ImportJob`、扫描器、清单、审核、执行、取消 API，前端“采集 → 目录导入”；
 - Wind 扫描器 `wind_l2_sz`、中泰扫描器 `zhongtai_l2_sz` 均已注册，各有 order/trade 两个操作；
 - 中泰深市 L2 `zhongtai.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用，字段名/类型/主键与 Wind 对齐；
@@ -43,7 +44,7 @@
 
 尚未完成：
 
-- Wind 全量只转换/导入了 20261118；其余 169 天未执行。Wind 源约 550 GB，完整转换预计约 2 小时、输出约 350 GB；
+- Wind trade 其余 170 天尚未导入；转换目录已存在 171 个 order 和 171 个 trade Parquet；
 - 中泰转换脚本只做了语法和内存小样本检查，没有跑真实数据；中泰扫描器也尚未导入真实数据；
 - 中泰源只有上午数据，且包含 ETF/基金/可转债/B 股/REITs；转换器只保留股票，20260323 股票上午输出应为
   order 85,917,403 行、trade 76,321,044 行；
@@ -63,6 +64,28 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮验证：`pytest -q` 76 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+### 2026-11-20 — Codex（统一 L2 日期分区键）
+
+完成：
+
+- 定位 Wind L2 已导入但覆盖热力图全缺失的原因：目录导入保存 `YYYYMMDD`，热力图按
+  ISO `YYYY-MM-DD` 查找；
+- Wind/中泰目录仍扫描 `YYYYMMDD` 文件夹，但新 Manifest、Catalog 和 Collection Run 统一使用
+  `YYYY-MM-DD`；
+- 增加 SQLite 启动迁移，将四个 Wind/中泰 L2 数据集已有的紧凑日期分区键转换为 ISO 日期；
+- 迁移只更新 Catalog 与运行记录，不移动或重写正式 Parquet 文件。
+
+验证：
+
+- 目录导入、旧分区迁移和概览定向测试：6 项通过；
+- `pytest -q`：77 项通过（1 条 Starlette/httpx 弃用警告）；
+- `ruff check .`：通过。
+- 服务重启后的真实数据库迁移：Wind 委托 171 个分区为 `2026-03-11` 至 `2026-11-19`，
+  Catalog 与 Collection Run 均无残留 8 位日期键；
+- 覆盖率 API 最近 30 个交易日返回完整 29、缺失 0、当天待更新 1。
+
+下一步：无。
 
 ## 当前状态
 
@@ -190,7 +213,7 @@
 
 1. 先与用户确认多存储根的两个根路径、分片策略和迁移方式，再实现 `storage_roots` /
    `catalog_files.root_id`；不要按物理硬盘建多个 SQLite。
-2. 执行 Wind L2 全量转换，再在“采集 → 目录导入”扫描并确认导入；20261118 已存在，会被识别为重复。
+2. 在“采集 → 目录导入”导入 Wind trade 剩余 170 天；20261118 已存在，会被识别为重复。
 3. 磁盘空闲后执行中泰转换，然后扫描导入；注意只保留股票、只有上午、`is_historical=true`。
 4. 如需看 Catalog 审计视图，用户已明确暂时不要；保持按数据集接口和概览热力图即可。
 
@@ -199,7 +222,7 @@
 ## 已知问题与注意事项
 
 - 多存储根尚未实现；当前仍只有单一 `data_root`，Dataset 多卷分片只是待确认方案；
-- Wind L2 全量只完成 20261118 一天，剩余 169 天未转换/导入；
+- Wind order 171 天已完成导入；Wind trade 已转换 171 天，但剩余 170 天尚未导入；
 - 中泰 L2 真实数据尚未转换/导入；中泰源只有上午 09:15–11:30，且包含大量非股票代码；
 - 中泰转换器只做语法和内存小样本检查，第一次真实运行应先拿一天验证行数、side 和 Schema；
 - Catalog 全量前端页已按用户要求回退，当前没有独立 Catalog 浏览入口。

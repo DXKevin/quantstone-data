@@ -145,13 +145,14 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
                     trade_date = datetime.strptime(directory.name, "%Y%m%d").date()
                 except ValueError:
                     continue
+                partition_key = trade_date.isoformat()
                 if start_date and trade_date < start_date:
                     continue
                 if end_date and trade_date > end_date:
                     continue
                 source = directory / operation.filename
                 entry = {
-                    "partition_key": directory.name,
+                    "partition_key": partition_key,
                     "path": str(source),
                     "size_bytes": source.stat().st_size if source.is_file() else None,
                     "mtime": (
@@ -169,12 +170,12 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
                     entry["errors"] = [{"rule": "missing_file", "path": str(source)}]
                     entries.append(entry)
                     continue
-                if directory.name in existing:
+                if partition_key in existing:
                     entry["status"] = "duplicate"
                     existing_partition = session.scalar(
                         select(CatalogPartition).where(
                             CatalogPartition.dataset_id == dataset.id,
-                            CatalogPartition.partition_key == directory.name,
+                            CatalogPartition.partition_key == partition_key,
                         )
                     )
                     entry["row_count"] = (

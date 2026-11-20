@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import time
 from datetime import date
 from pathlib import Path
@@ -122,7 +123,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
 
         manifest = client.get(f"/api/v1/import-jobs/{job_id}/manifest")
         assert manifest.status_code == 200
-        assert manifest.json()["files"][0]["partition_key"] == "20261118"
+        assert manifest.json()["files"][0]["partition_key"] == "2026-11-18"
 
         executed = client.post(f"/api/v1/import-jobs/{job_id}/execute")
         assert executed.status_code == 200
@@ -135,7 +136,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert partitions.status_code == 200
         assert len(partitions.json()) == 1
         assert partitions.json()[0]["row_count"] == 2
-        assert partitions.json()[0]["partition_key"] == "20261118"
+        assert partitions.json()[0]["partition_key"] == "2026-11-18"
 
         collection_jobs = client.get("/api/v1/collection-jobs")
         assert collection_jobs.status_code == 200
@@ -143,6 +144,63 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
             item["input_method"] == "directory_import"
             for item in collection_jobs.json()["items"]
         )
+
+
+def test_legacy_l2_partition_keys_are_migrated_to_iso_dates(tmp_path: Path) -> None:
+    database_path = tmp_path / "test.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    data_root = tmp_path / "data"
+    app = create_app(database_url, data_root=data_root)
+    with TestClient(app) as client:
+        presets = {
+            item["contract"]["id"]: item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+        }
+        calendar = presets["tushare.cn.stock.trade_cal"]
+        assert client.post("/api/v1/datasets", json=calendar).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code
+            == 200
+        )
+        assert client.post("/api/v1/datasets", json=presets[ORDER_ID]).status_code == 201
+        assert client.post(f"/api/v1/datasets/{ORDER_ID}/activate").status_code == 200
+        source = data_root / "imports" / "wind_l2" / "sz" / "20261118" / "l2_order.parquet"
+        _write_order_file(source)
+        created = client.post(
+            "/api/v1/import-jobs",
+            json={
+                "dataset_id": ORDER_ID,
+                "scanner_key": "wind_l2_sz",
+                "operation": "import_order",
+                "source_root": str(source.parent.parent),
+            },
+        )
+        ready = _wait_status(client, created.json()["id"], {"review_ready"})
+        assert client.post(f"/api/v1/import-jobs/{ready['id']}/execute").status_code == 200
+        assert _wait_status(client, ready["id"], {"succeeded"})["status"] == "succeeded"
+
+    with sqlite3.connect(database_path) as database:
+        database.execute(
+            "UPDATE catalog_partitions SET partition_key = '20261118' WHERE dataset_id = ?",
+            (ORDER_ID,),
+        )
+        database.execute(
+            "UPDATE collection_runs SET partition_key = '20261118' WHERE job_id IN "
+            "(SELECT id FROM collection_jobs WHERE dataset_id = ?)",
+            (ORDER_ID,),
+        )
+
+    with TestClient(create_app(database_url, data_root=data_root)) as restarted:
+        partitions = restarted.get(f"/api/v1/catalog/partitions?dataset_id={ORDER_ID}")
+        assert partitions.json()[0]["partition_key"] == "2026-11-18"
+
+    with sqlite3.connect(database_path) as database:
+        run_key = database.execute(
+            "SELECT r.partition_key FROM collection_runs r "
+            "JOIN collection_jobs j ON j.id = r.job_id WHERE j.dataset_id = ?",
+            (ORDER_ID,),
+        ).fetchone()
+        assert run_key == ("2026-11-18",)
 
 def _write_zhongtai_trade_file(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
