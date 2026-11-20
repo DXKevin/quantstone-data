@@ -56,6 +56,7 @@ export default function ImportJobs({
   );
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [transferMode, setTransferMode] = useState<"move" | "copy">("move");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +183,7 @@ export default function ImportJobs({
         scanner_key: operations[0]?.scanner_key ?? "wind_l2_sz",
         operation,
         source_root: sourceRoot,
+        transfer_mode: transferMode,
         start_date: startDate || null,
         end_date: endDate || null,
       });
@@ -246,6 +248,7 @@ export default function ImportJobs({
           <label className="input-field"><span>目标数据集</span><select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>{importableDatasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
           <label className="input-field"><span>扫描操作</span><select value={operation} onChange={(event) => setOperation(event.target.value)}>{operations.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></label>
           <label className="input-field"><span>源目录</span><input value={sourceRoot} onChange={(event) => setSourceRoot(event.target.value)} placeholder="/home/hhd_data/quantstone-data/imports/wind_l2/sz" /></label>
+          <label className="input-field"><span>文件处理</span><select value={transferMode} onChange={(event) => setTransferMode(event.target.value as "move" | "copy")}><option value="move">移动（同盘快速，导入后删除源文件）</option><option value="copy">复制（保留源文件）</option></select></label>
           <label className="input-field"><span>开始日期</span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
           <label className="input-field"><span>结束日期</span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
           <button className="primary-button" type="submit" disabled={submitting || !operations.length}>{submitting ? "扫描中…" : "开始扫描"}</button>

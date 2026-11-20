@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,7 @@ class ImportJobCreate(BaseModel):
     scanner_key: str = Field(min_length=1, max_length=128)
     operation: str = Field(min_length=1, max_length=128)
     source_root: str = Field(min_length=1, max_length=1024)
+    transfer_mode: Literal["move", "copy"] = "move"
     start_date: date | None = None
     end_date: date | None = None
 

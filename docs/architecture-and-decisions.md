@@ -423,10 +423,13 @@ created → scanning → review_ready → importing → succeeded/failed
 扫描阶段按交易日期目录识别 `l2_order.parquet` / `l2_trade.parquet`，检查 Parquet Schema、
 行数、分区日期和契约要求的非空字段，生成不可变清单 `imports/jobs/<job_id>/manifest.json`。
 已有 Catalog 分区的日期标记为 `duplicate`，导入时跳过。执行导入前重新校验源文件大小和
-mtime；文件先复制到 staging，再由 L2 审核器复核，最后复用 `publish_partition` 写正式
+mtime；目录导入默认将文件原子移动到 staging，再由 L2 审核器复核，最后复用
+`publish_partition` 写正式
 目录和 Catalog。源目录沿用 `YYYYMMDD` 命名，Manifest、Catalog 和 Collection Run 的日期
 分区键统一保存为 ISO `YYYY-MM-DD`，以便与交易日历和覆盖热力图直接匹配；物理文件路径
-不作为分区键格式的依据。导入任务和采集、合并共用同一个后台单工作线程。
+不作为分区键格式的依据。用户也可选择复制模式以保留源文件。移动模式要求源目录与数据
+根目录位于同一文件系统，不能原子移动时明确失败，不自动退化成耗时复制；审核或发布失败时
+将尚未成功发布的文件恢复到原路径。导入任务和采集、合并共用同一个后台单工作线程。
 
 当前 L2 审核器检查 Schema、空值、行数和分区日期，不对上亿行的主键组合做全量唯一性扫描；
 主键唯一性应在转换脚本或一次性离线校验中确认。

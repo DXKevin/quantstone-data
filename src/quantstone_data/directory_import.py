@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -26,6 +27,7 @@ from .models import (
     ImportJob,
 )
 from .publishing import publish_partition
+from .publishing.path_resolver import resolve_partition_target
 from .reviewer_registry import review_dataset
 from .reviewer_types import ReviewContext
 from .scanner_registry import SCANNERS, get_scanner_operation
@@ -244,7 +246,7 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
             )
 
 
-def _copy_and_publish(
+def _stage_and_publish(
     session: Session,
     data_root: Path,
     job: ImportJob,
@@ -277,26 +279,53 @@ def _copy_and_publish(
         / f"{run.id}{source.suffix}"
     )
     staging.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, staging)
-    report = review_dataset(dataset.id, ReviewContext(staging, schema, trade_date))
-    if not report.passed:
-        run.status = "review_failed"
-        run.error = "；".join(
-            str(item.get("rule") or item.get("message")) for item in report.errors
+    transfer_mode = str(job.parameters.get("transfer_mode") or "move")
+    moved_source = transfer_mode == "move"
+    target = resolve_partition_target(
+        data_root,
+        dataset.id,
+        dataset.storage_policy or {},
+        entry["partition_key"],
+        run.id,
+    )
+    try:
+        if moved_source:
+            try:
+                os.replace(source, staging)
+            except OSError as error:
+                if error.errno == errno.EXDEV:
+                    raise ValueError(
+                        "源目录与数据目录不在同一文件系统，无法快速移动；请改用复制模式"
+                    ) from error
+                raise
+        else:
+            shutil.copy2(source, staging)
+        report = review_dataset(dataset.id, ReviewContext(staging, schema, trade_date))
+        if not report.passed:
+            run.status = "review_failed"
+            run.error = "；".join(
+                str(item.get("rule") or item.get("message")) for item in report.errors
+            )
+            session.commit()
+            raise ValueError(f"{entry['partition_key']} 审核失败：{run.error}")
+        publish_partition(
+            session,
+            data_root=data_root,
+            dataset_id=dataset.id,
+            storage_policy=dataset.storage_policy or {},
+            partition_key=entry["partition_key"],
+            artifact_path=staging,
+            row_count=report.row_count,
+            run=run,
         )
         session.commit()
-        raise ValueError(f"{entry['partition_key']} 审核失败：{run.error}")
-    publish_partition(
-        session,
-        data_root=data_root,
-        dataset_id=dataset.id,
-        storage_policy=dataset.storage_policy or {},
-        partition_key=entry["partition_key"],
-        artifact_path=staging,
-        row_count=report.row_count,
-        run=run,
-    )
-    session.commit()
+    except Exception:
+        if moved_source and not source.exists():
+            restore_from = staging if staging.exists() else target
+            if restore_from.exists():
+                source.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(restore_from, source)
+        raise
 
 
 def _run_import(job_id: str, session_factory, data_root: Path) -> None:
@@ -355,7 +384,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
                         collection_job_id=collection_job.id,
                     )
                     return
-                _copy_and_publish(
+                _stage_and_publish(
                     session, data_root, job, dataset, schema, entry, collection_job
                 )
                 imported += 1
@@ -495,6 +524,7 @@ def create_import_job(
             "source_root": str(source_root),
             "start_date": payload.start_date.isoformat() if payload.start_date else None,
             "end_date": payload.end_date.isoformat() if payload.end_date else None,
+            "transfer_mode": payload.transfer_mode,
         },
         status=ImportJobStatus.CREATED.value,
     )
@@ -523,6 +553,7 @@ def create_import_job(
         scanner_key=job.scanner_key,
         operation=job.operation,
         source_root=str(source_root),
+        transfer_mode=payload.transfer_mode,
     )
     return serialize_job(job)
 

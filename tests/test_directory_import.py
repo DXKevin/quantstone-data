@@ -137,6 +137,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert len(partitions.json()) == 1
         assert partitions.json()[0]["row_count"] == 2
         assert partitions.json()[0]["partition_key"] == "2026-11-18"
+        assert not source.exists()
 
         collection_jobs = client.get("/api/v1/collection-jobs")
         assert collection_jobs.status_code == 200
@@ -292,6 +293,7 @@ def test_zhongtai_trade_directory_import(tmp_path: Path) -> None:
                 "scanner_key": "zhongtai_l2_sz",
                 "operation": "import_trade",
                 "source_root": str(source.parent.parent),
+                "transfer_mode": "copy",
             },
         )
         assert created.status_code == 202, created.text
@@ -307,4 +309,5 @@ def test_zhongtai_trade_directory_import(tmp_path: Path) -> None:
         partitions = client.get(f"/api/v1/catalog/partitions?dataset_id={TRADE_ID}")
         assert partitions.status_code == 200
         assert partitions.json()[0]["row_count"] == 2
+        assert source.exists()
 

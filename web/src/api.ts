@@ -594,6 +594,7 @@ export const api = {
     scanner_key: string;
     operation: string;
     source_root: string;
+    transfer_mode?: "move" | "copy";
     start_date?: string | null;
     end_date?: string | null;
   }) =>
