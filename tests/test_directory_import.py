@@ -182,19 +182,36 @@ def test_legacy_l2_partition_keys_are_migrated_to_iso_dates(tmp_path: Path) -> N
         assert _wait_status(client, ready["id"], {"succeeded"})["status"] == "succeeded"
 
     with sqlite3.connect(database_path) as database:
+        current_path = database.execute(
+            "SELECT path FROM catalog_files WHERE dataset_id = ?", (ORDER_ID,)
+        ).fetchone()[0]
+        compact_path = current_path.replace("/2026-11-18/", "/20261118/")
+        current_file = data_root / current_path
+        compact_directory = current_file.parent.parent / "20261118"
+        current_file.parent.rename(compact_directory)
         database.execute(
-            "UPDATE catalog_partitions SET partition_key = '20261118' WHERE dataset_id = ?",
-            (ORDER_ID,),
+            "UPDATE catalog_files SET path = ? WHERE dataset_id = ?",
+            (compact_path, ORDER_ID),
         )
         database.execute(
-            "UPDATE collection_runs SET partition_key = '20261118' WHERE job_id IN "
+            "UPDATE catalog_partitions SET partition_key = '20261118', file_path = ? "
+            "WHERE dataset_id = ?",
+            (compact_path, ORDER_ID),
+        )
+        database.execute(
+            "UPDATE collection_runs SET partition_key = '20261118', published_path = ? "
+            "WHERE job_id IN "
             "(SELECT id FROM collection_jobs WHERE dataset_id = ?)",
-            (ORDER_ID,),
+            (compact_path, ORDER_ID),
         )
 
     with TestClient(create_app(database_url, data_root=data_root)) as restarted:
         partitions = restarted.get(f"/api/v1/catalog/partitions?dataset_id={ORDER_ID}")
         assert partitions.json()[0]["partition_key"] == "2026-11-18"
+        migrated_path = partitions.json()[0]["file_path"]
+        assert "/2026-11-18/" in migrated_path
+        assert (data_root / migrated_path).is_file()
+        assert not compact_directory.exists()
 
     with sqlite3.connect(database_path) as database:
         run_key = database.execute(
@@ -203,6 +220,16 @@ def test_legacy_l2_partition_keys_are_migrated_to_iso_dates(tmp_path: Path) -> N
             (ORDER_ID,),
         ).fetchone()
         assert run_key == ("2026-11-18",)
+        file_path = database.execute(
+            "SELECT path FROM catalog_files WHERE dataset_id = ?", (ORDER_ID,)
+        ).fetchone()[0]
+        run_path = database.execute(
+            "SELECT r.published_path FROM collection_runs r "
+            "JOIN collection_jobs j ON j.id = r.job_id WHERE j.dataset_id = ?",
+            (ORDER_ID,),
+        ).fetchone()[0]
+        assert file_path == migrated_path
+        assert run_path == migrated_path
 
 def _write_zhongtai_trade_file(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)

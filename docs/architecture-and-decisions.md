@@ -427,7 +427,8 @@ mtime；目录导入默认将文件原子移动到 staging，再由 L2 审核器
 `publish_partition` 写正式
 目录和 Catalog。源目录沿用 `YYYYMMDD` 命名，Manifest、Catalog 和 Collection Run 的日期
 分区键统一保存为 ISO `YYYY-MM-DD`，以便与交易日历和覆盖热力图直接匹配；物理文件路径
-不作为分区键格式的依据。用户也可选择复制模式以保留源文件。移动模式要求源目录与数据
+中的日期目录也统一为 `YYYY-MM-DD`。启动迁移会原子移动历史 `YYYYMMDD` 目录并同步更新
+Catalog 和 Collection Run 路径。用户也可选择复制模式以保留源文件。移动模式要求源目录与数据
 根目录位于同一文件系统，不能原子移动时明确失败，不自动退化成耗时复制；审核或发布失败时
 将尚未成功发布的文件恢复到原路径。受信任的服务器目录导入不计算完整文件 SHA-256，
 `catalog_files.sha256` 与 `catalog_partitions.sha256` 保存空字符串表示未计算，避免为每个超大

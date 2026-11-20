@@ -121,6 +121,8 @@
 - 前端新建目录导入任务时可直接选择文件处理方式，并明确显示移动会在成功后删除源文件。
 - 服务器目录导入发布时不再计算完整 SHA-256，Catalog 中以空字符串表示未计算，避免对每个
   1–2 GB L2 Parquet 再做一次全文件读取；其他发布路径仍保留 SHA-256。
+- L2 正式物理目录日期统一为 `YYYY-MM-DD`；启动时会原子迁移历史 `YYYYMMDD` 目录并同步更新
+  CatalogFile、CatalogPartition 和 CollectionRun 路径，数据库失败时恢复目录。
 
 验证：
 

@@ -22,6 +22,7 @@ from .dataset_deletion import router as dataset_deletion_router
 from .dataset_presets import router as dataset_presets_router
 from .directory_import import recover_interrupted_import_jobs
 from .directory_import import router as directory_import_router
+from .l2_path_migration import migrate_l2_directory_paths
 from .logging_config import configure_logging, log_event
 from .maintenance import recover_interrupted_maintenance_jobs
 from .maintenance import router as maintenance_router
@@ -42,9 +43,17 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         Base.metadata.create_all(engine)
         upgrade_sqlite_schema(engine)
         with session_factory() as session:
+            migrated_l2_directories = migrate_l2_directory_paths(
+                session, resolved_data_root
+            )
             recovered_jobs = recover_interrupted_jobs(session)
             recovered_maintenance = recover_interrupted_maintenance_jobs(session)
             recovered_imports = recover_interrupted_import_jobs(session)
+        if migrated_l2_directories:
+            log_event(
+                "l2_directory_paths_migrated",
+                directories=migrated_l2_directories,
+            )
         if recovered_jobs or recovered_maintenance or recovered_imports:
             log_event(
                 "interrupted_jobs_recovered",
