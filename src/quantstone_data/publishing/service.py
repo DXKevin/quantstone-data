@@ -53,6 +53,7 @@ def publish_partition(
     artifact_path: Path,
     row_count: int,
     run: CollectionRun,
+    calculate_sha256: bool = True,
 ) -> CatalogPartition:
     target = resolve_partition_target(
         data_root,
@@ -65,7 +66,7 @@ def publish_partition(
     os.replace(artifact_path, target)
     relative_target = target.relative_to(data_root).as_posix()
     size_bytes = target.stat().st_size
-    digest = _sha256(target)
+    digest = _sha256(target) if calculate_sha256 else ""
     file_row = upsert_file(
         session,
         dataset_id=dataset_id,
@@ -99,6 +100,7 @@ def publish_partition(
         file_path=relative_target,
         row_count=row_count,
         size_bytes=size_bytes,
+        sha256_calculated=calculate_sha256,
         replaced_path=previous_path,
     )
     return catalog

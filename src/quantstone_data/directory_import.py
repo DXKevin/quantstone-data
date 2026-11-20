@@ -317,6 +317,7 @@ def _stage_and_publish(
             artifact_path=staging,
             row_count=report.row_count,
             run=run,
+            calculate_sha256=False,
         )
         session.commit()
     except Exception:

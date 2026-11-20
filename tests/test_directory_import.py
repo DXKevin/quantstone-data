@@ -137,6 +137,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert len(partitions.json()) == 1
         assert partitions.json()[0]["row_count"] == 2
         assert partitions.json()[0]["partition_key"] == "2026-11-18"
+        assert partitions.json()[0]["sha256"] == ""
         assert not source.exists()
 
         collection_jobs = client.get("/api/v1/collection-jobs")
