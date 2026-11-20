@@ -620,6 +620,20 @@ TuShare 日 K 当前采用 `trade_date` 逻辑分区、`yearly_with_delta` 布�
 `catalog_partitions` 通过 `file_id` 指向文件，因此一个文件可以承载多个分区。统计行数、
 体积和缺失文件时按文件去重，不会因为多个分区共用一个文件而重复累加。
 
+多块存储介质的扩展方向是 **storage root**，不是“物理硬盘”或“多个 SQLite 数据库”。
+程序只应知道若干可配置的根路径，物理盘、LVM、HDD/SSD 的差异属于部署层。规划中的模型：
+
+```text
+storage_roots(id, name, path, enabled, priority)
+catalog_files(root_id, relative_path, ...)
+真实路径 = storage_roots[root_id].path + catalog_files.relative_path
+```
+
+现有数据默认归入第一个 root，不要求搬迁；同一逻辑数据集的不同分区可以选择不同 root，
+读取、发布、删除、合并、扫描、预览都必须通过 root 解析路径。旧记录可以继续以
+`data_root` 作为默认 root 保持兼容。不得为每块盘建立独立 Catalog 数据库，否则跨数据集的
+查询、覆盖统计和删除审查都需要联邦化。该能力尚未实现，具体根路径和分片策略待用户确认。
+
 年度合并由 `POST /api/v1/datasets/{dataset_id}/compact?year=YYYY` 提交为持久化
 `MaintenanceJob`，接口立即返回 `202 + queued`。`POST .../compact-all` 会扫描 Catalog 中
 尚未指向年度文件的年份，为每个待合并年份创建一个任务；已有排队或执行中任务的年份会被

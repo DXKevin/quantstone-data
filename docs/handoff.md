@@ -14,10 +14,60 @@
 - 完成测试、提交并推送后才算正常交接；
 - 不保留无说明的未提交修改。
 
+## 2026-11-20 交接摘要（优先阅读）
+
+- 当前工作 Agent：DeepSeek Harness 结束，等待 Codex 接手
+- 工作分支：`main`，工作区干净，最新提交见 `git log -1`（交接提交已推送）
+- 代码目录：`/home/quantadmin/project/quantstone-data`
+- 数据根目录：`/home/hhd_data/quantstone-data`
+- SQLite：`var/quantstone-data.db`（约 3.8 MB，2,890 个 Catalog 分区）
+- 服务：`./scripts/quantstone-dev.sh status|restart|logs`，后端 8000，前端 5173
+- 当前 7 个数据集均为 active：TuShare 3 个、Wind L2 2 个、中泰 L2 2 个。
+
+本轮完成：
+
+- Wind 深市 L2 `wind.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用；
+- 20261118 一天已转换并导入 Catalog：order 116,393,103 行、trade 104,411,003 行；
+- 正式目录导入功能已实现：`ImportJob`、扫描器、清单、审核、执行、取消 API，前端“采集 → 目录导入”；
+- Wind 扫描器 `wind_l2_sz`、中泰扫描器 `zhongtai_l2_sz` 均已注册，各有 order/trade 两个操作；
+- 中泰深市 L2 `zhongtai.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用，字段名/类型/主键与 Wind 对齐；
+- 中泰设置为 `manual` + `is_historical=true`，不进日更完成率和覆盖热力图；
+- 数据集契约新增 `is_historical`，前端可勾选，热力图和日更统计会排除历史数据集；
+- 中泰来源已确认为 `stock_day_a_l2/SZ`，历史约 2017-01 至 2026-03；只迁移股票前缀
+  `000/001/002/003/300/301/302`，源数据只覆盖上午 09:15–11:30；
+- 中泰 trade 的 `side` 直接比较 `BidApplSeqNum` / `OfferApplSeqNum`，不需要 join order；
+- 临时脚本不在 Git 仓库内：
+  - `/home/quantadmin/l2_migration/convert_wind_l2.py`
+  - `/home/quantadmin/l2_migration/convert_zhongtai_l2.py`
+  - 同目录两个 README。
+
+尚未完成：
+
+- Wind 全量只转换/导入了 20261118；其余 169 天未执行。Wind 源约 550 GB，完整转换预计约 2 小时、输出约 350 GB；
+- 中泰转换脚本只做了语法和内存小样本检查，没有跑真实数据；中泰扫描器也尚未导入真实数据；
+- 中泰源只有上午数据，且包含 ETF/基金/可转债/B 股/REITs；转换器只保留股票，20260323 股票上午输出应为
+  order 85,917,403 行、trade 76,321,044 行；
+- **多存储根（dataset 多卷分片）尚未实现**。用户已确认方向，且明确“程序不知道物理硬盘，只知道多个 dataset 路径”：
+  - 应建 `storage_roots`（id/name/path/enabled/priority）；
+  - `catalog_files` 增 `root_id` + 相对路径；
+  - 现有数据默认归第一个 root，新分区可写第二个 root；
+  - 读取/发布/删除/合并/扫描统一解析 `root + relative_path`；
+  - 不复制 SQLite，不按磁盘建多个数据库；物理盘/LVM 只属于部署层；
+  - 尚未确定两个根路径和分片策略，需先和用户确认再动代码。
+
+接手注意：
+
+- 修改/重启后端前先确认没有 `running`/`queued` 的采集、导入或合并任务；
+- 不要删除 `imports/wind_l2_test` 中的 20261118 测试转换输出；它是目录导入的测试源。
+  Catalog 已发布到正式 `datasets/` 目录，不依赖该测试源；
+- L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
+- Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
+- 本轮验证：`pytest -q` 76 项通过、`ruff check .` 通过、`npm run build` 通过。
+
 ## 当前状态
 
-更新时间：2026-11-19
-当前工作 Agent：无，等待下一位 Agent 接手
+更新时间：2026-11-20
+当前工作 Agent：DeepSeek Harness 已交接，等待 Codex 接手
 工作分支：`main`  
 远程仓库：`git@github.com:DXKevin/quantstone-data.git`
 
@@ -136,19 +186,23 @@
 
 ## 建议下一步
 
-Linux 内网远程开发环境已经接管完成。下一步确认服务器目录导入设计；暂不开发 SDK，也暂不
-继续扩展浏览器上传。
+当前优先级：
 
-建议第一步包含：
-
-1. 配置 TuShare Token，并决定是否配置 systemd 常驻服务；
-2. 确认是否仍需迁移 Windows 历史 Catalog 和 TuShare 数据；当前 Linux 已从空 Catalog 开始；
-3. 确认 L2 专用目录扫描器的源路径规则、清单模型、重复判定和发布方式。
+1. 先与用户确认多存储根的两个根路径、分片策略和迁移方式，再实现 `storage_roots` /
+   `catalog_files.root_id`；不要按物理硬盘建多个 SQLite。
+2. 执行 Wind L2 全量转换，再在“采集 → 目录导入”扫描并确认导入；20261118 已存在，会被识别为重复。
+3. 磁盘空闲后执行中泰转换，然后扫描导入；注意只保留股票、只有上午、`is_historical=true`。
+4. 如需看 Catalog 审计视图，用户已明确暂时不要；保持按数据集接口和概览热力图即可。
 
 不得把现有 TuShare Token、百度网盘账号或真实金融数据提交到 Git；本地 `.env` 只供运行使用。
 
 ## 已知问题与注意事项
 
+- 多存储根尚未实现；当前仍只有单一 `data_root`，Dataset 多卷分片只是待确认方案；
+- Wind L2 全量只完成 20261118 一天，剩余 169 天未转换/导入；
+- 中泰 L2 真实数据尚未转换/导入；中泰源只有上午 09:15–11:30，且包含大量非股票代码；
+- 中泰转换器只做语法和内存小样本检查，第一次真实运行应先拿一天验证行数、side 和 Schema；
+- Catalog 全量前端页已按用户要求回退，当前没有独立 Catalog 浏览入口。
 - `schema_version` 当前作为内部契约格式字段固定为 v1，不提供数据集内的 Schema 升级能力；
 - 当前 SQLite 表由 `create_all` 建立，尚未引入 Alembic；
 - FastAPI 测试会出现 Starlette 关于 `httpx` 的弃用警告，不影响现有测试结果；
