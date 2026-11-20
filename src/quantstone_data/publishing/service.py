@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..file_cleanup import remove_empty_parent_directories
 from ..logging_config import log_event
 from ..models import CatalogFile, CatalogPartition, CollectionRun
 from .catalog_writer import upsert_file, upsert_partition
@@ -33,7 +34,12 @@ def _drop_unreferenced_file(
         select(CatalogPartition.id).where(CatalogPartition.file_id == stale.id).limit(1)
     )
     if referenced is None:
-        (data_root / path).unlink(missing_ok=True)
+        stale_path = data_root / path
+        stale_path.unlink(missing_ok=True)
+        remove_empty_parent_directories(
+            stale_path,
+            stop=data_root / "datasets" / stale.dataset_id,
+        )
         session.delete(stale)
 
 

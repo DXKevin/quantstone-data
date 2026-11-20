@@ -306,8 +306,10 @@ def test_compaction_moves_replaced_files_to_revisions(tmp_path: Path) -> None:
         wait_maintenance_job(client, submitted.json()["id"])
         data_root = Path(client.app.state.data_root)
         revisions = data_root / "revisions" / DATASET_ID / "2024"
+        delta = data_root / "datasets" / DATASET_ID / "delta"
 
     assert any(revisions.iterdir())
+    assert not delta.exists()
 
 
 def test_recompaction_preserves_annual_rows_and_replaces_repaired_day(tmp_path: Path) -> None:

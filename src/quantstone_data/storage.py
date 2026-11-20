@@ -14,6 +14,7 @@ import pyarrow.parquet as pq
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .file_cleanup import remove_empty_parent_directories
 from .models import CatalogFile, CatalogPartition, Dataset
 from .publishing.catalog_writer import upsert_file
 
@@ -369,6 +370,10 @@ def compact_year(
             if revision.exists():
                 revision = revisions / f"{source.stem}-{uuid4().hex}{source.suffix}"
             os.replace(source, revision)
+            remove_empty_parent_directories(
+                source,
+                stop=data_root / "datasets" / dataset_id,
+            )
         stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
         if stale is not None:
             session.delete(stale)
