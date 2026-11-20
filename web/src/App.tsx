@@ -227,6 +227,10 @@ function App() {
               setArea("datasets");
               setDatasetSection("registry");
             }}
+            onOpen={(id) => {
+              setDatasetSection("registry");
+              void openDataset(id);
+            }}
             onRetry={() => void loadDatasets()}
           />
         )}
@@ -305,6 +309,7 @@ function DatasetPresetCatalog(props: {
   error: string | null;
   navigation: ReactNode;
   onCreated: (dataset: DatasetDetail) => void;
+  onOpen: (id: string) => void;
   onRetry: () => void;
 }) {
   const [creating, setCreating] = useState<string | null>(null);
@@ -317,7 +322,11 @@ function DatasetPresetCatalog(props: {
     try {
       props.onCreated(await api.createDataset(preset.contract));
     } catch (reason) {
-      setCreateError(reason instanceof Error ? reason.message : "无法从预置契约创建数据集");
+      try {
+        props.onCreated(await api.getDataset(preset.contract.id));
+      } catch {
+        setCreateError(reason instanceof Error ? reason.message : "无法从预置契约创建数据集");
+      }
     } finally {
       setCreating(null);
     }
@@ -346,7 +355,10 @@ function DatasetPresetCatalog(props: {
             <div className="preset-header">
               <div><span className="preset-category">{preset.category}</span><h2>{contract.display_name}</h2><code>{contract.id}</code></div>
               {current ? (
-                <span className={`status status-${current.status}`}>已创建 · {statusLabels[current.status]}</span>
+                <div className="preset-actions">
+                  <span className={`status status-${current.status}`}>已创建 · {statusLabels[current.status]}</span>
+                  <button className="ghost-button" onClick={() => props.onOpen(current.id)}>查看数据集<ChevronRight size={15} /></button>
+                </div>
               ) : (
                 <button className="primary-button" disabled={creating === preset.key} onClick={() => void createFromPreset(preset)}>
                   <Plus size={16} />{creating === preset.key ? "正在创建…" : "创建草稿"}
