@@ -14,11 +14,14 @@ from .stock_basic import (
 from .stock_basic import (
     collect_initial as collect_stock_basic_initial,
 )
+from .stock_st import collect_incremental as collect_stock_st_incremental
+from .stock_st import collect_initial as collect_stock_st_initial
 from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
+STOCK_ST_DATASET_ID = "tushare.cn.stock.stock_st"
 TRADE_CAL_DATASET_ID = "tushare.cn.stock.trade_cal"
 
 DATE_RANGE_PARAMETERS = (
@@ -51,6 +54,26 @@ OPERATIONS = (
         parameters=(),
         datasets=(STOCK_BASIC_DATASET_ID,),
         function=collect_stock_basic_incremental,
+    ),
+    CollectorOperation(
+        key="stock_st_initial",
+        name="ST 股票列表首次采集",
+        description="按交易日首次采集 TuShare stock_st 历史每日列表。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(STOCK_ST_DATASET_ID,),
+        function=collect_stock_st_initial,
+        rate_limit=DAILY_RATE_LIMIT,
+    ),
+    CollectorOperation(
+        key="stock_st_incremental",
+        name="ST 股票列表增量更新",
+        description="从数据集当前水位之后补充 TuShare stock_st 每日列表。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(STOCK_ST_DATASET_ID,),
+        function=collect_stock_st_incremental,
+        rate_limit=DAILY_RATE_LIMIT,
     ),
     CollectorOperation(
         key="daily_initial",

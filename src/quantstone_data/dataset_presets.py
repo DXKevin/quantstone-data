@@ -238,6 +238,52 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tushare_stock_st",
+        category="TuShare · A股",
+        contract=DatasetCreate(
+            id="tushare.cn.stock.stock_st",
+            provider="tushare",
+            region="cn",
+            instrument="stock",
+            dataset_name="stock_st",
+            market=None,
+            display_name="A股 ST 股票列表",
+            description="TuShare stock_st 历史每日 ST 股票列表及风险警示类型。",
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "stock_st_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "stock_st_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ts_code", "trade_date"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "TuShare 股票代码", nullable=False),
+                field("name", "string", "股票名称", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("type", "string", "风险警示类型代码", nullable=False),
+                field("type_name", "string", "风险警示类型名称", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_daily",
         category="TuShare · A股",
         contract=DatasetCreate(

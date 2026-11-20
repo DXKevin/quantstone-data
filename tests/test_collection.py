@@ -628,6 +628,94 @@ def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypa
     assert failed_runs.json()["items"][0]["error"] == upstream_error
 
 
+def test_stock_st_collection_publishes_reviewed_daily_partition(
+    tmp_path: Path, monkeypatch
+) -> None:
+    collected_dates: list[str] = []
+
+    def fake_stock_st(_token: str, trade_date: str, _fields: list[str]) -> list[dict]:
+        collected_dates.append(trade_date)
+        return [
+            {
+                "ts_code": "000001.SZ",
+                "name": "ST测试",
+                "trade_date": trade_date,
+                "type": "ST",
+                "type_name": "风险警示板",
+            }
+        ]
+
+    def fake_trade_cal(_token, _start_date, _end_date, _fields):
+        return [
+            {
+                "exchange": "SSE",
+                "cal_date": "20261118",
+                "is_open": 1,
+                "pretrade_date": "20261117",
+            }
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.stock_st._call_stock_st",
+        fake_stock_st,
+    )
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.trade_cal._call_trade_cal",
+        fake_trade_cal,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        presets = {
+            item["contract"]["id"]: item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+        }
+        assert client.post(
+            "/api/v1/datasets", json=presets["tushare.cn.stock.trade_cal"]
+        ).status_code == 201
+        assert client.post(
+            "/api/v1/datasets/tushare.cn.stock.trade_cal/activate"
+        ).status_code == 200
+        calendar_job = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-18"},
+            },
+        ).json()
+        assert client.post(
+            f"/api/v1/collection-jobs/{calendar_job['id']}/execute"
+        ).status_code == 202
+        assert wait_for_job(client, calendar_job["id"]).json()["status"] == "succeeded"
+
+        assert client.post(
+            "/api/v1/datasets", json=presets["tushare.cn.stock.stock_st"]
+        ).status_code == 201
+        assert client.post(
+            "/api/v1/datasets/tushare.cn.stock.stock_st/activate"
+        ).status_code == 200
+        job = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.stock_st",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-18"},
+            },
+        ).json()
+        assert client.post(f"/api/v1/collection-jobs/{job['id']}/execute").status_code == 202
+        completed = wait_for_job(client, job["id"])
+        assert completed.json()["status"] == "succeeded", completed.json()
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.stock_st"
+        ).json()
+        assert collected_dates == ["20261118"]
+        assert catalog[0]["partition_key"] == "2026-11-18"
+        assert catalog[0]["row_count"] == 1
+
+
 def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
     payload = {
         "id": "tushare.cn.stock.trade_cal",

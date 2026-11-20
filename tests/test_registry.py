@@ -32,12 +32,17 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
             "description": "可选的更新截止日期，默认当天",
         }
     ]
+    stock_st_initial = next(
+        item for item in collector["operations"] if item["key"] == "stock_st_initial"
+    )
+    assert stock_st_initial["datasets"] == ["tushare.cn.stock.stock_st"]
 
 
 def test_reviewer_registry_uses_dataset_ids() -> None:
     assert set(REVIEWERS) == {
         "tushare.cn.stock.daily",
         "tushare.cn.stock.stock_basic",
+        "tushare.cn.stock.stock_st",
         "tushare.cn.stock.trade_cal",
         "wind.cn.stock.l2_order.sz",
         "wind.cn.stock.l2_trade.sz",

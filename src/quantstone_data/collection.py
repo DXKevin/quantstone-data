@@ -36,7 +36,6 @@ from .collection_schemas import (
     InputMethod,
 )
 from .collector_registry import get_operation, validate_operation_parameters
-from .collectors.tushare_cn_stock.definition import DAILY_DATASET_ID
 from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
 from .database import get_session
 from .execution import run_operation
@@ -1017,7 +1016,11 @@ def _run_collection(
     data_root: Path,
     session: Session,
 ) -> CollectionJobRead:
-    if job.dataset_id == DAILY_DATASET_ID:
+    policy = dataset.storage_policy or {}
+    if policy.get("logical_partition_field") and policy.get("layout") in {
+        "daily",
+        "yearly_with_delta",
+    }:
         return _execute_daily_job(
             job,
             operation,

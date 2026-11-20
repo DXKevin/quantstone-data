@@ -504,9 +504,17 @@ TuShare A 股交易日历使用数据集 ID `tushare.cn.stock.trade_cal`，默�
 接受起止日期，增量更新重新生成完整快照。当前账号的 `trade_cal` 权限限制为每小时一次，
 不得按年份拆成高频连续请求。
 
+TuShare 历史每日 ST 列表使用数据集 ID `tushare.cn.stock.stock_st`，保留官方
+`ts_code/name/trade_date/type/type_name` 五个字段，只将 `trade_date` 技术标准化为日期类型。
+数据按交易日分区，主键为 `ts_code + trade_date`，采用 `yearly_with_delta` 布局并引用 A 股
+交易日历；首次与增量采集均按交易日调用 `stock_st`，审核 Schema、非空、主键唯一性、分区
+日期和 TuShare 股票代码格式。分区采集由存储策略中的逻辑分区字段和布局识别，不按数据集 ID
+硬编码。
+
 TuShare 网络入口由可选环境变量 `TUSHARE_API_URL` 统一配置，默认使用官方
-`https://api.tushare.pro`。代理入口只改变传输路径，不改变供应商身份；`stock_basic`、`daily`
-和 `trade_cal` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得记录 Token。
+`https://api.tushare.pro`。代理入口只改变传输路径，不改变供应商身份；`stock_basic`、`stock_st`、
+`daily` 和 `trade_cal` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得
+记录 Token。
 
 所有以日期作为逻辑分区的数据集都必须在存储策略中显式配置 `calendar_dataset_id`。系统不再
 用“周一至周五”推测交易日，也不通过数据集名称隐式寻找日历。启用日期分区数据集时，所引用

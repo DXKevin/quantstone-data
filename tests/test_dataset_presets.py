@@ -17,6 +17,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         assert [item["contract"]["id"] for item in presets] == [
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.stock_basic",
+            "tushare.cn.stock.stock_st",
             "tushare.cn.stock.daily",
             "wind.cn.stock.l2_order.sz",
             "wind.cn.stock.l2_trade.sz",
@@ -29,12 +30,14 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             assert created.status_code == 201
             assert created.json()["status"] == "draft"
 
-    daily = presets[2]["contract"]
-    stock_basic = presets[1]["contract"]
-    l2_order = presets[3]["contract"]
-    l2_trade = presets[4]["contract"]
-    zt_order = presets[5]["contract"]
-    zt_trade = presets[6]["contract"]
+    contracts = {item["contract"]["id"]: item["contract"] for item in presets}
+    daily = contracts["tushare.cn.stock.daily"]
+    stock_basic = contracts["tushare.cn.stock.stock_basic"]
+    stock_st = contracts["tushare.cn.stock.stock_st"]
+    l2_order = contracts["wind.cn.stock.l2_order.sz"]
+    l2_trade = contracts["wind.cn.stock.l2_trade.sz"]
+    zt_order = contracts["zhongtai.cn.stock.l2_order.sz"]
+    zt_trade = contracts["zhongtai.cn.stock.l2_trade.sz"]
     assert l2_order["provider"] == "wind"
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
@@ -90,6 +93,19 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert stock_basic["time_granularity"] == "none"
     assert daily["update_frequency"] == "daily"
     assert daily["time_granularity"] == "day"
+    assert stock_st["primary_key"] == ["ts_code", "trade_date"]
+    assert stock_st["storage_policy"]["layout"] == "yearly_with_delta"
+    assert [item["name"] for item in stock_st["fields"]] == [
+        "ts_code",
+        "name",
+        "trade_date",
+        "type",
+        "type_name",
+    ]
+    assert {item["operation"] for item in stock_st["collection_bindings"]} == {
+        "stock_st_initial",
+        "stock_st_incremental",
+    }
     assert [item["name"] for item in stock_basic["fields"]] == [
         "ts_code",
         "symbol",

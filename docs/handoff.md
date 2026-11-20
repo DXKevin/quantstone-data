@@ -149,6 +149,20 @@
 
 下一步：确认单日结果后可执行两个导入任务，或先启动全量转换。
 
+### 2026-11-20 — Codex（TuShare stock_st 数据集）
+
+完成：
+
+- 新增预置契约 `tushare.cn.stock.stock_st`，保留官方 5 个字段，按 `trade_date` 分区，主键为
+  `ts_code + trade_date`，使用交易日历与 `yearly_with_delta` 存储；
+- TuShare A 股采集器新增 `stock_st_initial` / `stock_st_incremental`，通过现有代理 API 配置按
+  交易日请求并输出 Parquet；
+- 新增 stock_st 审核器，检查必填字段、空数据、主键唯一性、分区日期和 TS 代码格式；
+- 分区采集调度从硬编码 daily 数据集改为按存储策略识别，支持后续同类按日数据集。
+
+验证：预置契约、注册表、stock_st 单日采集发布和既有 daily 回归定向测试均通过；
+`pytest -q` 79 项通过，`ruff check .` 通过。
+
 ## 当前状态
 
 更新时间：2026-11-20
