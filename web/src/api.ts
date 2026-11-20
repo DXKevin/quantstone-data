@@ -20,6 +20,7 @@ export type CollectionJobStatus =
 export interface DatasetStoragePolicy {
   logical_partition_field: string | null;
   calendar_dataset_id: string | null;
+  allow_empty_partitions: boolean;
   layout: "daily" | "yearly_with_delta" | "snapshot";
   write_strategy: "append" | "replace_partition" | "replace_snapshot";
   compaction: "yearly" | null;

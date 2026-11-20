@@ -635,6 +635,8 @@ def test_stock_st_collection_publishes_reviewed_daily_partition(
 
     def fake_stock_st(_token: str, trade_date: str, _fields: list[str]) -> list[dict]:
         collected_dates.append(trade_date)
+        if trade_date == "20261119":
+            return []
         return [
             {
                 "ts_code": "000001.SZ",
@@ -652,7 +654,13 @@ def test_stock_st_collection_publishes_reviewed_daily_partition(
                 "cal_date": "20261118",
                 "is_open": 1,
                 "pretrade_date": "20261117",
-            }
+            },
+            {
+                "exchange": "SSE",
+                "cal_date": "20261119",
+                "is_open": 1,
+                "pretrade_date": "20261118",
+            },
         ]
 
     monkeypatch.setattr(
@@ -682,7 +690,7 @@ def test_stock_st_collection_publishes_reviewed_daily_partition(
                 "dataset_id": "tushare.cn.stock.trade_cal",
                 "operation": "initial",
                 "input_method": "collector",
-                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-18"},
+                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-19"},
             },
         ).json()
         assert client.post(
@@ -702,7 +710,7 @@ def test_stock_st_collection_publishes_reviewed_daily_partition(
                 "dataset_id": "tushare.cn.stock.stock_st",
                 "operation": "initial",
                 "input_method": "collector",
-                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-18"},
+                "parameters": {"start_date": "2026-11-18", "end_date": "2026-11-19"},
             },
         ).json()
         assert client.post(f"/api/v1/collection-jobs/{job['id']}/execute").status_code == 202
@@ -711,9 +719,9 @@ def test_stock_st_collection_publishes_reviewed_daily_partition(
         catalog = client.get(
             "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.stock_st"
         ).json()
-        assert collected_dates == ["20261118"]
-        assert catalog[0]["partition_key"] == "2026-11-18"
-        assert catalog[0]["row_count"] == 1
+        assert collected_dates == ["20261118", "20261119"]
+        partitions = {item["partition_key"]: item["row_count"] for item in catalog}
+        assert partitions == {"2026-11-18": 1, "2026-11-19": 0}
 
 
 def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:

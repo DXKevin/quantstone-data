@@ -36,6 +36,8 @@ def check_partition_date(
     if expected is None or not schema.time_field or schema.time_field not in table.column_names:
         return []
     actual = set(table[schema.time_field].to_pylist())
+    if not actual:
+        return []
     if actual == {expected}:
         return []
     return [

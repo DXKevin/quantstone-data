@@ -122,6 +122,7 @@ def test_legacy_tushare_collector_key_is_migrated(tmp_path: Path) -> None:
     assert dataset.json()["storage_policy"] == {
         "logical_partition_field": None,
         "calendar_dataset_id": None,
+        "allow_empty_partitions": False,
         "layout": "snapshot",
         "write_strategy": "replace_snapshot",
         "compaction": None,

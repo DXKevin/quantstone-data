@@ -731,6 +731,9 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
   const [calendarDatasetId, setCalendarDatasetId] = useState(
     props.dataset?.storage_policy?.calendar_dataset_id ?? "",
   );
+  const [allowEmptyPartitions, setAllowEmptyPartitions] = useState(
+    props.dataset?.storage_policy?.allow_empty_partitions ?? false,
+  );
   const [timeField, setTimeField] = useState(props.dataset?.schema.time_field ?? "");
   const initialFields = props.dataset?.schema.fields.map((field, index) => ({
     key: index + 1,
@@ -799,6 +802,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
         ? {
             logical_partition_field: partitionField || null,
             calendar_dataset_id: partitionField ? calendarDatasetId || null : null,
+            allow_empty_partitions: allowEmptyPartitions,
             layout: storageLayout as "daily" | "yearly_with_delta" | "snapshot",
             write_strategy: storageLayout === "snapshot" ? "replace_snapshot" : "replace_partition",
             compaction: storageLayout === "yearly_with_delta" ? "yearly" : null,
@@ -891,6 +895,7 @@ function DatasetForm(props: { collectors: CollectorDefinition[]; datasets: Datas
             <label className="input-field"><span>逻辑分区字段</span><input value={partitionField} disabled={!storageLayout || storageLayout === "snapshot"} onChange={(event) => setPartitionField(event.target.value)} placeholder="trade_date" /></label>
           </div>
           {partitionField && <label className="input-field calendar-binding"><span>交易日历数据集</span><select value={calendarDatasetId} onChange={(event) => setCalendarDatasetId(event.target.value)}><option value="">请选择交易日历数据集</option>{props.datasets.filter((item) => item.id !== datasetId && item.storage_policy?.layout === "snapshot").map((item) => <option key={item.id} value={item.id}>{item.display_name} · {item.id}</option>)}</select><small>采集计划只会生成日历中标记为交易日的日期；日历必须先启用并发布数据。</small></label>}
+          {partitionField && <label className="input-field checkbox-field"><span>空分区策略</span><label><input type="checkbox" checked={allowEmptyPartitions} onChange={(event) => setAllowEmptyPartitions(event.target.checked)} />允许交易日存在 0 行，并将其记录为已覆盖</label></label>}
           {partitionField && !props.datasets.some((item) => item.id !== datasetId && item.storage_policy?.layout === "snapshot") && <div className="calendar-warning">当前没有可绑定的交易日历，请先创建并启用交易日历数据集。</div>}
           {storageLayout === "yearly_with_delta" && <div className="operation-help">每日审核通过后立即发布为增量 Parquet，后续按年度合并；Catalog 仍逐日记录覆盖。</div>}
         </div>

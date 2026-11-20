@@ -95,6 +95,8 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert daily["time_granularity"] == "day"
     assert stock_st["primary_key"] == ["ts_code", "trade_date"]
     assert stock_st["storage_policy"]["layout"] == "yearly_with_delta"
+    assert stock_st["storage_policy"]["allow_empty_partitions"] is True
+    assert daily["storage_policy"]["allow_empty_partitions"] is False
     assert [item["name"] for item in stock_st["fields"]] == [
         "ts_code",
         "name",

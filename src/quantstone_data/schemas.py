@@ -51,6 +51,7 @@ class DatasetCollectionBinding(BaseModel):
 class DatasetStoragePolicy(BaseModel):
     logical_partition_field: str | None = None
     calendar_dataset_id: str | None = Field(default=None, max_length=255)
+    allow_empty_partitions: bool = False
     layout: str = Field(pattern=r"^(daily|yearly_with_delta|snapshot)$")
     write_strategy: str = Field(pattern=r"^(append|replace_partition|replace_snapshot)$")
     compaction: str | None = Field(default=None, pattern=r"^yearly$")

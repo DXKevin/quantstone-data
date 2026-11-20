@@ -4,7 +4,6 @@ import pyarrow.parquet as pq
 
 from ......reviewer_types import ReviewContext, ReviewReport
 from .....checks import (
-    check_not_empty,
     check_partition_date,
     check_primary_key,
     check_required_fields,
@@ -32,7 +31,6 @@ def review(context: ReviewContext) -> ReviewReport:
     table = pq.ParquetFile(context.artifact_path).read()
     errors = [
         *check_required_fields(table, context.schema),
-        *check_not_empty(table),
         *check_primary_key(table, context.schema),
         *check_partition_date(table, context.schema, context.expected_partition),
         *_check_ts_codes(table),

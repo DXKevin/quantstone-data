@@ -268,6 +268,7 @@ DATASET_PRESETS = (
             storage_policy={
                 "logical_partition_field": "trade_date",
                 "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "allow_empty_partitions": True,
                 "layout": "yearly_with_delta",
                 "write_strategy": "replace_partition",
                 "compaction": "yearly",
