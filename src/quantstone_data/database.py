@@ -221,6 +221,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "AND json_extract(storage_policy, '$.calendar_dataset_id') IS NULL"
             )
         )
+        connection.execute(
+            text(
+                "UPDATE datasets SET storage_policy = "
+                "json_set(storage_policy, '$.allow_empty_partitions', "
+                "CASE WHEN id = 'tushare.cn.stock.stock_st' THEN json('true') "
+                "ELSE json('false') END) "
+                "WHERE storage_policy IS NOT NULL "
+                "AND json_extract(storage_policy, '$.allow_empty_partitions') IS NULL"
+            )
+        )
 
         # 早期 stock_basic 预置误将供应商的完整接口缩减为 3 个字段。仅在契约仍是
         # 精确的旧三字段形态且尚未发布数据时原位修正，避免改变已有物理数据的契约。
