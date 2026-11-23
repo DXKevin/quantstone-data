@@ -1741,8 +1741,10 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
   5 项通过；
 - `ruff check src tests`：通过；
 - `web/npm run build`：通过。
+- 前后端已安全重启；健康检查、2 个扫描器/4 个操作和前端页面均正常，线上 OpenAPI 已包含
+  `ImportJobCreate.purpose`。
 
-下一步：重启前后端并在浏览器验证创建、扫描确认和统一任务展示。
+下一步：无。
 
 遗留问题：当前 Codex 环境运行既有 TestClient 集成测试仍会卡在 lifespan 启动，反向应用本轮改动
 后同样复现；定向纯后端测试和前端类型构建均已通过。
