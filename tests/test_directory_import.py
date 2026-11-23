@@ -146,6 +146,16 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
             item["input_method"] == "directory_import"
             for item in collection_jobs.json()["items"]
         )
+        imported_job = next(
+            item
+            for item in collection_jobs.json()["items"]
+            if item["input_method"] == "directory_import"
+        )
+        review = client.get(f"/api/v1/collection-jobs/{imported_job['id']}/review")
+        assert review.status_code == 200
+        assert review.json()["passed"] is True
+        assert review.json()["row_count"] == 2
+        assert review.json()["runs"][0]["partition_key"] == "2026-11-18"
 
 
 def test_legacy_l2_partition_keys_are_migrated_to_iso_dates(tmp_path: Path) -> None:

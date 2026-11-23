@@ -40,8 +40,16 @@ from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
 from .database import get_session
 from .execution import run_operation
 from .logging_config import log_event
-from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset, DatasetSchemaVersion
+from .models import (
+    CatalogPartition,
+    CollectionJob,
+    CollectionRun,
+    Dataset,
+    DatasetSchemaVersion,
+    ImportJob,
+)
 from .publishing import publish_partition_transaction
+from .review_reports import build_directory_import_review, write_collection_review
 from .reviewer_registry import review_dataset
 from .reviewer_types import ReviewContext
 from .schemas import DatasetStatus
@@ -1401,6 +1409,19 @@ def get_collection_review(job_id: str, request: Request, session: SessionDep) ->
     job = session.get(CollectionJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="collection job not found")
+    if not job.staged_path and job.input_method == "directory_import":
+        import_job_id = str((job.parameters or {}).get("import_job_id") or "")
+        import_job = session.get(ImportJob, import_job_id) if import_job_id else None
+        if import_job is not None and import_job.manifest_path:
+            manifest_path = request.app.state.data_root / import_job.manifest_path
+            if manifest_path.is_file():
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                job.staged_path = write_collection_review(
+                    request.app.state.data_root,
+                    job.id,
+                    build_directory_import_review(job.dataset_id, manifest),
+                )
+                session.commit()
     if not job.staged_path:
         raise HTTPException(status_code=409, detail="job has no staged review result")
     report_path = (request.app.state.data_root / job.staged_path).parent / "review.json"

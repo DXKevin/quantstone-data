@@ -28,6 +28,7 @@ from .models import (
 )
 from .publishing import publish_partition_transaction
 from .publishing.path_resolver import resolve_partition_target
+from .review_reports import build_directory_import_review, write_collection_review
 from .reviewer_registry import review_dataset
 from .reviewer_types import ReviewContext
 from .scanner_registry import SCANNERS, get_scanner_operation
@@ -365,6 +366,11 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
                 collector_key=job.scanner_key,
                 collector_operation=job.operation,
                 parameters={"import_job_id": job.id},
+            )
+            collection_job.staged_path = write_collection_review(
+                data_root,
+                collection_job.id,
+                build_directory_import_review(dataset.id, manifest),
             )
             session.add(collection_job)
             session.commit()
