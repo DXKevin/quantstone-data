@@ -8,10 +8,10 @@ import pyarrow.parquet as pq
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from ...field_types import arrow_type, normalize_value
 from ...provider_http import post_json
-from .stock_basic import load_api_url, raise_api_error
+from .stock_basic import CollectionError, load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.trade_cal"
-FULL_HISTORY_START = date(1990, 1, 1)
+MAX_INCREMENTAL_RANGE_DAYS = 3000
 
 
 def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[str]) -> list[dict]:
@@ -37,11 +37,16 @@ def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[s
 
 
 def _collect(
-    context: CollectionContext, start_date: date, end_date: date, field_contracts: list[dict]
+    context: CollectionContext,
+    start_date: date,
+    end_date: date,
+    field_contracts: list[dict],
+    *,
+    merge_current: bool = False,
 ) -> CollectionResult:
     source_fields = [item.get("source_name") or item["name"] for item in field_contracts]
     rows = _call_trade_cal(context.token, start_date, end_date, source_fields)
-    normalized = [
+    refreshed = [
         {
             field["name"]: normalize_value(
                 row.get(field.get("source_name") or field["name"]), field["data_type"]
@@ -50,6 +55,25 @@ def _collect(
         }
         for row in rows
     ]
+    if merge_current:
+        if not refreshed:
+            raise CollectionError("TuShare trade_cal 增量窗口返回 0 行，拒绝覆盖当前快照")
+        if context.current_artifact_path is None or not context.current_artifact_path.is_file():
+            raise CollectionError("交易日历增量更新缺少当前快照，请先执行首次采集")
+        current = pq.read_table(context.current_artifact_path).to_pylist()
+        retained = [
+            row
+            for row in current
+            if row["cal_date"] < start_date or row["cal_date"] > end_date
+        ]
+        normalized = retained + refreshed
+    else:
+        normalized = refreshed
+    primary_keys = {
+        (row["exchange"], row["cal_date"]): row
+        for row in normalized
+    }
+    normalized = list(primary_keys.values())
     normalized.sort(key=lambda row: (row["cal_date"], row["exchange"]))
     schema = pa.schema(
         [
@@ -70,6 +94,7 @@ def _collect(
             "exchange": "SSE",
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
+            "merged_current_snapshot": merge_current,
         },
     )
 
@@ -93,4 +118,11 @@ def collect_incremental(
         if parameters.get("end_date")
         else date.today() + timedelta(days=366)
     )
-    return _collect(context, FULL_HISTORY_START, end_date, field_contracts)
+    start_date = end_date - timedelta(days=MAX_INCREMENTAL_RANGE_DAYS - 1)
+    return _collect(
+        context,
+        start_date,
+        end_date,
+        field_contracts,
+        merge_current=True,
+    )

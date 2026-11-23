@@ -1,9 +1,11 @@
 import hashlib
 import threading
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.error import HTTPError
 
+import pyarrow.parquet as pq
 from fastapi.testclient import TestClient
 
 from quantstone_data.collectors.tushare_cn_stock.stock_basic import CollectionError
@@ -801,6 +803,87 @@ def test_trade_calendar_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
     assert executed.json()["status"] == "succeeded"
     assert catalog.json()[0]["partition_key"] == "snapshot"
     assert (tmp_path / "data" / catalog.json()[0]["file_path"]).is_file()
+
+
+def test_trade_calendar_incremental_merges_3000_day_window_into_snapshot(
+    tmp_path: Path, monkeypatch
+) -> None:
+    calls: list[tuple[date, date]] = []
+
+    def fake_trade_cal(_token, start_date, end_date, _fields):
+        calls.append((start_date, end_date))
+        return [
+            {
+                "exchange": "SSE",
+                "cal_date": value.strftime("%Y%m%d"),
+                "is_open": 1,
+                "pretrade_date": None,
+            }
+            for value in (start_date, end_date)
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.trade_cal._call_trade_cal",
+        fake_trade_cal,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        preset = next(
+            item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+            if item["contract"]["id"] == "tushare.cn.stock.trade_cal"
+        )
+        assert client.post("/api/v1/datasets", json=preset).status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.trade_cal/activate").status_code
+            == 200
+        )
+        initial = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "initial",
+                "input_method": "collector",
+                "parameters": {"start_date": "2010-01-01", "end_date": "2027-12-31"},
+            },
+        ).json()
+        assert client.post(
+            f"/api/v1/collection-jobs/{initial['id']}/execute"
+        ).status_code == 202
+        assert wait_for_job(client, initial["id"]).json()["status"] == "succeeded"
+
+        incremental_end = date(2028, 1, 10)
+        incremental = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.trade_cal",
+                "operation": "incremental",
+                "input_method": "collector",
+                "parameters": {"end_date": incremental_end.isoformat()},
+            },
+        ).json()
+        assert client.post(
+            f"/api/v1/collection-jobs/{incremental['id']}/execute"
+        ).status_code == 202
+        completed = wait_for_job(client, incremental["id"])
+        assert completed.json()["status"] == "succeeded", completed.json()
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.trade_cal"
+        ).json()
+
+    refresh_start = incremental_end - timedelta(days=2999)
+    assert calls == [
+        (date(2010, 1, 1), date(2027, 12, 31)),
+        (refresh_start, incremental_end),
+    ]
+    table = pq.read_table(tmp_path / "data" / catalog[0]["file_path"])
+    assert table.num_rows == 3
+    assert table["cal_date"].to_pylist() == [
+        date(2010, 1, 1),
+        refresh_start,
+        incremental_end,
+    ]
 
 
 def test_snapshot_job_can_be_cancelled_before_publish(tmp_path: Path, monkeypatch) -> None:

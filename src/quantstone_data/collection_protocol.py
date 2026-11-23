@@ -16,6 +16,7 @@ class CollectionContext:
     run_id: str
     staging_dir: Path
     token: str
+    current_artifact_path: Path | None = None
 
 
 @dataclass(frozen=True)

@@ -567,6 +567,15 @@ def _execute_snapshot_job(
     ]
     run_directory = data_root / "staging" / job.id / run.id
     report_path = data_root / "staging" / job.id / "review.json"
+    current_partition = session.scalar(
+        select(CatalogPartition).where(
+            CatalogPartition.dataset_id == job.dataset_id,
+            CatalogPartition.partition_key == "snapshot",
+        )
+    )
+    current_artifact_path = (
+        data_root / current_partition.file_path if current_partition is not None else None
+    )
     try:
         log_event(
             "collection_run_started",
@@ -581,7 +590,12 @@ def _execute_snapshot_job(
             job.collector_key or "unknown",
             operation,
             lambda: operation.function(
-                CollectionContext(run.id, run_directory, load_token()),
+                CollectionContext(
+                    run.id,
+                    run_directory,
+                    load_token(),
+                    current_artifact_path=current_artifact_path,
+                ),
                 job.parameters,
                 fields,
             ),
