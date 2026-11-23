@@ -87,6 +87,9 @@ h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.5px; }
 .recent-collection-row time { color: #6d7872; font-size: 11px; }
 .recent-collection-empty { margin: 0; padding: 16px 20px; color: var(--muted); font-size: 11px; }
 .daily-completion-panel { margin-bottom: 20px; }
+.daily-completion-total-percent { color: #18794e; font-size: 24px; font-variant-numeric: tabular-nums; }
+.daily-completion-total { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #eef2ef; color: #40564c; font-size: 11px; }
+.daily-completion-total small { color: var(--muted); font-size: 10px; }
 .daily-completion-toggle { width: 100%; display: flex; align-items: center; gap: 7px; padding: 9px 20px; border: 0; background: #fbfcfb; color: #4e655b; font: inherit; font-size: 11px; cursor: pointer; }
 .daily-completion-toggle:hover { background: #f4f8f6; }
 .daily-completion-toggle small { margin-left: auto; color: var(--muted); font-size: 10px; }
@@ -628,6 +631,7 @@ body { font-size: 14px; }
   .dataset-category-assignment .category-assignment-error { grid-column: 1; }
   .collection-metrics { grid-template-columns: repeat(2, 1fr); }
   .daily-completion-row { grid-template-columns: 1fr; gap: 8px; }
+  .daily-completion-total { grid-template-columns: 1fr; gap: 8px; }
 }
 
 /* 目录导入 */

@@ -238,6 +238,23 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
               <h2>日更数据完成率</h2>
               <span>最近 {dailyCompletion.days} 个交易日 · {dailyCompletion.today}</span>
             </div>
+            <strong className="daily-completion-total-percent">
+              {dailyCompletion.total.completion_percent === null
+                ? "—"
+                : `${dailyCompletion.total.completion_percent}%`}
+            </strong>
+          </div>
+          <div className="daily-completion-total">
+            <div className="coverage-bar">
+              <i style={{ width: `${Math.min(dailyCompletion.total.completion_percent ?? 0, 100)}%` }} />
+            </div>
+            <span>
+              总计 {dailyCompletion.total.complete.toLocaleString()} / {dailyCompletion.total.expected.toLocaleString()} 个应完成项
+            </span>
+            <small>
+              缺失 {dailyCompletion.total.missing} · 失败 {dailyCompletion.total.failed + dailyCompletion.total.abnormal}
+              {dailyCompletion.total.pending ? ` · 待采集 ${dailyCompletion.total.pending}` : ""}
+            </small>
           </div>
           <button
             type="button"

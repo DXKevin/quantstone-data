@@ -375,6 +375,15 @@ export interface DailyCompletion {
   today: string;
   days: number;
   dates: string[];
+  total: {
+    complete: number;
+    expected: number;
+    completion_percent: number | null;
+    missing: number;
+    failed: number;
+    abnormal: number;
+    pending: number;
+  };
   datasets: DailyCompletionRow[];
 }
 

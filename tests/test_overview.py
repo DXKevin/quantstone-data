@@ -4,13 +4,36 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from quantstone_data.main import create_app
-from quantstone_data.overview import _coverage_percent, _serialize_timestamp
+from quantstone_data.overview import (
+    _coverage_percent,
+    _daily_completion_total,
+    _serialize_timestamp,
+)
 
 
 def test_coverage_percent_reserves_100_for_complete_coverage() -> None:
     assert _coverage_percent(2886, 2887) == 99.9
     assert _coverage_percent(2887, 2887) == 100.0
     assert _coverage_percent(0, 0) is None
+
+
+def test_daily_completion_total_weights_all_expected_items() -> None:
+    total = _daily_completion_total(
+        [
+            {"complete": 9, "expected": 10, "missing": 1},
+            {"complete": 1, "expected": 1, "failed": 0, "pending": 0},
+        ]
+    )
+
+    assert total == {
+        "complete": 10,
+        "expected": 11,
+        "completion_percent": 90.9,
+        "missing": 1,
+        "failed": 0,
+        "abnormal": 0,
+        "pending": 0,
+    }
 
 
 def test_overview_timestamp_keeps_utc_semantics_after_sqlite_round_trip() -> None:
@@ -71,6 +94,15 @@ def test_overview_lists_datasets_with_empty_catalog(tmp_path: Path) -> None:
     assert item["latest_partition"] is None
     assert daily.status_code == 200
     assert daily.json()["days"] == 30
+    assert daily.json()["total"] == {
+        "complete": 0,
+        "expected": 0,
+        "completion_percent": None,
+        "missing": 0,
+        "failed": 0,
+        "abnormal": 0,
+        "pending": 0,
+    }
     assert daily.json()["datasets"] == []
 
 

@@ -33,6 +33,21 @@ def _coverage_percent(completed: int, expected: int) -> float | None:
     return min(round(completed * 100 / expected, 1), 99.9)
 
 
+def _daily_completion_total(rows: list[dict]) -> dict:
+    """汇总所有日更数据集的应完成项，避免对各数据集百分比做简单平均。"""
+    complete = sum(int(row.get("complete", 0)) for row in rows)
+    expected = sum(int(row.get("expected", 0)) for row in rows)
+    return {
+        "complete": complete,
+        "expected": expected,
+        "completion_percent": _coverage_percent(complete, expected),
+        "missing": sum(int(row.get("missing", 0)) for row in rows),
+        "failed": sum(int(row.get("failed", 0)) for row in rows),
+        "abnormal": sum(int(row.get("abnormal", 0)) for row in rows),
+        "pending": sum(int(row.get("pending", 0)) for row in rows),
+    }
+
+
 def describe_review_errors(errors: list[dict]) -> str:
     """把审核规则错误压缩成一句可读的中文说明。"""
     parts: list[str] = []
@@ -390,6 +405,7 @@ def daily_completion(
         "today": coverage["today"],
         "days": days,
         "dates": coverage["dates"],
+        "total": _daily_completion_total(rows),
         "datasets": rows,
     }
 
