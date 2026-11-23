@@ -1737,14 +1737,19 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 
 - `pytest tests/test_catalog_concurrency.py -q`：3 项通过；
 - `ruff check src tests`：通过；
+- 常驻服务重启后真实 SQLite 连接为 `journal_mode=wal`、`busy_timeout=60000`、
+  `synchronous=1 (NORMAL)`、`foreign_keys=1`，健康检查通过；
+- 中泰逐笔委托剩余导入与复权因子回填并发运行：导入任务
+  `fe513445-b6bb-4e8a-b2ee-2bf1d1ca3450` 成功发布 1,109 个分区、58,544,360,738 行，期间
+  复权因子成功发布首批 100 个分区，未再出现 `database is locked`；中泰委托 Catalog 当前共
+  2,213 个分区、80,424,316,422 行；
 - 全量 pytest 在当前 Codex 执行环境中卡在既有 TestClient lifespan 启动；临时反向应用全部改动后
   同一既有用例仍然卡住，因此未获得本轮全量测试结果，需在常驻服务重启前后继续验证。
 
 下一步：
 
-- 确认没有活动任务后重启单 worker 后端，核对真实 SQLite PRAGMA；
-- 重试中泰逐笔委托剩余目录导入与 TuShare 复权因子回填，并确认并发发布不再出现
-  `database is locked`。
+- 复权因子回填任务 `58c45fd3-1d60-4d1e-8e12-618930d59a24` 仍在运行，任务结束前不得重启后端；
+- 任务结束后核对最终分区数与错误日志，再执行所需年度合并。
 
 遗留问题：
 
