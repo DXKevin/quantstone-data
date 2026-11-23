@@ -1723,6 +1723,34 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 
 ## 后续 Agent 更新模板
 
+### 2026-11-23 — Codex（SQLite 并发写入保护）
+
+完成：
+
+- SQLite 连接启用 WAL、60 秒写锁等待、`synchronous=NORMAL` 与外键检查；
+- 采集发布、目录导入发布和年度合并共享进程内 Catalog 短事务锁，不限制采集与审核阶段并发；
+- 分区发布统一在锁内完成文件移动、Catalog 写入和提交，提交失败后回滚 Session 并将文件退回 staging；
+- 日分区和快照采集的异常路径在复用 Session 前显式回滚，避免失败事务污染后续状态写入；
+- 新增并发配置、写入串行化和发布失败文件恢复测试。
+
+验证：
+
+- `pytest tests/test_catalog_concurrency.py -q`：3 项通过；
+- `ruff check src tests`：通过；
+- 全量 pytest 在当前 Codex 执行环境中卡在既有 TestClient lifespan 启动；临时反向应用全部改动后
+  同一既有用例仍然卡住，因此未获得本轮全量测试结果，需在常驻服务重启前后继续验证。
+
+下一步：
+
+- 确认没有活动任务后重启单 worker 后端，核对真实 SQLite PRAGMA；
+- 重试中泰逐笔委托剩余目录导入与 TuShare 复权因子回填，并确认并发发布不再出现
+  `database is locked`。
+
+遗留问题：
+
+- SQLite 方案只支持当前单进程后端；多 worker 或多实例部署需要 PostgreSQL 或跨进程锁；
+- 文件移动后进程被强制终止的崩溃窗口仍需启动对账机制处理。
+
 ### 2026-11-23 — Codex（TuShare A股复权因子）
 
 完成：

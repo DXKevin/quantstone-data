@@ -1,5 +1,6 @@
 import hashlib
 import os
+import threading
 from pathlib import Path
 
 from sqlalchemy import select
@@ -10,6 +11,13 @@ from ..logging_config import log_event
 from ..models import CatalogFile, CatalogPartition, CollectionRun
 from .catalog_writer import upsert_file, upsert_partition
 from .path_resolver import resolve_partition_target
+
+_CATALOG_WRITE_LOCK = threading.RLock()
+
+
+def catalog_write_lock() -> threading.RLock:
+    """返回进程内 Catalog 写锁；必须只包围短事务，不得覆盖采集和文件解析。"""
+    return _CATALOG_WRITE_LOCK
 
 
 def _sha256(path: Path) -> str:
@@ -104,3 +112,46 @@ def publish_partition(
         replaced_path=previous_path,
     )
     return catalog
+
+
+def publish_partition_transaction(
+    session: Session,
+    *,
+    data_root: Path,
+    dataset_id: str,
+    storage_policy: dict,
+    partition_key: str,
+    artifact_path: Path,
+    row_count: int,
+    run: CollectionRun,
+    calculate_sha256: bool = True,
+) -> CatalogPartition:
+    """在共享短锁中原子发布文件和 Catalog，失败时将文件退回 staging。"""
+    target = resolve_partition_target(
+        data_root,
+        dataset_id,
+        storage_policy,
+        partition_key,
+        run.id,
+    )
+    with _CATALOG_WRITE_LOCK:
+        try:
+            catalog = publish_partition(
+                session,
+                data_root=data_root,
+                dataset_id=dataset_id,
+                storage_policy=storage_policy,
+                partition_key=partition_key,
+                artifact_path=artifact_path,
+                row_count=row_count,
+                run=run,
+                calculate_sha256=calculate_sha256,
+            )
+            session.commit()
+            return catalog
+        except Exception:
+            session.rollback()
+            if target.exists() and not artifact_path.exists():
+                artifact_path.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, artifact_path)
+            raise

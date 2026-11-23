@@ -4,7 +4,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy import Engine, bindparam, create_engine, inspect, text
+from sqlalchemy import Engine, bindparam, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -25,9 +25,21 @@ def default_data_root() -> Path:
 
 def create_session_factory(database_url: str) -> sessionmaker[Session]:
     connect_args = (
-        {"check_same_thread": False, "timeout": 15} if database_url.startswith("sqlite") else {}
+        {"check_same_thread": False, "timeout": 60} if database_url.startswith("sqlite") else {}
     )
     engine = create_engine(database_url, connect_args=connect_args)
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine, "connect")
+        def _configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA busy_timeout=60000")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA journal_mode=WAL")
+            finally:
+                cursor.close()
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

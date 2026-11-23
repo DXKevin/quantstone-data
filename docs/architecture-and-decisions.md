@@ -925,6 +925,14 @@ quantstone-data/
 - 测试：pytest；
 - Python 检查：Ruff。
 
+SQLite 只用于当前单进程后端。每个连接启用 WAL、`busy_timeout=60000`、
+`synchronous=NORMAL` 和外键检查。采集发布、目录导入发布与年度合并共享一把进程内 Catalog
+短事务锁；文件下载、解析、审核和 Parquet 合并不占用这把锁。分区发布必须在锁内完成文件移动、
+Catalog 更新和提交；数据库提交失败时先回滚 Session，再把刚移动的正式文件退回 staging，供
+目录导入继续恢复到来源目录。任何失败事务在复用 Session 前必须显式 `rollback()`。这些约束
+依赖单 Uvicorn worker；未来若改成多进程或多实例，必须迁移 PostgreSQL 或使用跨进程锁，不能
+把当前进程锁当作分布式互斥。
+
 随着模块增加，后端可以逐步拆分为：
 
 ```text
@@ -970,7 +978,8 @@ quantstone_data/
 
 当前 TuShare daily 已走通按交易日的 Parquet、审核、发布和 Catalog 闭环，trade_cal 与
 stock_basic 已走通 snapshot 覆盖发布闭环。daily 已支持权威交易日历规划和年度合并；通用
-Planner、原子发布恢复和 SDK 读取仍未实现。
+Planner、进程崩溃后的完整发布恢复和 SDK 读取仍未实现。当前已经覆盖数据库提交失败时的文件
+回退，但进程在文件移动与提交之间被强制终止时，仍需要后续恢复日志或启动对账机制。
 
 ## 18. 前端产品约定
 

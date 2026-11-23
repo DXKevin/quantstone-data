@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from .file_cleanup import remove_empty_parent_directories
 from .models import CatalogFile, CatalogPartition, Dataset
 from .publishing.catalog_writer import upsert_file
+from .publishing.service import catalog_write_lock
 
 
 class MissingCatalogFilesError(RuntimeError):
@@ -335,49 +336,52 @@ def compact_year(
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + ".tmp")
     pq.write_table(merged, temporary, compression="zstd")
+    compacted_size = temporary.stat().st_size
+    compacted_sha256 = _sha256(temporary)
 
-    revisions = data_root / "revisions" / dataset_id / f"{year:04d}"
-    revisions.mkdir(parents=True, exist_ok=True)
-    previous_annual: Path | None = None
-    if target.is_file():
-        previous_annual = revisions / f"{year}.before-{uuid4().hex}.parquet"
-        os.replace(target, previous_annual)
-    try:
-        os.replace(temporary, target)
-    except Exception:
-        if previous_annual is not None and previous_annual.is_file():
-            os.replace(previous_annual, target)
-        raise
+    with catalog_write_lock():
+        revisions = data_root / "revisions" / dataset_id / f"{year:04d}"
+        revisions.mkdir(parents=True, exist_ok=True)
+        previous_annual: Path | None = None
+        if target.is_file():
+            previous_annual = revisions / f"{year}.before-{uuid4().hex}.parquet"
+            os.replace(target, previous_annual)
+        try:
+            os.replace(temporary, target)
+        except Exception:
+            if previous_annual is not None and previous_annual.is_file():
+                os.replace(previous_annual, target)
+            raise
 
-    file_row = upsert_file(
-        session,
-        dataset_id=dataset_id,
-        path=target_rel,
-        row_count=merged.num_rows,
-        size_bytes=target.stat().st_size,
-        sha256=_sha256(target),
-    )
-    for item in partitions:
-        item.file_id = file_row.id
-        item.file_path = target_rel
+        file_row = upsert_file(
+            session,
+            dataset_id=dataset_id,
+            path=target_rel,
+            row_count=merged.num_rows,
+            size_bytes=compacted_size,
+            sha256=compacted_sha256,
+        )
+        for item in partitions:
+            item.file_id = file_row.id
+            item.file_path = target_rel
 
-    for path in sources:
-        if path == target_rel:
-            continue
-        source = data_root / path
-        if source.is_file():
-            revision = revisions / source.name
-            if revision.exists():
-                revision = revisions / f"{source.stem}-{uuid4().hex}{source.suffix}"
-            os.replace(source, revision)
-            remove_empty_parent_directories(
-                source,
-                stop=data_root / "datasets" / dataset_id,
-            )
-        stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
-        if stale is not None:
-            session.delete(stale)
-    session.commit()
+        for path in sources:
+            if path == target_rel:
+                continue
+            source = data_root / path
+            if source.is_file():
+                revision = revisions / source.name
+                if revision.exists():
+                    revision = revisions / f"{source.stem}-{uuid4().hex}{source.suffix}"
+                os.replace(source, revision)
+                remove_empty_parent_directories(
+                    source,
+                    stop=data_root / "datasets" / dataset_id,
+                )
+            stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
+            if stale is not None:
+                session.delete(stale)
+        session.commit()
 
     return {
         "dataset_id": dataset_id,

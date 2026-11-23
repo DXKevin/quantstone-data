@@ -41,7 +41,7 @@ from .database import get_session
 from .execution import run_operation
 from .logging_config import log_event
 from .models import CatalogPartition, CollectionJob, CollectionRun, Dataset, DatasetSchemaVersion
-from .publishing import publish_partition
+from .publishing import publish_partition_transaction
 from .reviewer_registry import review_dataset
 from .reviewer_types import ReviewContext
 from .schemas import DatasetStatus
@@ -464,7 +464,7 @@ def _execute_daily_job(
                 session.commit()
                 break
 
-            publish_partition(
+            publish_partition_transaction(
                 session,
                 data_root=data_root,
                 dataset_id=job.dataset_id,
@@ -475,8 +475,12 @@ def _execute_daily_job(
                 run=run,
             )
             shutil.rmtree(run_directory, ignore_errors=True)
-            session.commit()
         except Exception as error:
+            run_id = run.id
+            job_id = job.id
+            session.rollback()
+            run = session.get(CollectionRun, run_id)
+            job = session.get(CollectionJob, job_id)
             message = (
                 _upstream_failure_message(error) if _is_upstream_failure(error) else str(error)
             )
@@ -664,7 +668,7 @@ def _execute_snapshot_job(
             )
             if cancelled is not None:
                 return cancelled
-            publish_partition(
+            publish_partition_transaction(
                 session,
                 data_root=data_root,
                 dataset_id=job.dataset_id,
@@ -689,6 +693,11 @@ def _execute_snapshot_job(
         )
         return serialize_job(job)
     except (CollectionError, URLError, RateLimitExceeded) as error:
+        run_id = run.id
+        job_id = job.id
+        session.rollback()
+        run = session.get(CollectionRun, run_id)
+        job = session.get(CollectionJob, job_id)
         message = _upstream_failure_message(error)
         run.status = "failed"
         run.error = message
@@ -707,6 +716,11 @@ def _execute_snapshot_job(
         )
         raise HTTPException(status_code=502, detail=message) from error
     except Exception as error:
+        run_id = run.id
+        job_id = job.id
+        session.rollback()
+        run = session.get(CollectionRun, run_id)
+        job = session.get(CollectionJob, job_id)
         run.status = "failed"
         run.error = str(error)
         job.status = CollectionJobStatus.FAILED.value

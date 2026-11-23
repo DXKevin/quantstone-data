@@ -26,7 +26,7 @@ from .models import (
     DatasetSchemaVersion,
     ImportJob,
 )
-from .publishing import publish_partition
+from .publishing import publish_partition_transaction
 from .publishing.path_resolver import resolve_partition_target
 from .reviewer_registry import review_dataset
 from .reviewer_types import ReviewContext
@@ -308,7 +308,7 @@ def _stage_and_publish(
             )
             session.commit()
             raise ValueError(f"{entry['partition_key']} 审核失败：{run.error}")
-        publish_partition(
+        publish_partition_transaction(
             session,
             data_root=data_root,
             dataset_id=dataset.id,
@@ -319,7 +319,6 @@ def _stage_and_publish(
             run=run,
             calculate_sha256=False,
         )
-        session.commit()
     except Exception:
         if moved_source and not source.exists():
             restore_from = staging if staging.exists() else target
