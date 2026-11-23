@@ -3,7 +3,10 @@ from ...collector_types import (
     CollectorOperation,
     CollectorParameter,
     RateLimit,
+    RetryPolicy,
 )
+from .adj_factor import collect_incremental as collect_adj_factor_incremental
+from .adj_factor import collect_initial as collect_adj_factor_initial
 from .daily import (
     collect_daily_incremental,
     collect_daily_initial,
@@ -22,6 +25,7 @@ from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
+ADJ_FACTOR_DATASET_ID = "tushare.cn.stock.adj_factor"
 NAMECHANGE_DATASET_ID = "tushare.cn.stock.namechange"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
 STOCK_ST_DATASET_ID = "tushare.cn.stock.stock_st"
@@ -38,8 +42,33 @@ INCREMENTAL_PARAMETERS = (
 
 # TuShare daily 按账号限制每分钟 50 次；首次与增量共用同一窗口。
 DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
+# 当前代理在连续约 180 次请求后返回英文限流提示，保守控制在每分钟 150 次。
+ADJ_FACTOR_RATE_LIMIT = RateLimit(calls=150, period_seconds=60, scope="adj_factor")
+ADJ_FACTOR_RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=65)
 
 OPERATIONS = (
+    CollectorOperation(
+        key="adj_factor_initial",
+        name="复权因子首次采集",
+        description="按交易日首次采集 TuShare adj_factor 历史数据。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(ADJ_FACTOR_DATASET_ID,),
+        function=collect_adj_factor_initial,
+        rate_limit=ADJ_FACTOR_RATE_LIMIT,
+        retry=ADJ_FACTOR_RETRY,
+    ),
+    CollectorOperation(
+        key="adj_factor_incremental",
+        name="复权因子增量更新",
+        description="从数据集当前水位之后补充 TuShare adj_factor 每日数据。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(ADJ_FACTOR_DATASET_ID,),
+        function=collect_adj_factor_incremental,
+        rate_limit=ADJ_FACTOR_RATE_LIMIT,
+        retry=ADJ_FACTOR_RETRY,
+    ),
     CollectorOperation(
         key="namechange_initial",
         name="股票曾用名首次采集",

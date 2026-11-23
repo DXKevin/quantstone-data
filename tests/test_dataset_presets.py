@@ -15,6 +15,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         assert response.status_code == 200
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
+            "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
             "tushare.cn.stock.stock_basic",
@@ -32,6 +33,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             assert created.json()["status"] == "draft"
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
+    adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
     stock_basic = contracts["tushare.cn.stock.stock_basic"]
@@ -89,8 +91,19 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     ]
     assert zt_trade["primary_key"] == ["trade_date", "symbol", "trade_no"]
     assert zt_trade["is_historical"] is True
-    assert presets[0]["contract"]["update_frequency"] == "monthly"
-    assert presets[0]["contract"]["time_granularity"] == "day"
+    trade_cal = contracts["tushare.cn.stock.trade_cal"]
+    assert trade_cal["update_frequency"] == "monthly"
+    assert trade_cal["time_granularity"] == "day"
+    assert adj_factor["primary_key"] == ["ts_code", "trade_date"]
+    assert adj_factor["storage_policy"]["layout"] == "yearly_with_delta"
+    assert adj_factor["storage_policy"]["calendar_dataset_id"] == (
+        "tushare.cn.stock.trade_cal"
+    )
+    assert [item["name"] for item in adj_factor["fields"]] == [
+        "ts_code",
+        "trade_date",
+        "adj_factor",
+    ]
     assert stock_basic["update_frequency"] == "daily"
     assert stock_basic["time_granularity"] == "none"
     assert namechange["primary_key"] == ["ts_code", "start_date", "name"]

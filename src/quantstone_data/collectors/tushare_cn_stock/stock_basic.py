@@ -22,7 +22,15 @@ DEFAULT_API_URL = "https://api.tushare.pro"
 # TuShare stock_basic 需要分别请求三种状态；空值不会稳定返回完整股票范围。
 DEFAULT_LIST_STATUSES = ("L", "D", "P")
 RATE_LIMIT_CODES = {40203, -40203}
-RATE_LIMIT_KEYWORDS = ("每分钟", "每小时", "频率", "超过限制", "访问次数")
+RATE_LIMIT_KEYWORDS = (
+    "每分钟",
+    "每小时",
+    "频率",
+    "超过限制",
+    "访问次数",
+    "rate limit",
+    "too many requests",
+)
 DEFAULT_RETRY_AFTER = 60.0
 DATASET_ID = "tushare.cn.stock.stock_basic"
 
@@ -34,8 +42,9 @@ class CollectionError(RuntimeError):
 def raise_api_error(body: dict, fallback: str) -> NoReturn:
     """把 TuShare 错误响应转换为异常；限流错误单独标记以便重试。"""
     message = body.get("msg") or fallback
+    normalized_message = message.lower()
     if body.get("code") in RATE_LIMIT_CODES or any(
-        keyword in message for keyword in RATE_LIMIT_KEYWORDS
+        keyword in normalized_message for keyword in RATE_LIMIT_KEYWORDS
     ):
         raise RateLimitExceeded(message, retry_after=DEFAULT_RETRY_AFTER)
     raise CollectionError(message)

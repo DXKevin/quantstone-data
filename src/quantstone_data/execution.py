@@ -105,7 +105,7 @@ def run_operation(
                 )
         try:
             return call()
-        except (RateLimitExceeded, URLError) as error:
+        except (RateLimitExceeded, TimeoutError, URLError) as error:
             if attempt >= attempts:
                 raise
             pause = delay

@@ -2,10 +2,12 @@ from pathlib import Path
 
 import pytest
 
+from quantstone_data.collection_protocol import RateLimitExceeded
 from quantstone_data.collectors.tushare_cn_stock.stock_basic import (
     DEFAULT_API_URL,
     CollectionError,
     load_api_url,
+    raise_api_error,
 )
 
 
@@ -36,3 +38,8 @@ def test_tushare_api_url_rejects_unsafe_values(
 
     with pytest.raises(CollectionError, match="TUSHARE_API_URL"):
         load_api_url(tmp_path)
+
+
+def test_tushare_english_rate_limit_message_is_retryable() -> None:
+    with pytest.raises(RateLimitExceeded, match="Rate limit exceeded"):
+        raise_api_error({"code": -1, "msg": "Rate limit exceeded"}, "fallback")

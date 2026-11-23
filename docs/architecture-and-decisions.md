@@ -521,9 +521,19 @@ TuShare 股票代码格式。该数据集在存储策略中显式配置 `allow_e
 没有 ST 股票时仍发布 0 行分区并计为已覆盖。日 K 等不允许空分区的数据集保持默认值 `false`，
 0 行仍审核失败。分区采集由存储策略中的逻辑分区字段和布局识别，不按数据集 ID 硬编码。
 
+TuShare A 股复权因子使用数据集 ID `tushare.cn.stock.adj_factor`，保留官方
+`ts_code/trade_date/adj_factor` 三个字段，主键为 `ts_code + trade_date`，并要求复权因子非空且
+大于 0。该数据集与日 K 使用同一 A 股交易日历、交易日分区和 `yearly_with_delta` 布局；首次采集
+按交易日获取与日 K 相同的历史范围，增量采集从当前水位后的交易日继续。每个交易日通过一次
+`adj_factor(trade_date=...)` 获取全市场数据，不按股票代码循环。采集请求通过 TuShare 供应商共享
+并发门串行发送；当前代理实测连续约 180 次请求后返回英文限流提示，因此 `adj_factor` 使用每分钟
+150 次的保守滑动窗口。中英文限流响应均进入通用等待重试机制。
+网络读取超时同样属于可重试错误；`adj_factor` 的单分区请求最多尝试 5 次，避免长历史任务因一次
+瞬时超时整体终止。
+
 TuShare 网络入口由可选环境变量 `TUSHARE_API_URL` 统一配置，默认使用官方
 `https://api.tushare.pro`。代理入口只改变传输路径，不改变供应商身份；`stock_basic`、`stock_st`、
-`daily`、`trade_cal` 和 `namechange` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得
+`daily`、`trade_cal`、`namechange` 和 `adj_factor` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得
 记录 Token。
 
 所有以日期作为逻辑分区的数据集都必须在存储策略中显式配置 `calendar_dataset_id`。系统不再

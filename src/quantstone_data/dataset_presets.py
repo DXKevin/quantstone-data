@@ -135,6 +135,50 @@ def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
 
 DATASET_PRESETS = (
     DatasetPreset(
+        key="tushare_adj_factor",
+        category="TuShare · A股",
+        contract=DatasetCreate(
+            id="tushare.cn.stock.adj_factor",
+            provider="tushare",
+            region="cn",
+            instrument="stock",
+            dataset_name="adj_factor",
+            market=None,
+            display_name="A股复权因子",
+            description="TuShare adj_factor A股每日复权因子。",
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "adj_factor_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "adj_factor_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ts_code", "trade_date"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "TS代码", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("adj_factor", "float64", "复权因子", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_trade_cal",
         category="TuShare · A股",
         contract=DatasetCreate(
