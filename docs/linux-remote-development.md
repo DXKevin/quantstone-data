@@ -64,8 +64,9 @@ cd /home/quantadmin/project/quantstone-data
 内网开放 5173 端口。脚本通过用户级 systemd 持续运行服务，并支持 `stop`、`restart`、
 `status` 和 `logs`；当前用户未启用 linger，因此服务器重启后的自动启动仍需另行配置。
 
-当前后台任务队列、取消集合和限流器都在进程内，因此后端只能运行一个 Uvicorn worker，
-不能使用 `--workers` 启动多进程。服务重启会把未完成任务标记失败，不能自动续跑。
+当前后台任务线程、取消集合、供应商并发门和限流器都在进程内，因此后端只能运行一个 Uvicorn
+worker，不能使用 `--workers` 启动多进程。任务线程数不设统一上限，但同一数据集串行、同一
+供应商 API 并发为 1。服务重启会把未完成任务标记失败，不能自动续跑。
 
 ## 当前 Catalog 与数据位置
 

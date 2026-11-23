@@ -541,6 +541,7 @@ def create_import_job(
                 request.app.state.session_factory,
                 request.app.state.data_root,
             ),
+            resource_key=f"dataset:{job.dataset_id}",
         )
     except RuntimeError as error:
         job.status = ImportJobStatus.FAILED.value
@@ -614,6 +615,7 @@ def execute_import_job(
                 request.app.state.session_factory,
                 request.app.state.data_root,
             ),
+            resource_key=f"dataset:{job.dataset_id}",
         )
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail="后台任务执行器不可用") from error

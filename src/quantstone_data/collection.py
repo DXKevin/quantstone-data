@@ -991,6 +991,7 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
                     request.app.state.session_factory,
                     data_root,
                 ),
+                resource_key=f"dataset:{job.dataset_id}",
             )
         except RuntimeError as error:
             _QUEUED_JOBS.discard(job.id)

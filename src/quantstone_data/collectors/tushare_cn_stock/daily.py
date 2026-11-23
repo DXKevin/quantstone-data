@@ -1,35 +1,27 @@
 from __future__ import annotations
 
-import json
-from urllib.request import Request, urlopen
-
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from ...field_types import arrow_type, normalize_value
+from ...provider_http import post_json
 from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.daily"
 
 
 def _call_daily(token: str, trade_date: str, fields: list[str]) -> list[dict]:
-    payload = json.dumps(
+    body = post_json(
+        "tushare",
+        load_api_url(),
         {
             "api_name": "daily",
             "token": token,
             "params": {"trade_date": trade_date},
             "fields": ",".join(fields),
-        }
-    ).encode("utf-8")
-    request = Request(
-        load_api_url(),
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        },
     )
-    with urlopen(request, timeout=60) as response:  # noqa: S310
-        body = json.load(response)
     if body.get("code") != 0:
         raise_api_error(body, "TuShare daily 接口调用失败")
     data = body.get("data") or {}

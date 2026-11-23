@@ -166,6 +166,7 @@ def create_compaction_job(
                     request.app.state.session_factory,
                     request.app.state.data_root,
                 ),
+                resource_key=f"dataset:{job.dataset_id}",
             )
         except RuntimeError as error:
             job.status = MaintenanceJobStatus.FAILED.value
@@ -262,6 +263,7 @@ def create_auto_compaction_jobs(
                         request.app.state.session_factory,
                         request.app.state.data_root,
                     ),
+                    resource_key=f"dataset:{job.dataset_id}",
                 )
                 log_event(
                     "maintenance_job_queued",

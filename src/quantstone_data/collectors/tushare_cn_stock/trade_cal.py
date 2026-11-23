@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 from datetime import date, timedelta
-from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from ...field_types import arrow_type, normalize_value
+from ...provider_http import post_json
 from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.stock.trade_cal"
@@ -16,7 +15,9 @@ FULL_HISTORY_START = date(1990, 1, 1)
 
 
 def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[str]) -> list[dict]:
-    payload = json.dumps(
+    body = post_json(
+        "tushare",
+        load_api_url(),
         {
             "api_name": "trade_cal",
             "token": token,
@@ -26,16 +27,8 @@ def _call_trade_cal(token: str, start_date: date, end_date: date, fields: list[s
                 "end_date": end_date.strftime("%Y%m%d"),
             },
             "fields": ",".join(fields),
-        }
-    ).encode("utf-8")
-    request = Request(
-        load_api_url(),
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        },
     )
-    with urlopen(request, timeout=60) as response:  # noqa: S310
-        body = json.load(response)
     if body.get("code") != 0:
         raise_api_error(body, "TuShare trade_cal 接口调用失败")
     data = body.get("data") or {}

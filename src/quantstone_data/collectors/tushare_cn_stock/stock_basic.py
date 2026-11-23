@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, NoReturn
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -18,6 +16,7 @@ from ...collection_protocol import (
     RateLimitExceeded,
 )
 from ...field_types import arrow_type, normalize_value
+from ...provider_http import post_json
 
 DEFAULT_API_URL = "https://api.tushare.pro"
 # TuShare stock_basic 需要分别请求三种状态；空值不会稳定返回完整股票范围。
@@ -73,22 +72,16 @@ def load_api_url(project_root: Path | None = None) -> str:
 
 
 def call_api(token: str, list_status: str, fields: list[str]) -> list[dict]:
-    payload = json.dumps(
+    body = post_json(
+        "tushare",
+        load_api_url(),
         {
             "api_name": "stock_basic",
             "token": token,
             "params": {"exchange": "", "list_status": list_status},
             "fields": ",".join(fields),
-        }
-    ).encode("utf-8")
-    request = Request(
-        load_api_url(),
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        },
     )
-    with urlopen(request, timeout=60) as response:  # noqa: S310
-        body = json.load(response)
     if body.get("code") != 0:
         raise_api_error(body, "TuShare 接口调用失败")
     data = body.get("data") or {}
