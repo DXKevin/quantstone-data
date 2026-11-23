@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import CatalogFile, CatalogPartition
+from ..models import CatalogFile, CatalogPartition, utc_now
 
 
 def upsert_file(
@@ -52,4 +52,5 @@ def upsert_partition(
     catalog.size_bytes = size_bytes
     catalog.sha256 = sha256
     catalog.collection_run_id = collection_run_id
+    catalog.published_at = utc_now()
     return catalog, previous_path
