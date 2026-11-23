@@ -180,6 +180,53 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tushare_namechange",
+        category="TuShare · A股",
+        contract=DatasetCreate(
+            id="tushare.cn.stock.namechange",
+            provider="tushare",
+            region="cn",
+            instrument="stock",
+            dataset_name="namechange",
+            market=None,
+            display_name="A股股票曾用名",
+            description="TuShare namechange 全部股票历史名称变更记录。",
+            update_frequency="daily",
+            time_granularity="none",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "namechange_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "namechange_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": None,
+                "calendar_dataset_id": None,
+                "layout": "snapshot",
+                "write_strategy": "replace_snapshot",
+                "compaction": None,
+            },
+            primary_key=["ts_code", "start_date", "name"],
+            time_field=None,
+            fields=[
+                field("ts_code", "string", "TS代码", nullable=False),
+                field("name", "string", "证券名称", nullable=False),
+                field("start_date", "date", "名称生效日期", nullable=False),
+                field("end_date", "date", "名称结束日期"),
+                field("ann_date", "date", "公告日期", nullable=False),
+                field("change_reason", "string", "变更原因", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_stock_basic",
         category="TuShare · A股",
         contract=DatasetCreate(

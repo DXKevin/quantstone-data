@@ -452,6 +452,73 @@ def test_stock_basic_collector_stages_and_reviews_data(tmp_path: Path, monkeypat
     assert paused_preview.json()["rows"][0]["symbol"] is None
 
 
+def test_namechange_collection_publishes_snapshot(tmp_path: Path, monkeypatch) -> None:
+    def fake_call(_token: str, _fields: list[str]) -> list[dict]:
+        return [
+            {
+                "ts_code": "600848.SH",
+                "name": "上海临港",
+                "start_date": "20151118",
+                "end_date": None,
+                "ann_date": "20151118",
+                "change_reason": "改名",
+            },
+            {
+                "ts_code": "600848.SH",
+                "name": "自仪股份",
+                "start_date": "20070514",
+                "end_date": "20151117",
+                "ann_date": "20070514",
+                "change_reason": "撤销ST",
+            },
+        ]
+
+    monkeypatch.setattr(
+        "quantstone_data.collectors.tushare_cn_stock.namechange.call_api",
+        fake_call,
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
+
+    with create_client(tmp_path) as client:
+        presets = {
+            item["contract"]["id"]: item["contract"]
+            for item in client.get("/api/v1/dataset-presets").json()
+        }
+        created_dataset = client.post(
+            "/api/v1/datasets", json=presets["tushare.cn.stock.namechange"]
+        )
+        assert created_dataset.status_code == 201
+        assert (
+            client.post("/api/v1/datasets/tushare.cn.stock.namechange/activate").status_code
+            == 200
+        )
+        created = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": "tushare.cn.stock.namechange",
+                "operation": "initial",
+                "input_method": "collector",
+            },
+        )
+        assert created.status_code == 201
+        submitted = client.post(f"/api/v1/collection-jobs/{created.json()['id']}/execute")
+        completed = wait_for_job(client, created.json()["id"])
+        catalog = client.get(
+            "/api/v1/catalog/partitions?dataset_id=tushare.cn.stock.namechange"
+        )
+        preview = client.get(
+            "/api/v1/datasets/tushare.cn.stock.namechange/rows",
+            params={"ts_code": "600848.SH"},
+        )
+
+    assert submitted.status_code == 202
+    assert completed.json()["status"] == "succeeded"
+    assert catalog.json()[0]["partition_key"] == "snapshot"
+    assert catalog.json()[0]["row_count"] == 2
+    assert preview.json()["matched_count"] == 2
+    assert preview.json()["rows"][0]["end_date"] == "2015-11-17"
+
+
 def test_daily_collection_publishes_parquet_and_catalog(tmp_path: Path, monkeypatch) -> None:
     payload = {
         "id": "tushare.cn.stock.daily",

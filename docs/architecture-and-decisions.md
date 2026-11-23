@@ -499,6 +499,13 @@ operation 参数定义校验。凭证、限流和重试不属于数据集绑定�
 采集器从同一行 `ts_code` 的点号前部分恢复代码，避免产生 `.0` 或丢失前导零；供应商原本返回
 的空值保持为空，不用 `ts_code` 补值。
 
+TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
+`ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
+日期类型。该接口可以不传股票代码和日期直接返回全部历史记录；首次采集与增量更新都无参数
+获取全量，并替换一份完整 snapshot。数据不按股票分区，避免产生数千个小文件。复合主键为
+`ts_code + start_date + name`；`end_date` 允许为空，表示该名称当前仍然有效。审核要求非空数据、
+契约字段完整、主键非空且唯一。
+
 TuShare A 股交易日历使用数据集 ID `tushare.cn.stock.trade_cal`，默认采集 SSE 日历；TuShare
 官方说明沪深北股票交易所日历一致，因此不按市场拆分。该数据集采用完整快照存储，首次采集
 接受起止日期，增量更新重新生成完整快照。当前账号的 `trade_cal` 权限限制为每小时一次，
@@ -516,7 +523,7 @@ TuShare 股票代码格式。该数据集在存储策略中显式配置 `allow_e
 
 TuShare 网络入口由可选环境变量 `TUSHARE_API_URL` 统一配置，默认使用官方
 `https://api.tushare.pro`。代理入口只改变传输路径，不改变供应商身份；`stock_basic`、`stock_st`、
-`daily` 和 `trade_cal` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得
+`daily`、`trade_cal` 和 `namechange` 必须共享同一入口配置。运行记录的 provenance 保存实际 API URL，但不得
 记录 Token。
 
 所有以日期作为逻辑分区的数据集都必须在存储策略中显式配置 `calendar_dataset_id`。系统不再

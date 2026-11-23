@@ -16,6 +16,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
             "tushare.cn.stock.trade_cal",
+            "tushare.cn.stock.namechange",
             "tushare.cn.stock.stock_basic",
             "tushare.cn.stock.stock_st",
             "tushare.cn.stock.daily",
@@ -32,6 +33,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
     daily = contracts["tushare.cn.stock.daily"]
+    namechange = contracts["tushare.cn.stock.namechange"]
     stock_basic = contracts["tushare.cn.stock.stock_basic"]
     stock_st = contracts["tushare.cn.stock.stock_st"]
     l2_order = contracts["wind.cn.stock.l2_order.sz"]
@@ -91,6 +93,20 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert presets[0]["contract"]["time_granularity"] == "day"
     assert stock_basic["update_frequency"] == "daily"
     assert stock_basic["time_granularity"] == "none"
+    assert namechange["primary_key"] == ["ts_code", "start_date", "name"]
+    assert namechange["storage_policy"]["layout"] == "snapshot"
+    assert [item["name"] for item in namechange["fields"]] == [
+        "ts_code",
+        "name",
+        "start_date",
+        "end_date",
+        "ann_date",
+        "change_reason",
+    ]
+    assert {item["operation"] for item in namechange["collection_bindings"]} == {
+        "namechange_initial",
+        "namechange_incremental",
+    }
     assert daily["update_frequency"] == "daily"
     assert daily["time_granularity"] == "day"
     assert stock_st["primary_key"] == ["ts_code", "trade_date"]

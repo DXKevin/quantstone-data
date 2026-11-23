@@ -16,7 +16,9 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
     assert response.status_code == 200
     collector = response.json()[0]
     assert collector["key"] == "tushare_cn_stock"
-    operation = collector["operations"][0]
+    operation = next(
+        item for item in collector["operations"] if item["key"] == "stock_basic_initial"
+    )
     assert operation["key"] == "stock_basic_initial"
     assert operation["purpose"] == "initial"
     assert operation["datasets"] == ["tushare.cn.stock.stock_basic"]
@@ -41,6 +43,7 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
 def test_reviewer_registry_uses_dataset_ids() -> None:
     assert set(REVIEWERS) == {
         "tushare.cn.stock.daily",
+        "tushare.cn.stock.namechange",
         "tushare.cn.stock.stock_basic",
         "tushare.cn.stock.stock_st",
         "tushare.cn.stock.trade_cal",

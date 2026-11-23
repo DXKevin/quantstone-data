@@ -8,6 +8,8 @@ from .daily import (
     collect_daily_incremental,
     collect_daily_initial,
 )
+from .namechange import collect_incremental as collect_namechange_incremental
+from .namechange import collect_initial as collect_namechange_initial
 from .stock_basic import (
     collect_incremental as collect_stock_basic_incremental,
 )
@@ -20,6 +22,7 @@ from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
+NAMECHANGE_DATASET_ID = "tushare.cn.stock.namechange"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
 STOCK_ST_DATASET_ID = "tushare.cn.stock.stock_st"
 TRADE_CAL_DATASET_ID = "tushare.cn.stock.trade_cal"
@@ -37,6 +40,24 @@ INCREMENTAL_PARAMETERS = (
 DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
 
 OPERATIONS = (
+    CollectorOperation(
+        key="namechange_initial",
+        name="股票曾用名首次采集",
+        description="获取 TuShare namechange 全部历史记录，建立完整快照。",
+        purpose="initial",
+        parameters=(),
+        datasets=(NAMECHANGE_DATASET_ID,),
+        function=collect_namechange_initial,
+    ),
+    CollectorOperation(
+        key="namechange_incremental",
+        name="股票曾用名增量更新",
+        description="重新获取 TuShare namechange 全部历史记录，替换完整快照。",
+        purpose="incremental",
+        parameters=(),
+        datasets=(NAMECHANGE_DATASET_ID,),
+        function=collect_namechange_incremental,
+    ),
     CollectorOperation(
         key="stock_basic_initial",
         name="股票列表首次采集",
