@@ -43,9 +43,13 @@ const defaultSourceRoots: Record<string, string> = {
 export default function ImportJobs({
   datasets,
   navigation,
+  embedded = false,
+  onCollectionJobsChanged,
 }: {
   datasets: DatasetSummary[];
   navigation?: ReactNode;
+  embedded?: boolean;
+  onCollectionJobsChanged?: () => void;
 }) {
   const [scanners, setScanners] = useState<ScannerDefinition[]>([]);
   const [jobs, setJobs] = useState<ImportJob[]>([]);
@@ -135,6 +139,7 @@ export default function ImportJobs({
   }, [datasetId]);
 
   const hasActive = jobs.some((job) => ACTIVE_STATUSES.includes(job.status));
+  const visibleJobs = embedded ? jobs.filter((job) => job.collection_job_id === null) : jobs;
   useEffect(() => {
     if (!hasActive) return;
     const timer = window.setInterval(() => void load(true), 2500);
@@ -206,6 +211,8 @@ export default function ImportJobs({
       await api.executeImportJob(job.id);
       setNotice("已提交导入，后台正在审核并发布。");
       await load();
+      onCollectionJobsChanged?.();
+      window.setTimeout(() => onCollectionJobsChanged?.(), 1000);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交导入失败");
     } finally {
@@ -228,21 +235,21 @@ export default function ImportJobs({
   }
 
   return (
-    <div className="page">
+    <div className={embedded ? "embedded-import-jobs" : "page"}>
       {navigation}
-      <header className="page-header">
+      {!embedded && <header className="page-header">
         <div>
           <p className="eyebrow">DIRECTORY IMPORT</p>
           <h1>目录导入</h1>
           <p className="subtitle">扫描已转换的服务器目录，审核清单后按交易日导入。</p>
         </div>
         <button className="toolbar-button" onClick={() => void load()}><RefreshCw size={15} />刷新</button>
-      </header>
+      </header>}
 
       {notice && <div className="notice-banner"><CheckCircle2 size={17} />{notice}</div>}
       {error && <div className="form-error"><AlertCircle size={17} />{error}</div>}
 
-      <section className="panel import-create-panel">
+      {!embedded && <section className="panel import-create-panel">
         <div className="panel-toolbar"><div><h2>新建扫描</h2><span>源目录必须位于数据根目录的 imports/ 下</span></div></div>
         <form className="import-create-form" onSubmit={(event) => void createJob(event)}>
           <label className="input-field"><span>目标数据集</span><select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>{importableDatasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
@@ -253,17 +260,17 @@ export default function ImportJobs({
           <label className="input-field"><span>结束日期</span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
           <button className="primary-button" type="submit" disabled={submitting || !operations.length}>{submitting ? "扫描中…" : "开始扫描"}</button>
         </form>
-      </section>
+      </section>}
 
-      <section className="panel">
-        <div className="panel-toolbar"><div><h2>导入任务</h2><span>{jobs.length} 个任务</span></div></div>
+      {(!embedded || visibleJobs.length > 0) && <section className="panel">
+        <div className="panel-toolbar"><div><h2>{embedded ? "目录扫描与确认" : "导入任务"}</h2><span>{visibleJobs.length} 个任务</span></div></div>
         {loading ? (
           <div className="state-box"><div className="loader" /><p>正在加载导入任务…</p></div>
-        ) : jobs.length === 0 ? (
+        ) : visibleJobs.length === 0 ? (
           <div className="state-box empty-state"><FileScan size={28} /><strong>还没有目录导入任务</strong><p>先在上方选择数据集和源目录开始扫描。</p></div>
         ) : (
           <div className="import-job-list">
-            {jobs.map((job) => {
+            {visibleJobs.map((job) => {
               const summary = job.summary ?? {};
               const expanded = expandedId === job.id;
               const active = ACTIVE_STATUSES.includes(job.status);
@@ -304,7 +311,7 @@ export default function ImportJobs({
             })}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

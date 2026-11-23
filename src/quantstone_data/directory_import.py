@@ -358,7 +358,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
             collection_job = CollectionJob(
                 id=str(uuid4()),
                 dataset_id=dataset.id,
-                operation="initial",
+                operation=str(job.parameters.get("purpose") or "initial"),
                 input_method="directory_import",
                 status="running",
                 start_date=min(dates),
@@ -531,6 +531,7 @@ def create_import_job(
             "start_date": payload.start_date.isoformat() if payload.start_date else None,
             "end_date": payload.end_date.isoformat() if payload.end_date else None,
             "transfer_mode": payload.transfer_mode,
+            "purpose": payload.purpose.value,
         },
         status=ImportJobStatus.CREATED.value,
     )

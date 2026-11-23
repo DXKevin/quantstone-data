@@ -113,6 +113,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
                 "dataset_id": ORDER_ID,
                 "scanner_key": "wind_l2_sz",
                 "operation": "import_order",
+                "purpose": "repair",
                 "source_root": str(source.parent.parent),
             },
         )
@@ -129,6 +130,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert executed.status_code == 200
         completed = _wait_status(client, job_id, {"succeeded", "failed"})
         assert completed["status"] == "succeeded", completed["error"]
+        assert completed["collection_job_id"]
 
         partitions = client.get(
             f"/api/v1/catalog/partitions?dataset_id={ORDER_ID}"
@@ -143,7 +145,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         collection_jobs = client.get("/api/v1/collection-jobs")
         assert collection_jobs.status_code == 200
         assert any(
-            item["input_method"] == "directory_import"
+            item["input_method"] == "directory_import" and item["operation"] == "repair"
             for item in collection_jobs.json()["items"]
         )
         imported_job = next(

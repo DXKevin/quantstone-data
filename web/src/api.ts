@@ -603,6 +603,7 @@ export const api = {
     dataset_id: string;
     scanner_key: string;
     operation: string;
+    purpose?: CollectionOperation;
     source_root: string;
     transfer_mode?: "move" | "copy";
     start_date?: string | null;

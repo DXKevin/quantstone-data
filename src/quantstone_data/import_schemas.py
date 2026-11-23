@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .collection_schemas import CollectionOperation
+
 
 class ImportJobStatus(StrEnum):
     CREATED = "created"
@@ -22,6 +24,7 @@ class ImportJobCreate(BaseModel):
     dataset_id: str
     scanner_key: str = Field(min_length=1, max_length=128)
     operation: str = Field(min_length=1, max_length=128)
+    purpose: CollectionOperation = CollectionOperation.INITIAL
     source_root: str = Field(min_length=1, max_length=1024)
     transfer_mode: Literal["move", "copy"] = "move"
     start_date: date | None = None

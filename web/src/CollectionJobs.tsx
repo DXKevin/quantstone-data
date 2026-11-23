@@ -4,6 +4,7 @@ import {
   Ban,
   CheckCircle2,
   Clock3,
+  FolderInput,
   FileUp,
   Plus,
   RefreshCw,
@@ -24,7 +25,9 @@ import {
   type CollectionReview,
   type CollectionRun,
   type DatasetSummary,
+  type ScannerDefinition,
 } from "./api";
+import ImportJobs from "./ImportJobs";
 
 const operationLabels: Record<CollectionOperation, string> = {
   initial: "首次采集",
@@ -407,6 +410,12 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
         <div className="warning-banner"><AlertCircle size={17} />请先在数据集页面启用至少一个数据集，才能创建采集任务。</div>
       )}
 
+      <ImportJobs
+        datasets={activeDatasets}
+        embedded
+        onCollectionJobsChanged={() => void loadJobs(true, 0)}
+      />
+
       <section className="panel">
         <div className="panel-toolbar">
           <div><h2>任务记录</h2><span>共 {jobTotal} 个任务</span></div>
@@ -549,11 +558,40 @@ function CreateCollectionJob(props: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
+  const [scanners, setScanners] = useState<ScannerDefinition[]>([]);
+  const [scannerOperation, setScannerOperation] = useState("");
+  const [sourceRoot, setSourceRoot] = useState("");
+  const [transferMode, setTransferMode] = useState<"move" | "copy">("move");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
   const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
   const selectedBinding = selectedDataset?.collection_bindings.find((item) => item.purpose === operation);
   const selectedCollector = props.collectors.find((item) => item.key === selectedBinding?.collector_key);
   const selectedCollectorOperation = selectedCollector?.operations.find((item) => item.key === selectedBinding?.operation);
+  const directoryOperations = scanners.flatMap((scanner) => scanner.operations.map((item) => ({ ...item, scanner_key: scanner.key, scanner_name: scanner.name }))).filter((item) => item.dataset_id === datasetId);
+  const selectedDirectoryOperation = directoryOperations.find((item) => item.key === scannerOperation) ?? directoryOperations[0];
+  const firstDirectoryDatasetId = props.datasets.find((dataset) => scanners.some((scanner) => scanner.operations.some((item) => item.dataset_id === dataset.id)))?.id;
+
+  useEffect(() => {
+    void api.listScanners().then(setScanners).catch((reason) => setError(reason instanceof Error ? reason.message : "无法加载目录扫描器"));
+  }, []);
+
+  useEffect(() => {
+    if (directoryOperations.length && !directoryOperations.some((item) => item.key === scannerOperation)) {
+      setScannerOperation(directoryOperations[0].key);
+    }
+  }, [datasetId, scanners]);
+
+  useEffect(() => {
+    const defaults: Record<string, string> = {
+      "wind.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+      "wind.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+      "zhongtai.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
+      "zhongtai.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
+    };
+    if (inputMethod === "directory_import") setSourceRoot(defaults[datasetId] ?? "");
+  }, [datasetId, inputMethod]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -563,6 +601,9 @@ function CreateCollectionJob(props: {
     if (inputMethod === "collector" && !selectedCollectorOperation) return setError("没有找到该任务目的绑定的采集器操作。");
     if (missingParameter) return setError(`请填写必填参数：${missingParameter.name}`);
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
+    if (inputMethod === "directory_import" && !selectedDirectoryOperation) return setError("该数据集没有可用的目录扫描器。");
+    if (inputMethod === "directory_import" && !sourceRoot.trim()) return setError("请填写服务器源目录。");
+    if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
 
     const parameters = Object.fromEntries(
       (selectedCollectorOperation?.parameters ?? [])
@@ -582,6 +623,20 @@ function CreateCollectionJob(props: {
 
     setSubmitting(true);
     try {
+      if (inputMethod === "directory_import" && selectedDirectoryOperation) {
+        const importJob = await api.createImportJob({
+          dataset_id: datasetId,
+          scanner_key: selectedDirectoryOperation.scanner_key,
+          operation: selectedDirectoryOperation.key,
+          purpose: operation,
+          source_root: sourceRoot.trim(),
+          transfer_mode: transferMode,
+          start_date: startDate || null,
+          end_date: endDate || null,
+        });
+        await props.onComplete(`目录扫描任务 ${importJob.id.slice(0, 8)} 已创建，扫描完成后请确认导入。`);
+        return;
+      }
       const job = await api.createCollectionJob(payload);
       if (inputMethod === "file_import" && file) {
         try {
@@ -614,7 +669,7 @@ function CreateCollectionJob(props: {
         <div className="form-content">
           <div className="form-grid two-columns no-margin">
             <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); const nextPurposes = next?.collection_bindings.map((item) => item.purpose) ?? []; setDatasetId(event.target.value); if (inputMethod === "collector" && !nextPurposes.includes(operation) && nextPurposes.length) setOperation(nextPurposes[0]); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
-            <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod === "file_import" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod !== "collector" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
           {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{selectedCollectorOperation.description}</span></div>{selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
@@ -622,14 +677,26 @@ function CreateCollectionJob(props: {
       </section>
 
       <section className="form-section job-form-section">
-        <div className="section-number">02</div><div className="section-intro"><h2>数据输入</h2><p>采集器与手动文件只是获取方式，后续使用同一校验和发布流程。</p></div>
+        <div className="section-number">02</div><div className="section-intro"><h2>数据输入</h2><p>采集器、文件上传和服务器目录使用同一校验与发布流程。</p></div>
         <div className="form-content">
           <div className="method-cards">
             <button type="button" className={inputMethod === "file_import" ? "method-card selected" : "method-card"} onClick={() => setInputMethod("file_import")}><FileUp size={22} /><strong>手动文件</strong><span>上传本地文件到 staging</span></button>
             <button type="button" className={inputMethod === "collector" ? "method-card selected" : "method-card"} onClick={() => { setInputMethod("collector"); if (!supportedPurposes.includes(operation) && supportedPurposes.length) setOperation(supportedPurposes[0]); }}><RefreshCw size={22} /><strong>采集器</strong><span>由采集器获取供应商数据</span></button>
+            <button type="button" className={inputMethod === "directory_import" ? "method-card selected" : "method-card"} onClick={() => { setInputMethod("directory_import"); if (!directoryOperations.length && firstDirectoryDatasetId) setDatasetId(firstDirectoryDatasetId); }}><FolderInput size={22} /><strong>服务器目录</strong><span>扫描目录，确认清单后导入</span></button>
           </div>
           {inputMethod === "file_import" ? (
             <label className={file ? "file-drop selected" : "file-drop"}><input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><UploadCloud size={25} /><strong>{file ? file.name : "选择需要导入的文件"}</strong><span>{file ? formatBytes(file.size) : "文件将先进入临时区，不会直接写入正式数据"}</span></label>
+          ) : inputMethod === "directory_import" ? (
+            <div className="collector-parameter-form">
+              <div className="binding-preview"><strong>{selectedDirectoryOperation?.scanner_name ?? "该数据集没有目录扫描器"}</strong><span>{selectedDirectoryOperation ? `${selectedDirectoryOperation.scanner_key} · ${selectedDirectoryOperation.key}` : "请更换数据集"}</span><span>{selectedDirectoryOperation?.description ?? "服务器目录输入只对已注册扫描器的数据集开放。"}</span></div>
+              {selectedDirectoryOperation && <div className="form-grid two-columns date-grid">
+                <label className="input-field"><span>扫描操作<b>*</b></span><select value={selectedDirectoryOperation.key} onChange={(event) => setScannerOperation(event.target.value)}>{directoryOperations.map((item) => <option key={`${item.scanner_key}:${item.key}`} value={item.key}>{item.name}</option>)}</select></label>
+                <label className="input-field"><span>源目录<b>*</b></span><input value={sourceRoot} onChange={(event) => setSourceRoot(event.target.value)} placeholder="/home/hhd_data/quantstone-data/imports/..." /></label>
+                <label className="input-field"><span>文件处理</span><select value={transferMode} onChange={(event) => setTransferMode(event.target.value as "move" | "copy")}><option value="move">移动（同盘快速，成功后删除源文件）</option><option value="copy">复制（保留源文件）</option></select></label>
+                <label className="input-field"><span>开始日期</span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+                <label className="input-field"><span>结束日期</span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
+              </div>}
+            </div>
           ) : <div className="operation-help">采集器由数据集预先绑定，创建任务后在任务列表执行。</div>}
         </div>
       </section>

@@ -1723,6 +1723,30 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 
 ## 后续 Agent 更新模板
 
+### 2026-11-23 — Codex（目录导入合并到采集任务）
+
+完成：
+
+- 移除采集导航中的独立“目录导入”页面入口；
+- “创建采集任务”的数据输入增加“服务器目录”，支持扫描操作、源目录、移动/复制和日期范围；
+- 扫描中与待确认的目录任务直接显示在采集任务页，确认后生成普通 CollectionJob，完成任务只在
+  统一任务记录中显示，避免重复；
+- 目录导入保留内部 ImportJob/Manifest，并把用户选择的首次、增量、修复或重建目的传递给最终
+  CollectionJob；
+- 复权因子回填任务 `58c45fd3-1d60-4d1e-8e12-618930d59a24` 已成功，2,887 个分区全部发布。
+
+验证：
+
+- `pytest tests/test_review_reports.py tests/test_catalog_concurrency.py tests/test_import_schemas.py -q`：
+  5 项通过；
+- `ruff check src tests`：通过；
+- `web/npm run build`：通过。
+
+下一步：重启前后端并在浏览器验证创建、扫描确认和统一任务展示。
+
+遗留问题：当前 Codex 环境运行既有 TestClient 集成测试仍会卡在 lifespan 启动，反向应用本轮改动
+后同样复现；定向纯后端测试和前端类型构建均已通过。
+
 ### 2026-11-23 — Codex（目录导入审核报告）
 
 完成：
