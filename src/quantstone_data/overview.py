@@ -337,6 +337,7 @@ def daily_completion(
             + summary.get("missing", 0)
             + summary.get("failed", 0)
             + summary.get("abnormal", 0)
+            + summary.get("pending", 0)
         )
         rows.append(
             {
