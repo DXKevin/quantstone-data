@@ -1086,9 +1086,6 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
     operation = get_operation(job.collector_key, job.collector_operation)
     if operation is None or job.dataset_id not in operation.datasets:
         raise HTTPException(status_code=409, detail="dataset has no executable collector")
-    if len(operation.datasets) > 1:
-        raise HTTPException(status_code=501, detail="joint collection execution is not implemented")
-
     data_root: Path = request.app.state.data_root
     with _JOB_STATE_LOCK:
         session.refresh(job)
@@ -1107,7 +1104,11 @@ def execute_collection_job(job_id: str, request: Request, session: SessionDep) -
                     request.app.state.session_factory,
                     data_root,
                 ),
-                resource_key=f"dataset:{job.dataset_id}",
+                resource_key=(
+                    f"collector:{job.collector_key}:{job.collector_operation}"
+                    if len(operation.datasets) > 1
+                    else f"dataset:{job.dataset_id}"
+                ),
             )
         except RuntimeError as error:
             _QUEUED_JOBS.discard(job.id)
