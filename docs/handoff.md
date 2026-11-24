@@ -39,6 +39,22 @@
 - 服务重启后确认采集能力页显示 2 个联合操作；首次真实下载建议先选择一个交易日，核对两个
   Catalog 分区都由同一任务发布。
 
+## 2026-11-24 — Codex（TuShare index_basic）
+
+完成：
+
+- 新增预置数据集 `tushare.cn.index.index_basic`，使用 snapshot 存储和 `ts_code` 主键；
+- 契约包含 TuShare 官方 13 个输出字段，`base_date`、`list_date`、`exp_date` 存为 date；
+- 首次和增量采集均遍历 `MSCI/CSI/SSE/SZSE/CICC/SW/OTH` 七个市场，按 `ts_code` 去重后
+  生成完整快照，避免默认参数只返回 SSE；
+- 新增 `index_basic_initial` / `index_basic_incremental` 操作和专用审核器；
+- 用户要求最后自行运行采集任务，因此只创建并启用数据集，不代为创建或执行采集任务。
+
+验证：
+
+- index_basic 与 Wind 定向测试共 6 项通过；
+- `ruff check .`：通过。
+
 ## 2026-11-20 交接摘要（优先阅读）
 
 - 当前工作 Agent：DeepSeek Harness 结束，等待 Codex 接手

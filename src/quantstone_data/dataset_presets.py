@@ -135,6 +135,62 @@ def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
 
 DATASET_PRESETS = (
     DatasetPreset(
+        key="tushare_index_basic",
+        category="TuShare · 指数",
+        contract=DatasetCreate(
+            id="tushare.cn.index.index_basic",
+            provider="tushare",
+            region="cn",
+            instrument="index",
+            dataset_name="index_basic",
+            market=None,
+            display_name="指数基本信息",
+            description=(
+                "TuShare index_basic 指数基本信息，覆盖 MSCI、CSI、SSE、SZSE、CICC、SW、OTH。"
+            ),
+            update_frequency="daily",
+            time_granularity="none",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "index_basic_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "index_basic_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": None,
+                "calendar_dataset_id": None,
+                "layout": "snapshot",
+                "write_strategy": "replace_snapshot",
+                "compaction": None,
+            },
+            primary_key=["ts_code"],
+            time_field=None,
+            fields=[
+                field("ts_code", "string", "TS指数代码", nullable=False),
+                field("name", "string", "指数简称", nullable=False),
+                field("fullname", "string", "指数全称"),
+                field("market", "string", "交易所或服务商", nullable=False),
+                field("publisher", "string", "发布方", nullable=False),
+                field("index_type", "string", "指数风格"),
+                field("category", "string", "指数类别", nullable=False),
+                field("base_date", "date", "基期", nullable=False),
+                field("base_point", "float64", "基点", nullable=False),
+                field("list_date", "date", "发布日期", nullable=False),
+                field("weight_rule", "string", "加权方式"),
+                field("desc", "string", "指数描述"),
+                field("exp_date", "date", "终止日期"),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_adj_factor",
         category="TuShare · A股",
         contract=DatasetCreate(

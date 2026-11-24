@@ -515,6 +515,10 @@ operation 参数定义校验。凭证、限流和重试不属于数据集绑定�
 采集器从同一行 `ts_code` 的点号前部分恢复代码，避免产生 `.0` 或丢失前导零；供应商原本返回
 的空值保持为空，不用 `ts_code` 补值。
 
+TuShare `index_basic` 同样采用完整快照：每次分别请求 `MSCI`、`CSI`、`SSE`、`SZSE`、
+`CICC`、`SW`、`OTH` 七个市场并按 `ts_code` 去重，避免接口默认只返回 SSE。日期字段转换为
+Parquet `date`，其余字段保持供应商语义；首次和增量都替换单个快照文件。
+
 TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
 `ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
 日期类型。该接口可以不传股票代码和日期直接返回全部历史记录；首次采集与增量更新都无参数

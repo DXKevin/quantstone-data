@@ -11,6 +11,8 @@ from .daily import (
     collect_daily_incremental,
     collect_daily_initial,
 )
+from .index_basic import collect_incremental as collect_index_basic_incremental
+from .index_basic import collect_initial as collect_index_basic_initial
 from .namechange import collect_incremental as collect_namechange_incremental
 from .namechange import collect_initial as collect_namechange_initial
 from .stock_basic import (
@@ -25,6 +27,7 @@ from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
+INDEX_BASIC_DATASET_ID = "tushare.cn.index.index_basic"
 ADJ_FACTOR_DATASET_ID = "tushare.cn.stock.adj_factor"
 NAMECHANGE_DATASET_ID = "tushare.cn.stock.namechange"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
@@ -47,6 +50,24 @@ ADJ_FACTOR_RATE_LIMIT = RateLimit(calls=150, period_seconds=60, scope="adj_facto
 ADJ_FACTOR_RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=65)
 
 OPERATIONS = (
+    CollectorOperation(
+        key="index_basic_initial",
+        name="指数基本信息首次采集",
+        description="分别获取 TuShare 七个指数市场，建立完整指数基本信息快照。",
+        purpose="initial",
+        parameters=(),
+        datasets=(INDEX_BASIC_DATASET_ID,),
+        function=collect_index_basic_initial,
+    ),
+    CollectorOperation(
+        key="index_basic_incremental",
+        name="指数基本信息增量更新",
+        description="重新获取 TuShare 七个指数市场，替换完整指数基本信息快照。",
+        purpose="incremental",
+        parameters=(),
+        datasets=(INDEX_BASIC_DATASET_ID,),
+        function=collect_index_basic_incremental,
+    ),
     CollectorOperation(
         key="adj_factor_initial",
         name="复权因子首次采集",

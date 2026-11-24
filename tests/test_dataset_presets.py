@@ -15,6 +15,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         assert response.status_code == 200
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
+            "tushare.cn.index.index_basic",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
@@ -33,6 +34,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             assert created.json()["status"] == "draft"
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
+    index_basic = contracts["tushare.cn.index.index_basic"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
@@ -43,6 +45,9 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     zt_order = contracts["zhongtai.cn.stock.l2_order.sz"]
     zt_trade = contracts["zhongtai.cn.stock.l2_trade.sz"]
     assert l2_order["provider"] == "wind"
+    assert index_basic["instrument"] == "index"
+    assert index_basic["storage_policy"]["layout"] == "snapshot"
+    assert index_basic["primary_key"] == ["ts_code"]
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
     assert l2_order["time_granularity"] == "tick"
