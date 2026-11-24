@@ -92,6 +92,28 @@ def test_collect_daily_filters_to_universe(monkeypatch, tmp_path: Path) -> None:
     assert table["trade_date"].to_pylist()[0].isoformat() == "2026-11-23"
 
 
+def test_initial_collect_fetches_each_year_once(monkeypatch, tmp_path: Path) -> None:
+    calls: list[tuple[list[str], str, str]] = []
+
+    def fake_range_api(token, codes, start_date, end_date, fields):
+        calls.append((list(codes), start_date, end_date))
+        return _rows("2026-01-05") + _rows("2026-01-06")
+
+    monkeypatch.setattr(index_daily, "call_range_api", fake_range_api)
+    context = CollectionContext(
+        run_id="run",
+        staging_dir=tmp_path / "staging",
+        token="year-cache-token",
+    )
+    for trade_date in ("2026-01-05", "2026-01-06"):
+        result = index_daily.collect_initial(
+            context, {"trade_date": trade_date}, _field_contracts()
+        )
+        artifact = result.outputs["tushare.cn.index.index_daily"][0]
+        assert artifact.row_count == 13
+    assert len(calls) == 3
+
+
 def test_collect_daily_skips_index_before_start(monkeypatch, tmp_path: Path) -> None:
     rows = [row for row in _rows("2019-01-02") if row["ts_code"] != "000688.SH"]
     monkeypatch.setattr(

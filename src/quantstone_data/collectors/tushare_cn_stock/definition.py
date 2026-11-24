@@ -79,12 +79,11 @@ OPERATIONS = (
     CollectorOperation(
         key="index_daily_initial",
         name="指数日线首次采集",
-        description="按交易日采集主要指数日线，建立多指数历史分区。",
+        description="按年批量拉取主要指数日线，再逐日写入历史分区。",
         purpose="initial",
         parameters=DATE_RANGE_PARAMETERS,
         datasets=(INDEX_DAILY_DATASET_ID,),
         function=collect_index_daily_initial,
-        rate_limit=INDEX_DAILY_RATE_LIMIT,
         retry=INDEX_DAILY_RETRY,
     ),
     CollectorOperation(

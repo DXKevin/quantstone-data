@@ -525,10 +525,10 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 `ts_code/trade_date/open/high/low/close/pre_close/change/pct_chg/vol/amount`，主键
 `ts_code + trade_date`，按交易日分区，存储策略 `yearly_with_delta` 并启用年度合并。
 当前清单包含 13 个指数：上证、深证成指、沪深300、中证500/1000/2000、上证50、创业板指、
-科创50、创业板综、深证A指、中证800、中证全指。采集器每个交易日请求一次 `index_daily`
-的 `trade_date` 数据（不传 `ts_code`，接口当天返回全部指数），本地只保留清单内的指数；
-清单中 `start_date` 之前的指数自动跳过，不参与该日校验；到达 `start_date` 后缺失才失败，
-不静默少写。
+科创50、创业板综、深证A指、中证800、中证全指。首次采集按年拉取：非 CSI 指数合并成一组、CSI 指数逐个请求，每年 3 次调用，结果按年
+缓存在进程内，再逐日写入分区；增量更新才按交易日请求一次 `index_daily(trade_date=...)`。
+本地只保留清单内的指数；清单中 `start_date` 之前的指数自动跳过，不参与该日校验；到达
+`start_date` 后缺失才失败，不静默少写。
 
 指数清单保存在采集器同目录的 `index_daily_universe.json`，每项包含 `ts_code`、`name` 和
 `start_date`，不写死在采集函数里。`start_date` 不能直接取 `index_basic` 的 `base_date` 或
@@ -615,8 +615,8 @@ run_operation：限流等待 → 调用 → 限流/网络错误按退避重试
 - 每次限流等待和重试调度都写入结构化日志（`rate_limit_wait`、`operation_retry_scheduled`），
   便于排查长任务耗时。
 - TuShare 除“每分钟/频率/访问次数”外还会返回“请求额度暂不可用，请稍后重试”；该文本必须
-  归入可重试的限流异常，不能按普通采集失败立即终止。`index_daily` 采用 20 次/分钟和更长的
-  重试退避，给供应商额度窗口恢复时间。
+  归入可重试的限流异常，不能按普通采集失败立即终止。`index_daily` 增量采用 20 次/分钟，
+  首次按年加载用 15 次/分钟的年度窗口（每年 3 次请求），并保留更长的重试退避。
 - 限流器是进程内状态，多进程部署时必须改为共享限流，否则每个进程各自计算额度。
 - 所有 TuShare 采集器通过共享 HTTP 客户端请求；供应商级并发门固定为 1，因此不同代码文件、
   不同接口和不同任务不会同时向同一 TuShare 账户发出 HTTP 请求。并发门只覆盖单次网络请求，
