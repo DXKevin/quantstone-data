@@ -92,6 +92,26 @@ def test_collect_daily_filters_to_universe(monkeypatch, tmp_path: Path) -> None:
     assert table["trade_date"].to_pylist()[0].isoformat() == "2026-11-23"
 
 
+def test_collect_daily_skips_index_before_start(monkeypatch, tmp_path: Path) -> None:
+    rows = [row for row in _rows("2019-01-02") if row["ts_code"] != "000688.SH"]
+    monkeypatch.setattr(
+        index_daily,
+        "call_api",
+        lambda token, trade_date, fields: list(rows),
+    )
+    context = CollectionContext(
+        run_id="run",
+        staging_dir=tmp_path / "staging",
+        token="token",
+    )
+    result = index_daily.collect_daily(
+        context, {"trade_date": "2019-01-02"}, _field_contracts()
+    )
+    output = result.outputs["tushare.cn.index.index_daily"][0]
+    assert output.row_count == 12
+    assert "000688.SH" not in pq.read_table(output.path)["ts_code"].to_pylist()
+
+
 def test_collect_daily_reports_missing_index(monkeypatch, tmp_path: Path) -> None:
     rows = [row for row in _rows() if row["ts_code"] != "000300.SH"]
     monkeypatch.setattr(
