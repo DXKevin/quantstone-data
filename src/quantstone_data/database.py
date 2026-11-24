@@ -365,6 +365,29 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             ).bindparams(bindparam("dataset_ids", expanding=True)),
             {"dataset_ids": l2_dataset_ids, "date_pattern": compact_date_pattern},
         )
+        wind_bindings = {
+            "wind.cn.stock.l2_order.sz": (
+                '[{"purpose":"initial","collector_key":"wind_l2_sz",'
+                '"operation":"l2_order_initial","parameters":{}},'
+                '{"purpose":"incremental","collector_key":"wind_l2_sz",'
+                '"operation":"l2_order_incremental","parameters":{}}]'
+            ),
+            "wind.cn.stock.l2_trade.sz": (
+                '[{"purpose":"initial","collector_key":"wind_l2_sz",'
+                '"operation":"l2_trade_initial","parameters":{}},'
+                '{"purpose":"incremental","collector_key":"wind_l2_sz",'
+                '"operation":"l2_trade_incremental","parameters":{}}]'
+            ),
+        }
+        for dataset_id, bindings in wind_bindings.items():
+            connection.execute(
+                text(
+                    "UPDATE datasets SET collection_bindings = :bindings "
+                    "WHERE id = :dataset_id AND (collection_bindings IS NULL "
+                    "OR collection_bindings = '[]')"
+                ),
+                {"dataset_id": dataset_id, "bindings": bindings},
+            )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

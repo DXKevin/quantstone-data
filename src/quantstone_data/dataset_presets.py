@@ -444,7 +444,18 @@ DATASET_PRESETS = (
             ),
             update_frequency="daily",
             time_granularity="tick",
-            collection_bindings=[],
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "wind_l2_sz",
+                    "operation": "l2_order_initial",
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "wind_l2_sz",
+                    "operation": "l2_order_incremental",
+                },
+            ],
             storage_policy={
                 "logical_partition_field": "trade_date",
                 "calendar_dataset_id": "tushare.cn.stock.trade_cal",
@@ -549,7 +560,18 @@ DATASET_PRESETS = (
             ),
             update_frequency="daily",
             time_granularity="tick",
-            collection_bindings=[],
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "wind_l2_sz",
+                    "operation": "l2_trade_initial",
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "wind_l2_sz",
+                    "operation": "l2_trade_incremental",
+                },
+            ],
             storage_policy={
                 "logical_partition_field": "trade_date",
                 "calendar_dataset_id": "tushare.cn.stock.trade_cal",

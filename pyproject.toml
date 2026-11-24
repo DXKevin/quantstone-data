@@ -18,6 +18,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+wind-l2 = [
+  "aget>=0.2",
+  "chardet>=5.2",
+  "cryptography>=41",
+  "passlib>=1.7",
+  "pillow>=10.1",
+  "requests>=2",
+  "requests-toolbelt>=1",
+  "rich>=13.7",
+]
 dev = [
   "httpx>=0.28,<1",
   "pytest>=8.3,<9",

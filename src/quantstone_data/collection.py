@@ -423,7 +423,7 @@ def _execute_daily_job(
         session.commit()
 
         run_directory = data_root / "staging" / job.id / run.id
-        context = CollectionContext(run.id, run_directory, token)
+        context = CollectionContext(run.id, run_directory, token, data_root=data_root)
         try:
             log_event(
                 "collection_run_started",
@@ -609,6 +609,7 @@ def _execute_snapshot_job(
                     run_directory,
                     load_token(),
                     current_artifact_path=current_artifact_path,
+                    data_root=data_root,
                 ),
                 job.parameters,
                 fields,
@@ -820,7 +821,7 @@ def create_collection_job(
 
     parameters = dict(binding.get("parameters", {})) if binding else {}
     parameters.update(payload.parameters)
-    if payload.start_date:
+    if payload.start_date and payload.operation is not CollectionOperation.REPAIR:
         parameters["start_date"] = payload.start_date.isoformat()
         parameters["end_date"] = payload.end_date.isoformat()
     if binding:

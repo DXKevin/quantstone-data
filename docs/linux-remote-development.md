@@ -46,6 +46,7 @@ Linux 应重新安装 Python 3.11+、Node.js 和项目依赖。
 export QUANTSTONE_DATA_ROOT=/home/hhd_data/quantstone-data
 export TUSHARE_TOKEN='...'
 export TUSHARE_API_URL='http://proxy.example:32817'  # 可选，默认 https://api.tushare.pro
+export WIND_L2_BAIDUPCS_COOKIE='BDUSS=...; STOKEN=...; BAIDUID=...'
 ```
 
 `TUSHARE_API_URL` 必须是兼容 TuShare POST 协议的完整 HTTP(S) 地址。它只改变网络入口，数据集
@@ -67,6 +68,12 @@ cd /home/quantadmin/project/quantstone-data
 当前后台任务线程、取消集合、供应商并发门和限流器都在进程内，因此后端只能运行一个 Uvicorn
 worker，不能使用 `--workers` 启动多进程。任务线程数不设统一上限，但同一数据集串行、同一
 供应商 API 并发为 1。服务重启会把未完成任务标记失败，不能自动续跑。
+
+Wind L2 百度网盘采集器首次部署还需运行 `./scripts/install-wind-l2-deps.sh`。脚本从固定提交安装
+BaiduPCS-Py，并补入其 Linux/Python 3.12 缺失的纯 Python cipher 模块。Cookie 只放在未提交的
+`.env` 或进程环境中；可选配置为 `WIND_L2_BAIDUPCS_SHARE_URL`、
+`WIND_L2_BAIDUPCS_SHARE_PASSWORD`、`WIND_L2_BAIDUPCS_REMOTE_ROOT`、
+`WIND_L2_DOWNLOAD_CONCURRENCY` 和 `WIND_L2_DOWNLOAD_CHUNK_SIZE`。
 
 ## 当前 Catalog 与数据位置
 
