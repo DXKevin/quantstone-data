@@ -28,6 +28,8 @@ RATE_LIMIT_KEYWORDS = (
     "频率",
     "超过限制",
     "访问次数",
+    "请求额度",
+    "额度暂不可用",
     "rate limit",
     "too many requests",
 )

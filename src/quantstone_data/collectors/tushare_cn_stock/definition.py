@@ -48,8 +48,11 @@ INCREMENTAL_PARAMETERS = (
 
 # TuShare daily 按账号限制每分钟 50 次；首次与增量共用同一窗口。
 DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
-# index_daily 每个交易日一次请求；首次历史回填与增量共用同一窗口。
-INDEX_DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="index_daily")
+# index_daily 每个交易日一次请求；保守限制，避免触发供应商的额度保护。
+INDEX_DAILY_RATE_LIMIT = RateLimit(calls=20, period_seconds=60, scope="index_daily")
+INDEX_DAILY_RETRY = RetryPolicy(
+    attempts=6, delay_seconds=15, max_delay_seconds=120
+)
 # 当前代理在连续约 180 次请求后返回英文限流提示，保守控制在每分钟 150 次。
 ADJ_FACTOR_RATE_LIMIT = RateLimit(calls=150, period_seconds=60, scope="adj_factor")
 ADJ_FACTOR_RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=65)
@@ -82,6 +85,7 @@ OPERATIONS = (
         datasets=(INDEX_DAILY_DATASET_ID,),
         function=collect_index_daily_initial,
         rate_limit=INDEX_DAILY_RATE_LIMIT,
+        retry=INDEX_DAILY_RETRY,
     ),
     CollectorOperation(
         key="index_daily_incremental",
@@ -92,6 +96,7 @@ OPERATIONS = (
         datasets=(INDEX_DAILY_DATASET_ID,),
         function=collect_index_daily_incremental,
         rate_limit=INDEX_DAILY_RATE_LIMIT,
+        retry=INDEX_DAILY_RETRY,
     ),
     CollectorOperation(
         key="adj_factor_initial",

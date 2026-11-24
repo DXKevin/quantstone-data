@@ -43,3 +43,10 @@ def test_tushare_api_url_rejects_unsafe_values(
 def test_tushare_english_rate_limit_message_is_retryable() -> None:
     with pytest.raises(RateLimitExceeded, match="Rate limit exceeded"):
         raise_api_error({"code": -1, "msg": "Rate limit exceeded"}, "fallback")
+
+
+def test_tushare_chinese_quota_message_is_retryable() -> None:
+    with pytest.raises(RateLimitExceeded, match="请求额度暂不可用"):
+        raise_api_error(
+            {"code": -1, "msg": "请求额度暂不可用，请稍后重试"}, "fallback"
+        )
