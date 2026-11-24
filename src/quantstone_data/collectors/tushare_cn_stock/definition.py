@@ -13,6 +13,8 @@ from .daily import (
 )
 from .index_basic import collect_incremental as collect_index_basic_incremental
 from .index_basic import collect_initial as collect_index_basic_initial
+from .index_daily import collect_incremental as collect_index_daily_incremental
+from .index_daily import collect_initial as collect_index_daily_initial
 from .namechange import collect_incremental as collect_namechange_incremental
 from .namechange import collect_initial as collect_namechange_initial
 from .stock_basic import (
@@ -28,6 +30,7 @@ from .trade_cal import collect_initial as collect_trade_cal_initial
 
 DAILY_DATASET_ID = "tushare.cn.stock.daily"
 INDEX_BASIC_DATASET_ID = "tushare.cn.index.index_basic"
+INDEX_DAILY_DATASET_ID = "tushare.cn.index.index_daily"
 ADJ_FACTOR_DATASET_ID = "tushare.cn.stock.adj_factor"
 NAMECHANGE_DATASET_ID = "tushare.cn.stock.namechange"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
@@ -45,6 +48,8 @@ INCREMENTAL_PARAMETERS = (
 
 # TuShare daily 按账号限制每分钟 50 次；首次与增量共用同一窗口。
 DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="daily")
+# index_daily 每个交易日一次请求；首次历史回填与增量共用同一窗口。
+INDEX_DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="index_daily")
 # 当前代理在连续约 180 次请求后返回英文限流提示，保守控制在每分钟 150 次。
 ADJ_FACTOR_RATE_LIMIT = RateLimit(calls=150, period_seconds=60, scope="adj_factor")
 ADJ_FACTOR_RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=65)
@@ -67,6 +72,26 @@ OPERATIONS = (
         parameters=(),
         datasets=(INDEX_BASIC_DATASET_ID,),
         function=collect_index_basic_incremental,
+    ),
+    CollectorOperation(
+        key="index_daily_initial",
+        name="指数日线首次采集",
+        description="按交易日采集主要指数日线，建立多指数历史分区。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(INDEX_DAILY_DATASET_ID,),
+        function=collect_index_daily_initial,
+        rate_limit=INDEX_DAILY_RATE_LIMIT,
+    ),
+    CollectorOperation(
+        key="index_daily_incremental",
+        name="指数日线增量更新",
+        description="从数据集当前水位之后补充主要指数日线。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(INDEX_DAILY_DATASET_ID,),
+        function=collect_index_daily_incremental,
+        rate_limit=INDEX_DAILY_RATE_LIMIT,
     ),
     CollectorOperation(
         key="adj_factor_initial",

@@ -1,5 +1,6 @@
 from .reviewer_types import ReviewContext, ReviewerDefinition, ReviewReport
 from .reviewers.tushare.cn.index.index_basic import REVIEWER as TUSHARE_INDEX_BASIC
+from .reviewers.tushare.cn.index.index_daily import REVIEWER as TUSHARE_INDEX_DAILY
 from .reviewers.tushare.cn.stock.adj_factor import REVIEWER as TUSHARE_ADJ_FACTOR
 from .reviewers.tushare.cn.stock.daily import REVIEWER as TUSHARE_DAILY
 from .reviewers.tushare.cn.stock.namechange import REVIEWER as TUSHARE_NAMECHANGE
@@ -28,6 +29,7 @@ def _build_registry(
 REVIEWERS = _build_registry(
     (
         TUSHARE_INDEX_BASIC,
+        TUSHARE_INDEX_DAILY,
         TUSHARE_ADJ_FACTOR,
         TUSHARE_DAILY,
         TUSHARE_NAMECHANGE,

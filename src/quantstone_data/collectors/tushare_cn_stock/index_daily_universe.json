@@ -1,0 +1,17 @@
+{
+  "indices": [
+    {"ts_code": "000001.SH", "name": "上证指数", "start_date": "2013-12-31"},
+    {"ts_code": "399001.SZ", "name": "深证成指", "start_date": "2013-12-31"},
+    {"ts_code": "000300.SH", "name": "沪深300", "start_date": "2013-12-31"},
+    {"ts_code": "000905.SH", "name": "中证500", "start_date": "2013-12-31"},
+    {"ts_code": "000852.SH", "name": "中证1000", "start_date": "2013-12-31"},
+    {"ts_code": "932000.CSI", "name": "中证2000", "start_date": "2013-12-31"},
+    {"ts_code": "000016.SH", "name": "上证50", "start_date": "2013-12-31"},
+    {"ts_code": "399006.SZ", "name": "创业板指", "start_date": "2013-12-31"},
+    {"ts_code": "000688.SH", "name": "科创50", "start_date": "2019-12-31"},
+    {"ts_code": "399102.SZ", "name": "创业板综", "start_date": "2013-12-31"},
+    {"ts_code": "399107.SZ", "name": "深证A指", "start_date": "2013-12-31"},
+    {"ts_code": "000906.SH", "name": "中证800", "start_date": "2013-12-31"},
+    {"ts_code": "000985.CSI", "name": "中证全指", "start_date": "2013-12-31"}
+  ]
+}

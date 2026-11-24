@@ -521,6 +521,19 @@ Parquet `date`，其余字段保持供应商语义；首次和增量都替换单
 8,000 行上限使用 `offset` 分页，不能把首批恰好 8,000 行当作完整结果。虽然官方把
 `base_date/base_point/list_date` 标为必选，真实历史记录仍存在空值，契约按真实数据允许为空。
 
+TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，契约字段为
+`ts_code/trade_date/open/high/low/close/pre_close/change/pct_chg/vol/amount`，主键
+`ts_code + trade_date`，按交易日分区，存储策略 `yearly_with_delta` 并启用年度合并。
+当前清单包含 13 个指数：上证、深证成指、沪深300、中证500/1000/2000、上证50、创业板指、
+科创50、创业板综、深证A指、中证800、中证全指。采集器每个交易日请求一次 `index_daily`
+的 `trade_date` 数据（不传 `ts_code`，接口当天返回全部指数），本地只保留清单内的指数；
+任一清单指数在该日缺失即失败，不静默少写。
+
+指数清单保存在采集器同目录的 `index_daily_universe.json`，每项包含 `ts_code`、`name` 和
+`start_date`，不写死在采集函数里。新增指数时只改该 JSON，运行契约和采集器测试，然后提交
+覆盖历史范围的 repair 任务重建受影响分区；`start_date` 用于允许新指数在更晚日期才开始
+出现，日期更早时不要求返回。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
+
 TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
 `ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
 日期类型。该接口可以不传股票代码和日期直接返回全部历史记录；首次采集与增量更新都无参数

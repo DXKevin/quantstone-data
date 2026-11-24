@@ -16,6 +16,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
             "tushare.cn.index.index_basic",
+            "tushare.cn.index.index_daily",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
@@ -35,6 +36,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
     index_basic = contracts["tushare.cn.index.index_basic"]
+    index_daily = contracts["tushare.cn.index.index_daily"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
@@ -48,6 +50,28 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert index_basic["instrument"] == "index"
     assert index_basic["storage_policy"]["layout"] == "snapshot"
     assert index_basic["primary_key"] == ["ts_code"]
+    assert index_daily["instrument"] == "index"
+    assert index_daily["update_frequency"] == "daily"
+    assert index_daily["primary_key"] == ["ts_code", "trade_date"]
+    assert index_daily["storage_policy"]["layout"] == "yearly_with_delta"
+    assert index_daily["storage_policy"]["compaction"] == "yearly"
+    assert [item["name"] for item in index_daily["fields"]] == [
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "change",
+        "pct_chg",
+        "vol",
+        "amount",
+    ]
+    assert {item["operation"] for item in index_daily["collection_bindings"]} == {
+        "index_daily_initial",
+        "index_daily_incremental",
+    }
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
     assert l2_order["time_granularity"] == "tick"

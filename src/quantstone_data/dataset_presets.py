@@ -191,6 +191,61 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tushare_index_daily",
+        category="TuShare · 指数",
+        contract=DatasetCreate(
+            id="tushare.cn.index.index_daily",
+            provider="tushare",
+            region="cn",
+            instrument="index",
+            dataset_name="index_daily",
+            market=None,
+            display_name="主要指数日线",
+            description=(
+                "TuShare index_daily 主要指数日线；当前覆盖上证、深证、沪深300、"
+                "中证500/1000/2000、上证50、创业板、科创50等 13 个指数。"
+            ),
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "index_daily_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "index_daily_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ts_code", "trade_date"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "TS指数代码", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("open", "float64", "开盘点位"),
+                field("high", "float64", "最高点位"),
+                field("low", "float64", "最低点位"),
+                field("close", "float64", "收盘点位"),
+                field("pre_close", "float64", "昨日收盘点位"),
+                field("change", "float64", "涨跌点"),
+                field("pct_chg", "float64", "涨跌幅", unit="%"),
+                field("vol", "float64", "成交量", unit="手"),
+                field("amount", "float64", "成交额", unit="千元"),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_adj_factor",
         category="TuShare · A股",
         contract=DatasetCreate(

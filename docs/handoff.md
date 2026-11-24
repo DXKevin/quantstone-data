@@ -19,8 +19,8 @@
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
-- 当前 11 个数据集均为 active：TuShare 7 个、Wind L2 2 个、中泰 L2 2 个；
-- Catalog 实际为 **13,442 个分区、194,387,793,640 行、1.99 TB**；数据根
+- 当前 12 个数据集均为 active：TuShare 8 个、Wind L2 2 个、中泰 L2 2 个；
+- Catalog 实际为 **13,443 个分区、194,387,793,653 行、1.99 TB**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - Wind 深市 L2 两个数据集各有 **173 个分区**，覆盖 `2026-03-11` 至 `2026-11-23`：
   order 23,729,127,620 行、trade 20,941,981,752 行；委托和成交已改为联合首次/增量操作；
@@ -31,6 +31,8 @@
 - `tushare.cn.index.index_basic` 已发布 1 个 snapshot、10,733 行；成功任务
   `e8c8de96-9ac9-4bfd-8555-edd6c87c005d`；旧失败任务
   `ace1fc71-0161-4265-8da1-537e9c6bf74c` 是修复前记录，保留即可，不要重试覆盖；
+- `tushare.cn.index.index_daily` 已创建并启用，包含 13 个主要指数；已完成
+  `2026-11-23` 的真实接口采集和发布，1 个分区、13 行；完整历史尚未采集；
 - Wind L2 旧单输出任务留下的 `2026-11-20/2026-11-23` trade 缺口已由联合修复任务
   `bf8a1c1c` 补齐，压缩包和解压缓存已清理，`downloads/wind_l2` 复核占用为 0；
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
@@ -54,8 +56,27 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 最近一次完整测试记录为 77 项通过、`ruff check .` 通过、`npm run build` 通过；本轮只改文档，
-  未重跑测试。
+- 本轮完整测试：108 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-24 — DeepSeek Harness（指数日线）
+
+完成：
+
+- 新增预置数据集 `tushare.cn.index.index_daily`，包含 13 个主要指数，主键
+  `ts_code + trade_date`，日分区、`yearly_with_delta`、年度合并；
+- 新增 `index_daily_initial` / `index_daily_incremental` 采集操作；
+- 采集器每个交易日调用一次 `index_daily(trade_date=...)`，过滤到清单内指数；缺任一清单指数
+  即失败；
+- 指数清单在 `src/quantstone_data/collectors/tushare_cn_stock/index_daily_universe.json`，
+  包含 `ts_code/name/start_date`，新增指数只改 JSON；
+- 新增 `tushare.cn.index.index_daily` 审核器，检查 Schema、主键、分区日期和 OHLC；
+- 真实接口测试：`2026-11-23` 返回并发布 13 行；
+- 定向测试 16 项通过；完整套件 108 项通过，`ruff check .` 和前端构建通过。
+
+下一步：
+
+- 运行完整历史的 `index_daily` 首次采集；
+- 2026 年数据可执行年度合并，验证 `annual/2026.parquet`。
 
 ## 2026-11-24 — Codex（Wind 深市 L2 联合更新）
 
@@ -431,7 +452,8 @@
 1. 先与用户确认多存储根的两个根路径、分片策略和迁移方式，再实现 `storage_roots` /
    `catalog_files.root_id`；不要按物理硬盘建多个 SQLite。
 2. 复核 Wind 173 天和中泰 2,213 天 L2 的 Catalog、覆盖率和文件完整性；不要重复导入。
-3. 检查 `index_basic` snapshot 与旧失败任务记录，保留历史失败记录，不要误触发重试。
+3. 按用户确认的起始日期运行 `index_daily` 历史采集；新增指数只改
+   `index_daily_universe.json`，然后跑 repair 重建受影响分区。
 4. 如需看 Catalog 审计视图，用户已明确暂时不要；保持按数据集接口和概览热力图即可。
 
 不得把现有 TuShare Token、百度网盘账号或真实金融数据提交到 Git；本地 `.env` 只供运行使用。
