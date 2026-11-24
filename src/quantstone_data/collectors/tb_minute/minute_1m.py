@@ -12,9 +12,8 @@ from ...collection_protocol import CollectionContext, CollectionResult, DatasetA
 from . import baidu_client
 
 DATASET_ID = "tb_minute.cn.stock.minute_1m"
-REMOTE_ROOT = "/quant-data/A股分钟数据/沪深股票"
-ANNUAL_ROOT = f"{REMOTE_ROOT}/1分钟_按年汇总"
-DAILY_ROOT = f"{REMOTE_ROOT}/每日更新/1分钟"
+ANNUAL_ROOT = "沪深股票/1分钟_按年汇总"
+DAILY_ROOT = "沪深股票/每日更新/1分钟"
 CACHE_ROOT_NAME = "minute_1m"
 _YEAR_LOCK = threading.Lock()
 
@@ -73,10 +72,10 @@ def _cache_root(context: CollectionContext) -> Path:
     return Path(root) / "cache" / CACHE_ROOT_NAME
 
 
-def _download(url_path: str, target: Path) -> Path:
-    """从用户自己的百度网盘路径下载；远端文件保留不删。"""
+def _download(relative_path: str, target: Path) -> Path:
+    """只把当前分享文件转存到临时目录，下载后删除该转存文件。"""
     target.parent.mkdir(parents=True, exist_ok=True)
-    return baidu_client.download_path(url_path, target)
+    return baidu_client.fetch_shared_file(relative_path, target)
 
 
 def _extract(zip_path: Path, target_dir: Path) -> Path:

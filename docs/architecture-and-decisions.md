@@ -541,9 +541,10 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为
 `ts_code/trade_date/bar_time/open/high/low/close/volume/amount/pct_chg/amplitude`，
 主键 `ts_code + trade_date + bar_time`，按交易日日分区，不做年度合并；`bar_time` 是
-`HHMMSS` 整数，`volume` 单位为手，`amount` 单位为元。数据源为百度网盘
-`/quant-data/A股分钟数据/沪深股票`：首次采集读取 `1分钟_按年汇总/YYYY_1min.zip`，
-增量读取 `每日更新/1分钟/YYYY-MM/YYYYMMDD_1min.zip`。首次采集在进程内按年构建日分区
+`HHMMSS` 整数，`volume` 单位为手，`amount` 单位为元。数据源为百度分享链接：首次采集读取分享中的
+`沪深股票/1分钟_按年汇总/YYYY_1min.zip`，增量读取
+`沪深股票/每日更新/1分钟/YYYY-MM/YYYYMMDD_1min.zip`。采集器按需只转存当前一个
+zip 到 `/quant-data/A股分钟数据` 临时目录，下载后立即删除该转存文件，分享源不动。首次采集在进程内按年构建日分区
 缓存，逐日发布；增量只生成当天分区。发布后清理本地下载包、解压文件和已处理日缓存，
 百度网盘转存文件保留。repair 操作复用增量单日实现，不误用按年首次批量。该采集器使用可选 `minute` 依赖中的 DuckDB 处理数万只股票的年度
 CSV；同一分钟数据集不添加市场后缀，未来北交所若契约一致可直接并入，只有契约分叉时才
