@@ -798,19 +798,25 @@ def create_collection_job(
                 detail=f"交易日历文件缺失，请重新发布交易日历：{calendar_id}",
             )
 
-    binding = next(
-        (
-            item
-            for item in dataset.collection_bindings
-            if item["purpose"] == payload.operation.value
+    binding = _resolve_collection_binding(
+        dataset.collection_bindings,
+        payload.operation,
+        allow_repair_fallback=bool(
+            dataset.storage_policy
+            and dataset.storage_policy.get("logical_partition_field")
         ),
-        None,
     )
     if payload.input_method is InputMethod.COLLECTOR and binding is None:
         raise HTTPException(
             status_code=409,
             detail="dataset does not support this collection purpose",
         )
+    if (
+        payload.input_method is InputMethod.COLLECTOR
+        and payload.operation is CollectionOperation.REPAIR
+        and (payload.start_date is None or payload.end_date is None)
+    ):
+        raise HTTPException(status_code=422, detail="修复任务必须指定开始日期和结束日期")
 
     parameters = dict(binding.get("parameters", {})) if binding else {}
     parameters.update(payload.parameters)
@@ -867,6 +873,24 @@ def create_collection_job(
         collector_operation=job.collector_operation,
     )
     return serialize_job(job)
+
+
+def _resolve_collection_binding(
+    bindings: list[dict],
+    purpose: CollectionOperation,
+    *,
+    allow_repair_fallback: bool,
+) -> dict | None:
+    exact = next((item for item in bindings if item["purpose"] == purpose.value), None)
+    if exact is not None or purpose is not CollectionOperation.REPAIR or not allow_repair_fallback:
+        return exact
+    return next(
+        (item for item in bindings if item["purpose"] == CollectionOperation.INCREMENTAL.value),
+        next(
+            (item for item in bindings if item["purpose"] == CollectionOperation.INITIAL.value),
+            None,
+        ),
+    )
 
 
 @router.post(

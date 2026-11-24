@@ -615,7 +615,7 @@ function CreateCollectionJob(props: {
 }) {
   const initialDataset = props.datasets.find((dataset) => dataset.id === props.initialDatasetId);
   const initialOperation = props.initialOperation ?? "initial";
-  const hasRequestedBinding = initialDataset?.collection_bindings.some((binding) => binding.purpose === initialOperation) ?? false;
+  const hasRequestedBinding = Boolean(initialDataset && resolveCollectorBinding(initialDataset, initialOperation));
   const [datasetId, setDatasetId] = useState(initialDataset?.id ?? props.datasets[0]?.id ?? "");
   const [operation, setOperation] = useState<CollectionOperation>(initialOperation);
   const [inputMethod, setInputMethod] = useState<CollectionInputMethod>(hasRequestedBinding ? "collector" : "file_import");
@@ -630,10 +630,11 @@ function CreateCollectionJob(props: {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const selectedDataset = props.datasets.find((dataset) => dataset.id === datasetId);
-  const supportedPurposes = selectedDataset?.collection_bindings.map((item) => item.purpose) ?? [];
-  const selectedBinding = selectedDataset?.collection_bindings.find((item) => item.purpose === operation);
+  const supportedPurposes = selectedDataset ? collectorPurposes(selectedDataset) : [];
+  const selectedBinding = selectedDataset ? resolveCollectorBinding(selectedDataset, operation) : undefined;
   const selectedCollector = props.collectors.find((item) => item.key === selectedBinding?.collector_key);
   const selectedCollectorOperation = selectedCollector?.operations.find((item) => item.key === selectedBinding?.operation);
+  const collectorParameters = (selectedCollectorOperation?.parameters ?? []).filter((item) => operation !== "repair" || !["start_date", "end_date"].includes(item.name));
   const directoryOperations = scanners.flatMap((scanner) => scanner.operations.map((item) => ({ ...item, scanner_key: scanner.key, scanner_name: scanner.name }))).filter((item) => item.dataset_id === datasetId);
   const selectedDirectoryOperation = directoryOperations.find((item) => item.key === scannerOperation) ?? directoryOperations[0];
   const firstDirectoryDatasetId = props.datasets.find((dataset) => scanners.some((scanner) => scanner.operations.some((item) => item.dataset_id === dataset.id)))?.id;
@@ -662,16 +663,17 @@ function CreateCollectionJob(props: {
     event.preventDefault();
     setError(null);
     if (!datasetId) return setError("没有可用的已启用数据集。");
-    const missingParameter = selectedCollectorOperation?.parameters.find((item) => item.required && !parameterValues[item.name]?.trim());
+    const missingParameter = collectorParameters.find((item) => item.required && !parameterValues[item.name]?.trim());
     if (inputMethod === "collector" && !selectedCollectorOperation) return setError("没有找到该任务目的绑定的采集器操作。");
     if (missingParameter) return setError(`请填写必填参数：${missingParameter.name}`);
     if (inputMethod === "file_import" && !file) return setError("请选择需要导入的文件。");
     if (inputMethod === "directory_import" && !selectedDirectoryOperation) return setError("该数据集没有可用的目录扫描器。");
     if (inputMethod === "directory_import" && !sourceRoot.trim()) return setError("请填写服务器源目录。");
+    if (inputMethod === "collector" && operation === "repair" && (!startDate || !endDate)) return setError("修复任务必须选择开始日期和结束日期；修复单日时请选择相同日期。");
     if (startDate && endDate && startDate > endDate) return setError("开始日期不能晚于结束日期。");
 
     const parameters = Object.fromEntries(
-      (selectedCollectorOperation?.parameters ?? [])
+      collectorParameters
         .filter((item) => parameterValues[item.name] !== undefined && parameterValues[item.name] !== "")
         .map((item) => [item.name, convertParameterValue(item, parameterValues[item.name])]),
     );
@@ -680,8 +682,8 @@ function CreateCollectionJob(props: {
       dataset_id: datasetId,
       operation,
       input_method: inputMethod,
-      start_date: null,
-      end_date: null,
+      start_date: inputMethod === "collector" && operation === "repair" ? startDate : null,
+      end_date: inputMethod === "collector" && operation === "repair" ? endDate : null,
       collector_key: null,
       parameters,
     };
@@ -733,11 +735,11 @@ function CreateCollectionJob(props: {
         <div className="section-number">01</div><div className="section-intro"><h2>任务目标</h2><p>确定目标数据集以及本次任务的处理目的。</p></div>
         <div className="form-content">
           <div className="form-grid two-columns no-margin">
-            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); const nextPurposes = next?.collection_bindings.map((item) => item.purpose) ?? []; setDatasetId(event.target.value); if (inputMethod === "collector" && !nextPurposes.includes(operation) && nextPurposes.length) setOperation(nextPurposes[0]); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
+            <label className="input-field"><span>数据集<b>*</b></span><select value={datasetId} onChange={(event) => { const next = props.datasets.find((item) => item.id === event.target.value); const nextPurposes = next ? collectorPurposes(next) : []; setDatasetId(event.target.value); if (inputMethod === "collector" && !nextPurposes.includes(operation) && nextPurposes.length) setOperation(nextPurposes[0]); }}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.display_name} · {dataset.id}</option>)}</select></label>
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod !== "collector" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{selectedCollectorOperation.description}</span></div>{selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
+          {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{operation === "repair" ? "使用该采集器重新获取指定交易日，并以新 delta 替换当前逻辑分区。" : selectedCollectorOperation.description}</span></div>{operation === "repair" ? <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /><small>修复单日时，开始和结束选择同一天。</small></label></div> : selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
         </div>
       </section>
 
@@ -767,6 +769,21 @@ function CreateCollectionJob(props: {
       </section>
     </form>
   );
+}
+
+function resolveCollectorBinding(dataset: DatasetSummary, purpose: CollectionOperation) {
+  const exact = dataset.collection_bindings.find((binding) => binding.purpose === purpose);
+  if (exact || purpose !== "repair" || !dataset.storage_policy?.logical_partition_field) return exact;
+  return dataset.collection_bindings.find((binding) => binding.purpose === "incremental")
+    ?? dataset.collection_bindings.find((binding) => binding.purpose === "initial");
+}
+
+function collectorPurposes(dataset: DatasetSummary): CollectionOperation[] {
+  const purposes = dataset.collection_bindings.map((binding) => binding.purpose);
+  if (dataset.storage_policy?.logical_partition_field && resolveCollectorBinding(dataset, "repair")) {
+    purposes.push("repair");
+  }
+  return [...new Set(purposes)];
 }
 
 function CollectorParameterInput(props: {
