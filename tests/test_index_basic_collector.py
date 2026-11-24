@@ -13,7 +13,16 @@ def test_index_basic_collects_every_market_and_normalizes_contract(
 ) -> None:
     requested: list[str] = []
 
-    def fake_call(_token: str, market: str, _fields: list[str]) -> list[dict]:
+    def fake_call(
+        _token: str,
+        market: str,
+        _fields: list[str],
+        *,
+        offset: int,
+        limit: int,
+    ) -> list[dict]:
+        assert offset == 0
+        assert limit == index_basic.PAGE_LIMIT
         requested.append(market)
         return [
             {
@@ -50,12 +59,59 @@ def test_index_basic_collects_every_market_and_normalizes_contract(
     assert table.column("list_date")[0].as_py() == date(2001, 1, 1)
 
 
+def test_index_basic_paginates_full_market_pages(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(index_basic, "PAGE_LIMIT", 2)
+    offsets: list[int] = []
+
+    def fake_call(
+        _token: str,
+        _market: str,
+        _fields: list[str],
+        *,
+        offset: int,
+        limit: int,
+    ) -> list[dict]:
+        offsets.append(offset)
+        rows = [
+            {"ts_code": "000001.SH", "name": "一"},
+            {"ts_code": "000002.SH", "name": "二"},
+            {"ts_code": "000003.SH", "name": "三"},
+        ]
+        return rows[offset : offset + limit]
+
+    monkeypatch.setattr(index_basic, "call_api", fake_call)
+    fields = [
+        {
+            "name": "ts_code",
+            "source_name": "ts_code",
+            "data_type": "string",
+            "nullable": False,
+        },
+        {
+            "name": "name",
+            "source_name": "name",
+            "data_type": "string",
+            "nullable": False,
+        },
+    ]
+    result = index_basic.collect(
+        CollectionContext("run", tmp_path / "staging", "token"), fields, markets=("SSE",)
+    )
+
+    assert offsets == [0, 2]
+    assert result.outputs[index_basic.DATASET_ID][0].row_count == 3
+
+
 def test_index_basic_preset_is_complete() -> None:
     preset = next(
         item.contract for item in DATASET_PRESETS if item.contract.id == index_basic.DATASET_ID
     )
     assert preset.instrument == "index"
     assert preset.storage_policy.layout == "snapshot"
+    nullable = {field.name: field.nullable for field in preset.fields}
+    assert nullable["base_date"] is True
+    assert nullable["base_point"] is True
+    assert nullable["list_date"] is True
     assert [field.name for field in preset.fields] == [
         "ts_code",
         "name",

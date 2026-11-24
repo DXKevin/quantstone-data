@@ -313,6 +313,19 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             )
         )
 
+        # index_basic 官方文档把基期、基点和发布日期标为必选，但真实历史记录存在空值。
+        # 仅在尚未发布任何分区时放宽初始契约，避免修改已有数据集的实质契约。
+        connection.execute(
+            text(
+                "UPDATE dataset_fields SET nullable = 1 WHERE name IN "
+                "('base_date', 'base_point', 'list_date') AND schema_version_id IN ("
+                "SELECT s.id FROM dataset_schema_versions s "
+                "WHERE s.dataset_id = 'tushare.cn.index.index_basic'"
+                ") AND NOT EXISTS (SELECT 1 FROM catalog_partitions p "
+                "WHERE p.dataset_id = 'tushare.cn.index.index_basic')"
+            )
+        )
+
         partition_columns = {
             row[1] for row in connection.execute(text("PRAGMA table_info(catalog_partitions)"))
         }

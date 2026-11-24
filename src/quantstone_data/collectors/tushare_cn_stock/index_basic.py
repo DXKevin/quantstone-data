@@ -12,16 +12,24 @@ from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.index.index_basic"
 MARKETS = ("MSCI", "CSI", "SSE", "SZSE", "CICC", "SW", "OTH")
+PAGE_LIMIT = 8000
 
 
-def call_api(token: str, market: str, fields: list[str]) -> list[dict]:
+def call_api(
+    token: str,
+    market: str,
+    fields: list[str],
+    *,
+    offset: int = 0,
+    limit: int = PAGE_LIMIT,
+) -> list[dict]:
     body = post_json(
         "tushare",
         load_api_url(),
         {
             "api_name": "index_basic",
             "token": token,
-            "params": {"market": market},
+            "params": {"market": market, "offset": offset, "limit": limit},
             "fields": ",".join(fields),
         },
     )
@@ -44,10 +52,25 @@ def collect(
     source_fields = [item.get("source_name") or item["name"] for item in field_contracts]
     by_code: dict[str, dict] = {}
     for market in markets:
-        for row in call_api(context.token, market, source_fields):
-            ts_code = row.get("ts_code")
-            if ts_code:
-                by_code[str(ts_code)] = row
+        offset = 0
+        while True:
+            page = call_api(
+                context.token,
+                market,
+                source_fields,
+                offset=offset,
+                limit=PAGE_LIMIT,
+            )
+            before = len(by_code)
+            for row in page:
+                ts_code = row.get("ts_code")
+                if ts_code:
+                    by_code[str(ts_code)] = row
+            if len(page) < PAGE_LIMIT:
+                break
+            if len(by_code) == before:
+                raise RuntimeError(f"TuShare index_basic {market} 分页未前进")
+            offset += PAGE_LIMIT
 
     normalized = [
         {
