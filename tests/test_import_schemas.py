@@ -1,3 +1,4 @@
+from quantstone_data.collection_schemas import CollectionJobStatus
 from quantstone_data.import_schemas import ImportJobCreate
 
 
@@ -11,3 +12,6 @@ def test_directory_import_purpose_defaults_to_initial_and_accepts_repair() -> No
 
     assert ImportJobCreate(**common).purpose.value == "initial"
     assert ImportJobCreate(**common, purpose="repair").purpose.value == "repair"
+    assert CollectionJobStatus.SCANNING.value == "scanning"
+    assert CollectionJobStatus.REVIEW_READY.value == "review_ready"
+    assert CollectionJobStatus.IMPORTING.value == "importing"

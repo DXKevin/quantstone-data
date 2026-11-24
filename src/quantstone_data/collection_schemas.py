@@ -20,6 +20,9 @@ class InputMethod(StrEnum):
 
 class CollectionJobStatus(StrEnum):
     CREATED = "created"
+    SCANNING = "scanning"
+    REVIEW_READY = "review_ready"
+    IMPORTING = "importing"
     QUEUED = "queued"
     RUNNING = "running"
     CANCELLING = "cancelling"

@@ -6,6 +6,9 @@ export type CollectionPurpose = CollectionOperation;
 export type CollectionInputMethod = "collector" | "file_import" | "directory_import";
 export type CollectionJobStatus =
   | "created"
+  | "scanning"
+  | "review_ready"
+  | "importing"
   | "queued"
   | "running"
   | "cancelling"

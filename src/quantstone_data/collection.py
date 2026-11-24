@@ -114,6 +114,8 @@ def recover_interrupted_jobs(session: Session) -> int:
                         CollectionJobStatus.RUNNING.value,
                         CollectionJobStatus.QUEUED.value,
                         CollectionJobStatus.CANCELLING.value,
+                        CollectionJobStatus.SCANNING.value,
+                        CollectionJobStatus.IMPORTING.value,
                     )
                 )
             )
@@ -1200,14 +1202,26 @@ def delete_collection_job(
         CollectionJobStatus.QUEUED.value,
         CollectionJobStatus.RUNNING.value,
         CollectionJobStatus.CANCELLING.value,
+        CollectionJobStatus.SCANNING.value,
+        CollectionJobStatus.IMPORTING.value,
     }:
         raise HTTPException(status_code=409, detail="请先取消正在执行的任务")
 
     dataset_id = job.dataset_id
+    import_job = session.scalar(
+        select(ImportJob).where(ImportJob.collection_job_id == job_id)
+    )
     session.execute(delete(CollectionRun).where(CollectionRun.job_id == job_id))
+    if import_job is not None:
+        session.delete(import_job)
     session.delete(job)
     session.commit()
     shutil.rmtree(request.app.state.data_root / "staging" / job_id, ignore_errors=True)
+    if import_job is not None:
+        shutil.rmtree(
+            request.app.state.data_root / "imports" / "jobs" / import_job.id,
+            ignore_errors=True,
+        )
     log_event(
         "collection_job_deleted",
         job_id=job_id,

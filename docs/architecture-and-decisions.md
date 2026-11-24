@@ -421,10 +421,11 @@ created → scanning → review_ready → importing → succeeded/failed
 ```
 
 产品界面不单独暴露“目录导入”模块。用户在“创建采集任务”中选择“服务器目录”，填写扫描器、
-源目录、移动/复制方式和可选日期范围；扫描中与待确认的 ImportJob 显示在采集任务页，确认后
-生成 CollectionJob，并沿用统一的任务明细、审核报告和发布记录。后端保留 ImportJob 作为内部
-扫描快照，因为 Manifest、扫描确认与 Collection Run 的职责不同；这属于稳定的数据模型，不是
-等待再次合并的临时结构。目录任务目的会传入最终 CollectionJob，不再一律记录为首次采集。
+源目录、移动/复制方式和可选日期范围。创建时立即同时建立 CollectionJob 与内部 ImportJob；
+CollectionJob 在统一任务表中依次显示 `scanning → review_ready → importing → succeeded/failed`，
+确认导入、取消、扫描清单、执行明细和审核报告都从这条任务记录操作。后端保留 ImportJob 作为
+Manifest 扫描快照，因为它与 Collection Run 职责不同；它不再有独立产品列表。目录任务目的会
+传入 CollectionJob，不再一律记录为首次采集。
 
 扫描阶段按交易日期目录识别 `l2_order.parquet` / `l2_trade.parquet`，检查 Parquet Schema、
 行数、分区日期和契约要求的非空字段，生成不可变清单 `imports/jobs/<job_id>/manifest.json`。

@@ -104,16 +104,25 @@ def _summary(entries: list[dict]) -> dict:
     return {"files": len(entries), **counts}
 
 
+def _collection_job(session: Session, job: ImportJob) -> CollectionJob | None:
+    return session.get(CollectionJob, job.collection_job_id) if job.collection_job_id else None
+
+
 def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
     with session_factory() as session:
         job = session.get(ImportJob, job_id)
         if job is None:
             return
+        collection_job = _collection_job(session, job)
         if job.id in _CANCEL_REQUESTS:
             job.status = ImportJobStatus.CANCELLED.value
+            if collection_job is not None:
+                collection_job.status = "cancelled"
             session.commit()
             return
         job.status = ImportJobStatus.SCANNING.value
+        if collection_job is not None:
+            collection_job.status = "scanning"
         session.commit()
         try:
             dataset = session.get(Dataset, job.dataset_id)
@@ -198,6 +207,8 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
                 entries.append(entry)
                 if job.id in _CANCEL_REQUESTS:
                     job.status = ImportJobStatus.CANCELLED.value
+                    if collection_job is not None:
+                        collection_job.status = "cancelled"
                     session.commit()
                     return
             summary = _summary(entries)
@@ -218,15 +229,32 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
                 if summary["duplicates"] > 0 and summary["invalid"] == 0:
                     job.status = ImportJobStatus.SUCCEEDED.value
                     job.error = None
+                    if collection_job is not None:
+                        collection_job.status = "succeeded"
                 else:
                     job.status = ImportJobStatus.FAILED.value
                     job.error = "扫描完成，但没有可导入的新文件"
+                    if collection_job is not None:
+                        collection_job.status = "failed"
+                        collection_job.error = job.error
             else:
                 job.status = ImportJobStatus.REVIEW_READY.value
                 job.error = None
+                if collection_job is not None:
+                    ready = [item for item in entries if item["status"] == "ready"]
+                    dates = [date.fromisoformat(item["partition_key"]) for item in ready]
+                    collection_job.status = "review_ready"
+                    collection_job.start_date = min(dates)
+                    collection_job.end_date = max(dates)
+                    collection_job.staged_path = write_collection_review(
+                        data_root,
+                        collection_job.id,
+                        build_directory_import_review(dataset.id, manifest),
+                    )
             session.commit()
             log_event(
                 "import_scan_completed",
+                job_id=collection_job.id if collection_job else None,
                 import_job_id=job.id,
                 dataset_id=job.dataset_id,
                 summary=summary,
@@ -237,10 +265,15 @@ def _scan_job(job_id: str, session_factory, data_root: Path) -> None:
             if job is not None:
                 job.status = ImportJobStatus.FAILED.value
                 job.error = str(error) or error.__class__.__name__
+                collection_job = _collection_job(session, job)
+                if collection_job is not None:
+                    collection_job.status = "failed"
+                    collection_job.error = job.error
                 session.commit()
             log_event(
                 "import_scan_failed",
                 level=40,
+                job_id=collection_job.id if collection_job else None,
                 import_job_id=job_id,
                 error=str(error),
                 exc_info=True,
@@ -334,15 +367,19 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
         job = session.get(ImportJob, job_id)
         if job is None or job.status != ImportJobStatus.REVIEW_READY.value:
             return
+        collection_job = _collection_job(session, job)
         if job.id in _CANCEL_REQUESTS:
             job.status = ImportJobStatus.CANCELLED.value
+            if collection_job is not None:
+                collection_job.status = "cancelled"
             session.commit()
             return
         with _IMPORT_LOCK:
             _RUNNING_IMPORTS.add(job.id)
         job.status = ImportJobStatus.IMPORTING.value
+        if collection_job is not None:
+            collection_job.status = "importing"
         session.commit()
-        collection_job: CollectionJob | None = None
         try:
             dataset = session.get(Dataset, job.dataset_id)
             if dataset is None:
@@ -354,28 +391,8 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
             ready = [item for item in manifest["files"] if item["status"] == "ready"]
             if not ready:
                 raise ValueError("清单中没有可导入文件")
-            dates = [date.fromisoformat(item["partition_key"]) for item in ready]
-            collection_job = CollectionJob(
-                id=str(uuid4()),
-                dataset_id=dataset.id,
-                operation=str(job.parameters.get("purpose") or "initial"),
-                input_method="directory_import",
-                status="running",
-                start_date=min(dates),
-                end_date=max(dates),
-                collector_key=job.scanner_key,
-                collector_operation=job.operation,
-                parameters={"import_job_id": job.id},
-            )
-            collection_job.staged_path = write_collection_review(
-                data_root,
-                collection_job.id,
-                build_directory_import_review(dataset.id, manifest),
-            )
-            session.add(collection_job)
-            session.commit()
-            job.collection_job_id = collection_job.id
-            session.commit()
+            if collection_job is None:
+                raise ValueError("目录导入缺少关联采集任务")
 
             imported = 0
             rows = 0
@@ -386,6 +403,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
                     session.commit()
                     log_event(
                         "import_job_cancelled",
+                        job_id=collection_job.id,
                         import_job_id=job.id,
                         collection_job_id=collection_job.id,
                     )
@@ -402,6 +420,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
                 session.commit()
                 log_event(
                     "import_partition_published",
+                    job_id=collection_job.id,
                     import_job_id=job.id,
                     collection_job_id=collection_job.id,
                     dataset_id=dataset.id,
@@ -418,6 +437,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
             session.commit()
             log_event(
                 "import_job_completed",
+                job_id=collection_job.id,
                 import_job_id=job.id,
                 collection_job_id=collection_job.id,
                 dataset_id=dataset.id,
@@ -439,6 +459,7 @@ def _run_import(job_id: str, session_factory, data_root: Path) -> None:
             log_event(
                 "import_job_failed",
                 level=40,
+                job_id=collection_job.id if collection_job else None,
                 import_job_id=job_id,
                 error=str(error),
                 exc_info=True,
@@ -465,6 +486,10 @@ def recover_interrupted_import_jobs(session: Session) -> int:
     for job in jobs:
         job.status = ImportJobStatus.FAILED.value
         job.error = "应用重启时导入任务尚未完成，已标记为失败；请重新扫描。"
+        collection_job = _collection_job(session, job)
+        if collection_job is not None:
+            collection_job.status = "failed"
+            collection_job.error = job.error
     if jobs:
         session.commit()
     return len(jobs)
@@ -521,8 +546,10 @@ def create_import_job(
     source_root = _resolve_source_root(
         request.app.state.data_root, payload.source_root
     )
+    import_job_id = str(uuid4())
+    collection_job_id = str(uuid4())
     job = ImportJob(
-        id=str(uuid4()),
+        id=import_job_id,
         dataset_id=dataset.id,
         scanner_key=payload.scanner_key,
         operation=payload.operation,
@@ -534,8 +561,21 @@ def create_import_job(
             "purpose": payload.purpose.value,
         },
         status=ImportJobStatus.CREATED.value,
+        collection_job_id=collection_job_id,
     )
-    session.add(job)
+    collection_job = CollectionJob(
+        id=collection_job_id,
+        dataset_id=dataset.id,
+        operation=payload.purpose.value,
+        input_method="directory_import",
+        status="scanning",
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        collector_key=payload.scanner_key,
+        collector_operation=payload.operation,
+        parameters={"import_job_id": import_job_id},
+    )
+    session.add_all((job, collection_job))
     session.commit()
     session.refresh(job)
     try:
@@ -552,10 +592,13 @@ def create_import_job(
     except RuntimeError as error:
         job.status = ImportJobStatus.FAILED.value
         job.error = "后台任务执行器不可用"
+        collection_job.status = "failed"
+        collection_job.error = job.error
         session.commit()
         raise HTTPException(status_code=503, detail=job.error) from error
     log_event(
         "import_job_created",
+        job_id=collection_job.id,
         import_job_id=job.id,
         dataset_id=job.dataset_id,
         scanner_key=job.scanner_key,
@@ -625,7 +668,11 @@ def execute_import_job(
         )
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail="后台任务执行器不可用") from error
-    log_event("import_job_execute_requested", import_job_id=job.id)
+    log_event(
+        "import_job_execute_requested",
+        job_id=job.collection_job_id,
+        import_job_id=job.id,
+    )
     return serialize_job(job)
 
 
@@ -650,8 +697,19 @@ def cancel_import_job(
         job.status = ImportJobStatus.CANCELLED.value
     else:
         job.status = ImportJobStatus.CANCELLING.value
+    collection_job = _collection_job(session, job)
+    if collection_job is not None:
+        collection_job.status = (
+            "cancelled"
+            if job.status == ImportJobStatus.CANCELLED.value
+            else "cancelling"
+        )
     session.commit()
-    log_event("import_job_cancel_requested", import_job_id=job.id)
+    log_event(
+        "import_job_cancel_requested",
+        job_id=job.collection_job_id,
+        import_job_id=job.id,
+    )
     return serialize_job(job)
 
 

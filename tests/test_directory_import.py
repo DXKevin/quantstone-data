@@ -119,8 +119,15 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         )
         assert created.status_code == 202, created.text
         job_id = created.json()["id"]
+        collection_job_id = created.json()["collection_job_id"]
+        assert collection_job_id
         ready = _wait_status(client, job_id, {"review_ready"})
         assert ready["summary"]["ready"] == 1
+        pending_collection = client.get(
+            f"/api/v1/collection-jobs/{collection_job_id}"
+        )
+        assert pending_collection.status_code == 200
+        assert pending_collection.json()["status"] == "review_ready"
 
         manifest = client.get(f"/api/v1/import-jobs/{job_id}/manifest")
         assert manifest.status_code == 200
@@ -130,7 +137,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
         assert executed.status_code == 200
         completed = _wait_status(client, job_id, {"succeeded", "failed"})
         assert completed["status"] == "succeeded", completed["error"]
-        assert completed["collection_job_id"]
+        assert completed["collection_job_id"] == collection_job_id
 
         partitions = client.get(
             f"/api/v1/catalog/partitions?dataset_id={ORDER_ID}"

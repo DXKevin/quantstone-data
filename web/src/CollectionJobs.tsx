@@ -4,10 +4,12 @@ import {
   Ban,
   CheckCircle2,
   Clock3,
+  FileScan,
   FolderInput,
   FileUp,
   Plus,
   RefreshCw,
+  ShieldCheck,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -25,9 +27,10 @@ import {
   type CollectionReview,
   type CollectionRun,
   type DatasetSummary,
+  type ImportJob,
+  type ImportManifest,
   type ScannerDefinition,
 } from "./api";
-import ImportJobs from "./ImportJobs";
 
 const operationLabels: Record<CollectionOperation, string> = {
   initial: "首次采集",
@@ -44,6 +47,9 @@ const inputLabels: Record<string, string> = {
 
 const statusLabels = {
   created: "已创建",
+  scanning: "扫描中",
+  review_ready: "待确认",
+  importing: "导入中",
   queued: "排队中",
   running: "执行中",
   cancelling: "正在取消",
@@ -75,6 +81,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   onJobRequestHandled?: () => void;
 }) {
   const [jobs, setJobs] = useState<CollectionJob[]>([]);
+  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
   const [jobTotal, setJobTotal] = useState(0);
   const [jobPage, setJobPage] = useState(0);
   const jobLimit = 20;
@@ -94,6 +101,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   const [logLevel, setLogLevel] = useState("ALL");
   const [progress, setProgress] = useState<Record<string, CollectionProgress>>({});
   const [review, setReview] = useState<{ jobId: string; data: CollectionReview } | null>(null);
+  const [directoryManifest, setDirectoryManifest] = useState<{ jobId: string; data: ImportManifest } | null>(null);
   const jobsRef = useRef<CollectionJob[]>([]);
   const activeDatasets = useMemo(
     () => datasets.filter((dataset) => dataset.status === "active"),
@@ -111,12 +119,13 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
       setError(null);
     }
     try {
-      const data = await api.listCollectionJobs({
-        limit: jobLimit,
-        offset: page * jobLimit,
-      });
+      const [data, imports] = await Promise.all([
+        api.listCollectionJobs({ limit: jobLimit, offset: page * jobLimit }),
+        api.listImportJobs(),
+      ]);
       setJobs(data.items);
       setJobTotal(data.total);
+      setImportJobs(imports);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载采集任务");
     } finally {
@@ -152,7 +161,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
   }, [jobs]);
 
   const hasRunning = jobs.some(
-    (job) => job.status === "queued" || job.status === "running" || job.status === "cancelling",
+    (job) => ["queued", "running", "scanning", "importing", "cancelling"].includes(job.status),
   ) || runningJobId !== null;
 
   useEffect(() => {
@@ -161,7 +170,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
 
     async function poll() {
       const running = jobsRef.current.filter(
-        (job) => job.status === "queued" || job.status === "running" || job.status === "cancelling",
+        (job) => ["queued", "running", "scanning", "importing", "cancelling"].includes(job.status),
       );
       const entries = await Promise.all(
         running.map(async (job) => {
@@ -299,6 +308,40 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     }
   }
 
+  async function showDirectoryManifest(importJob: ImportJob) {
+    setError(null);
+    try {
+      setDirectoryManifest({ jobId: importJob.collection_job_id ?? importJob.id, data: await api.getImportManifest(importJob.id) });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法读取目录扫描清单");
+    }
+  }
+
+  async function executeDirectoryImport(importJob: ImportJob) {
+    setRunningJobId(importJob.collection_job_id ?? importJob.id);
+    setError(null);
+    try {
+      await api.executeImportJob(importJob.id);
+      setNotice("目录导入已提交，后台正在发布分区。");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "提交目录导入失败");
+    } finally {
+      setRunningJobId(null);
+      await loadJobs(true, jobPage);
+    }
+  }
+
+  async function cancelDirectoryImport(importJob: ImportJob) {
+    setError(null);
+    try {
+      await api.cancelImportJob(importJob.id);
+      setNotice("已请求取消目录任务。");
+      await loadJobs(true, jobPage);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "取消目录任务失败");
+    }
+  }
+
   async function cancelJob(job: CollectionJob) {
     if (confirming !== `${job.id}:cancel`) {
       setConfirming(`${job.id}:cancel`);
@@ -406,15 +449,34 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
           </div>}
         </section>
       )}
+      {directoryManifest && (
+        <section className="review-report">
+          <div className="review-summary">
+            <div><strong>目录扫描清单</strong><span>任务 {directoryManifest.jobId.slice(0, 8)}</span></div>
+            <div><span>文件</span><strong>{directoryManifest.data.files.length.toLocaleString()}</strong></div>
+            <div><span>可导入</span><strong>{Number(directoryManifest.data.summary.ready ?? 0).toLocaleString()}</strong></div>
+            <div><span>异常</span><strong>{Number(directoryManifest.data.summary.invalid ?? 0).toLocaleString()}</strong></div>
+            <button type="button" className="toolbar-button" onClick={() => setDirectoryManifest(null)}>关闭</button>
+          </div>
+          <div className="import-manifest">
+            <div className="import-manifest-head"><span>最多显示前 300 个文件</span><span>源目录 {directoryManifest.data.source_root}</span></div>
+            <div className="import-file-table">
+              <div className="import-file-row import-file-head"><span>交易日</span><span>状态</span><span>行数</span><span>错误</span></div>
+              {directoryManifest.data.files.slice(0, 300).map((file) => (
+                <div className={`import-file-row import-file-${file.status}`} key={`${file.partition_key}:${file.path}`}>
+                  <code>{file.partition_key}</code>
+                  <span>{file.status === "ready" ? "可导入" : file.status === "duplicate" ? "已存在" : "校验失败"}</span>
+                  <span>{file.row_count?.toLocaleString() ?? "—"}</span>
+                  <span>{file.errors.map((item) => String(item.rule ?? item.message ?? "")).join("；")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
       {!activeDatasets.length && (
         <div className="warning-banner"><AlertCircle size={17} />请先在数据集页面启用至少一个数据集，才能创建采集任务。</div>
       )}
-
-      <ImportJobs
-        datasets={activeDatasets}
-        embedded
-        onCollectionJobsChanged={() => void loadJobs(true, 0)}
-      />
 
       <section className="panel">
         <div className="panel-toolbar">
@@ -430,10 +492,11 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
             <div className="job-row job-head"><span>数据集 / 任务</span><span>任务目的</span><span>输入方式</span><span>日期范围</span><span>文件</span><span>状态</span><span>操作</span></div>
             {jobs.map((job) => {
               const jobProgress = progress[job.id];
-              const running = job.status === "queued" || job.status === "running" || job.status === "cancelling";
+              const running = ["queued", "running", "scanning", "importing", "cancelling"].includes(job.status);
               const expanded = expandedJobId === job.id;
               const jobRuns = runs[job.id] ?? [];
               const jobLogs = logs[job.id] ?? [];
+              const importJob = importJobs.find((item) => item.collection_job_id === job.id);
               return (
               <div className="job-block" key={job.id} id={`job-${job.id}`}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
@@ -451,8 +514,10 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                 <span className="job-actions" onClick={(event) => event.stopPropagation()}>
                   {job.input_method === "collector" && job.status === "created" && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeJob(job)}>{runningJobId === job.id ? <RefreshCw size={14} className="spin" /> : <RefreshCw size={14} />}{runningJobId === job.id ? "提交中…" : "执行采集"}</button>}
                   {job.input_method === "collector" && (job.status === "failed" || job.status === "review_failed" || job.status === "cancelled") && <button type="button" className="mini-upload-button" disabled={retryingJobId === job.id} onClick={() => void retryJob(job)}><RefreshCw size={14} className={retryingJobId === job.id ? "spin" : ""} />{retryingJobId === job.id ? "重试中…" : "重试"}</button>}
-                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void cancelJob(job)}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : job.status === "queued" ? "取消排队" : "取消"}</button>}
-                  {(job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
+                  {job.input_method === "directory_import" && job.status === "review_ready" && importJob && <button type="button" className="mini-upload-button" disabled={runningJobId === job.id} onClick={() => void executeDirectoryImport(importJob)}><ShieldCheck size={14} />确认导入</button>}
+                  {job.input_method === "directory_import" && importJob?.manifest_path && <button type="button" className="mini-upload-button" onClick={() => void showDirectoryManifest(importJob)}><FileScan size={14} />扫描清单</button>}
+                  {running && <button type="button" className="mini-upload-button danger-mini" disabled={job.status === "cancelling"} onClick={() => void (job.input_method === "directory_import" && importJob ? cancelDirectoryImport(importJob) : cancelJob(job))}><Ban size={14} />{job.status === "cancelling" ? "取消中…" : confirming === `${job.id}:cancel` ? "确认取消" : job.status === "queued" ? "取消排队" : "取消"}</button>}
+                  {job.staged_path && (job.status === "review_ready" || job.status === "review_passed" || job.status === "review_failed" || job.status === "succeeded") && <button type="button" className="mini-upload-button" onClick={() => void showReview(job)}>查看审核</button>}
                   {!running && <button type="button" className={confirming === `${job.id}:delete` ? "mini-upload-button danger-mini" : "mini-upload-button quiet-mini"} onClick={() => void deleteJob(job)}><Trash2 size={14} />{confirming === `${job.id}:delete` ? "确认删除" : "删除"}</button>}
                 </span>
               </div>
