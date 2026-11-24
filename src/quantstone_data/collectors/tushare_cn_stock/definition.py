@@ -98,6 +98,16 @@ OPERATIONS = (
         retry=INDEX_DAILY_RETRY,
     ),
     CollectorOperation(
+        key="index_daily_repair",
+        name="指数日线修复",
+        description="按年批量重新拉取指定日期范围的主要指数日线，替换受影响分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(INDEX_DAILY_DATASET_ID,),
+        function=collect_index_daily_initial,
+        retry=INDEX_DAILY_RETRY,
+    ),
+    CollectorOperation(
         key="adj_factor_initial",
         name="复权因子首次采集",
         description="按交易日首次采集 TuShare adj_factor 历史数据。",

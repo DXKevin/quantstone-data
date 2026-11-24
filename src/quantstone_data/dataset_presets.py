@@ -220,6 +220,12 @@ DATASET_PRESETS = (
                     "operation": "index_daily_incremental",
                     "parameters": {},
                 },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tushare_cn_stock",
+                    "operation": "index_daily_repair",
+                    "parameters": {},
+                },
             ],
             storage_policy={
                 "logical_partition_field": "trade_date",

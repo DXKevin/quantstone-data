@@ -410,6 +410,24 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 ),
                 {"dataset_id": dataset_id, "bindings": bindings},
             )
+        index_daily_bindings = (
+            '[{"purpose":"initial","collector_key":"tushare_cn_stock",'
+            '"operation":"index_daily_initial","parameters":{}},'
+            '{"purpose":"incremental","collector_key":"tushare_cn_stock",'
+            '"operation":"index_daily_incremental","parameters":{}},'
+            '{"purpose":"repair","collector_key":"tushare_cn_stock",'
+            '"operation":"index_daily_repair","parameters":{}}]'
+        )
+        connection.execute(
+            text(
+                "UPDATE datasets SET collection_bindings = :bindings "
+                "WHERE id = :dataset_id"
+            ),
+            {
+                "dataset_id": "tushare.cn.index.index_daily",
+                "bindings": index_daily_bindings,
+            },
+        )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

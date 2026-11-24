@@ -20,7 +20,7 @@
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
 - 当前 12 个数据集均为 active：TuShare 8 个、Wind L2 2 个、中泰 L2 2 个；
-- Catalog 实际为 **13,708 个分区、194,387,796,370 行、1.99 TB**；数据根
+- Catalog 实际为 **13,729 个分区、194,387,796,601 行、1.99 TB**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - Wind 深市 L2 两个数据集各有 **173 个分区**，覆盖 `2026-03-11` 至 `2026-11-23`：
   order 23,729,127,620 行、trade 20,941,981,752 行；委托和成交已改为联合首次/增量操作；
@@ -31,9 +31,9 @@
 - `tushare.cn.index.index_basic` 已发布 1 个 snapshot、10,733 行；成功任务
   `e8c8de96-9ac9-4bfd-8555-edd6c87c005d`；旧失败任务
   `ace1fc71-0161-4265-8da1-537e9c6bf74c` 是修复前记录，保留即可，不要重试覆盖；
-- `tushare.cn.index.index_daily` 已创建并启用，包含 13 个主要指数；当前 266 个分区、
-  2,730 行（2010-01-04 至 2026-11-23）；历史任务 `ced17ae5` 在 2011-02-11 因额度
-  错误中断，已成功的 265 个分区保留，等待修复后补跑；
+- `tushare.cn.index.index_daily` 已创建并启用，包含 13 个主要指数；当前 287 个分区、
+  2,961 行（2010-01-04 至 2026-11-23）；失败首次任务和取消的 repair 已保留分区，
+  单日 repair 已验证成功，后续从 2011-03-14 继续补；
 - Wind L2 旧单输出任务留下的 `2026-11-20/2026-11-23` trade 缺口已由联合修复任务
   `bf8a1c1c` 补齐，压缩包和解压缓存已清理，`downloads/wind_l2` 复核占用为 0；
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
@@ -88,8 +88,8 @@
 - 新增预置数据集 `tushare.cn.index.index_daily`，包含 13 个主要指数，主键
   `ts_code + trade_date`，日分区、`yearly_with_delta`、年度合并；
 - 新增 `index_daily_initial` / `index_daily_incremental` 采集操作；
-- 首次采集按年拉取（非 CSI 一批 + CSI 逐个，每年 3 次），进程内按年缓存后逐日写分区；
-  增量才按交易日调用一次；清单中
+- 首次和 repair 都按年拉取（非 CSI 一批 + CSI 逐个，每年 3 次），进程内按年缓存后
+  逐日写分区；增量才按交易日调用一次；清单中
   `start_date` 之前的指数自动跳过，不参与当天校验；到达 `start_date` 后缺失才失败；
 - 指数清单在 `src/quantstone_data/collectors/tushare_cn_stock/index_daily_universe.json`，
   包含 `ts_code/name/start_date`；`start_date` 已按 `index_daily` 实际最早交易日探测
@@ -97,7 +97,8 @@
   采用 `index_basic` 的基日/发布日；新增指数只改 JSON；
 - 新增 `tushare.cn.index.index_daily` 审核器，检查 Schema、主键、分区日期和 OHLC；
 - 真实接口测试：`2026-11-23` 返回并发布 13 行；
-- 定向测试 18 项通过；完整套件 111 项通过，`ruff check .` 和前端构建通过。
+- 定向测试 18 项通过；完整套件 111 项通过，`ruff check .` 和前端构建通过；
+- 新增显式 `index_daily_repair` 操作和 repair 绑定，repair 不再回退到增量。
 
 下一步：
 
