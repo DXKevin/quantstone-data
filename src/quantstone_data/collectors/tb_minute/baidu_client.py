@@ -76,35 +76,6 @@ def _list_shared(api, path: str, uk: int, share_id: int, token: str) -> list:
         page += 1
 
 
-def _raw_list(api, path: str) -> list[dict]:
-    try:
-        from baidupcs_py.baidupcs.pcs import Method, PcsNode
-    except ImportError as error:
-        raise RuntimeError("缺少 BaiduPCS-Py") from error
-    response = api._baidupcs._request(
-        Method.Get,
-        PcsNode.File.url(),
-        params={
-            "method": "list",
-            "by": "name",
-            "limit": "0-1000",
-            "order": "asc",
-            "path": path,
-        },
-    )
-    return response.json().get("list", [])
-
-
-def clear_transfer_root() -> None:
-    """清空临时转存目录，只保留空目录本身。"""
-    api = _api()
-    root = _load_setting("MINUTE_TRANSFER_ROOT") or "/quant-data/A股分钟数据"
-    if not api.exists(root):
-        api.makedir(root)
-        return
-    for item in _raw_list(api, root):
-        api.remove(item["path"])
-
 
 def _download_own(remote_path: str, target: Path) -> Path:
     try:
@@ -148,8 +119,10 @@ def _download_own(remote_path: str, target: Path) -> Path:
     return target
 
 
-def fetch_shared_file(relative_path: str, target: Path) -> Path:
-    """只转存一个分享文件到临时目录，下载后删除该转存文件。"""
+def fetch_shared_file(relative_path: str, target: Path, folder: str) -> Path:
+    """把分享中的单个文件转存到年数据/日数据目录，下载后保留转存文件。"""
+    if folder not in {"年数据", "日数据"}:
+        raise ValueError(f"不支持的转存目录：{folder}")
     api, share_url, data = _share()
     uk = int(data["share_uk"])
     share_id = int(data["shareid"])
@@ -169,17 +142,18 @@ def fetch_shared_file(relative_path: str, target: Path) -> Path:
         raise FileNotFoundError(f"分享中不存在文件：{relative_path}")
 
     transfer_root = _load_setting("MINUTE_TRANSFER_ROOT") or "/quant-data/A股分钟数据"
-    if not api.exists(transfer_root):
-        api.makedir(transfer_root)
-    remote_path = transfer_root.rstrip("/") + "/" + name
-    if api.exists(remote_path):
-        api.remove(remote_path)
-    api.transfer_shared_paths(
-        transfer_root, [source.fs_id], uk, share_id, token, share_url
-    )
-    try:
-        _download_own(remote_path, target)
-    finally:
+    remote_dir = transfer_root.rstrip("/") + "/" + folder
+    if not api.exists(remote_dir):
+        api.makedir(remote_dir)
+    remote_path = remote_dir + "/" + name
+    existing = api.meta(remote_path)
+    if existing and existing[0].is_file and existing[0].size == source.size:
+        pass
+    else:
         if api.exists(remote_path):
             api.remove(remote_path)
+        api.transfer_shared_paths(
+            remote_dir, [source.fs_id], uk, share_id, token, share_url
+        )
+    _download_own(remote_path, target)
     return target

@@ -72,10 +72,10 @@ def _cache_root(context: CollectionContext) -> Path:
     return Path(root) / "cache" / CACHE_ROOT_NAME
 
 
-def _download(relative_path: str, target: Path) -> Path:
-    """只把当前分享文件转存到临时目录，下载后删除该转存文件。"""
+def _download(relative_path: str, target: Path, folder: str) -> Path:
+    """把分享文件转存到年数据/日数据目录，下载后保留转存文件。"""
     target.parent.mkdir(parents=True, exist_ok=True)
-    return baidu_client.fetch_shared_file(relative_path, target)
+    return baidu_client.fetch_shared_file(relative_path, target, folder)
 
 
 def _extract(zip_path: Path, target_dir: Path) -> Path:
@@ -171,7 +171,7 @@ def _ensure_year_cache(context: CollectionContext, year: int) -> Path:
                 _remove_tree(old)
         zip_path = year_dir / f"{year}_1min.zip"
         if not zip_path.is_file():
-            _download(f"{ANNUAL_ROOT}/{year}_1min.zip", zip_path)
+            _download(f"{ANNUAL_ROOT}/{year}_1min.zip", zip_path, "年数据")
         return _build_year_partitions(zip_path, year_dir)
 
 
@@ -287,7 +287,7 @@ def collect_incremental(
     day = date.fromisoformat(trade_date)
     remote = f"{DAILY_ROOT}/{day:%Y-%m}/{day:%Y%m%d}_1min.zip"
     zip_path = context.staging_dir / f"{day:%Y%m%d}_1min.zip"
-    _download(remote, zip_path)
+    _download(remote, zip_path, "日数据")
     artifact = _build_daily_artifact(context, zip_path, trade_date)
     return CollectionResult(
         outputs={DATASET_ID: [artifact]},
