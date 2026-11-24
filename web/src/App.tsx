@@ -1208,7 +1208,7 @@ function DatasetMaintenance({ dataset }: { dataset: DatasetDetail }) {
   return (
     <section className="panel maintenance-panel">
       <div className="card-title">
-        <div><h2>年度数据合并</h2><p>将该年度的日增量 Parquet 合并为一个年度文件；采集与合并共用同一后台队列。</p></div>
+        <div><h2>年度数据合并</h2><p>按 Catalog 当前有效分区重建年度文件；修复日期优先采用最新 delta，审核完成后再整体切换。</p></div>
         {active && <span><RefreshCw size={12} className="spin" />后台任务运行中</span>}
       </div>
       <div className="maintenance-controls">
@@ -1242,7 +1242,8 @@ function describeMaintenanceResult(result: Record<string, unknown> | null) {
   if (result.status === "already_compacted") return "已经是年度文件";
   const partitions = Number(result.partitions ?? 0).toLocaleString();
   const rows = Number(result.rows ?? 0).toLocaleString();
-  return `${partitions} 个分区 · ${rows} 行`;
+  const cleanupWarnings = Array.isArray(result.cleanup_warnings) ? result.cleanup_warnings.length : 0;
+  return `${partitions} 个分区 · ${rows} 行${cleanupWarnings ? ` · ${cleanupWarnings} 个旧文件待清理` : ""}`;
 }
 
 function formatMaintenanceTime(value: string) {

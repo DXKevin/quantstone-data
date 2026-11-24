@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pyarrow as pa
@@ -296,50 +298,65 @@ def compact_year(
         raise ValueError("年度合并要求数据集配置 logical_partition_field")
 
     expected_keys = {item.partition_key for item in partitions}
+    expected_rows = {item.partition_key: item.row_count for item in partitions}
     keys_by_source: dict[str, set[str]] = {}
     for item in partitions:
         keys_by_source.setdefault(item.file_path, set()).add(item.partition_key)
 
-    tables: list[pa.Table] = []
-    for path in sources:
-        source = data_root / path
-        table = pq.read_table(source)
-        if partition_field not in table.column_names:
-            raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
-        wanted = keys_by_source[path]
-        values = table[partition_field].to_pylist()
-        normalized = [
-            value.isoformat() if hasattr(value, "isoformat") else str(value)
-            for value in values
-        ]
-        filtered = table.filter([value in wanted for value in normalized])
-        present = {value for value in normalized if value in wanted}
-        if present != wanted:
-            missing = sorted(wanted - present)
-            raise ValueError(f"文件 {path} 缺少 Catalog 分区：{', '.join(missing)}")
-        tables.append(filtered)
+    snapshot = _partition_snapshot(partitions)
+    target = data_root / target_rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.tmp-{uuid4().hex}")
+    merged_rows, actual_rows = _write_year_candidate(
+        data_root=data_root,
+        sources=sources,
+        keys_by_source=keys_by_source,
+        partition_field=partition_field,
+        temporary=temporary,
+    )
 
-    merged = pa.concat_tables(tables)
-    merged_values = merged[partition_field].to_pylist()
-    merged_keys = {
-        value.isoformat() if hasattr(value, "isoformat") else str(value)
-        for value in merged_values
-    }
-    if merged_keys != expected_keys:
-        missing = sorted(expected_keys - merged_keys)
-        unexpected = sorted(merged_keys - expected_keys)
+    actual_keys = set(actual_rows)
+    if actual_keys != expected_keys:
+        temporary.unlink(missing_ok=True)
+        missing = sorted(expected_keys - actual_keys)
+        unexpected = sorted(actual_keys - expected_keys)
         raise ValueError(
             f"年度合并分区校验失败，缺少 {missing or '无'}，额外 {unexpected or '无'}"
         )
+    mismatched_rows = {
+        key: {"expected": expected_rows[key], "actual": actual_rows[key]}
+        for key in sorted(expected_keys)
+        if actual_rows[key] != expected_rows[key]
+    }
+    if mismatched_rows:
+        temporary.unlink(missing_ok=True)
+        raise ValueError(f"年度合并分区行数与 Catalog 不一致：{mismatched_rows}")
+    if not temporary.is_file():
+        raise ValueError("年度合并没有生成任何数据")
 
-    target = data_root / target_rel
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(target.name + ".tmp")
-    pq.write_table(merged, temporary, compression="zstd")
-    compacted_size = temporary.stat().st_size
-    compacted_sha256 = _sha256(temporary)
+    try:
+        compacted_size = temporary.stat().st_size
+        compacted_sha256 = _sha256(temporary)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
     with catalog_write_lock():
+        session.rollback()
+        current_partitions = list(
+            session.scalars(
+                select(CatalogPartition)
+                .where(
+                    CatalogPartition.dataset_id == dataset_id,
+                    CatalogPartition.partition_key.like(f"{prefix}%"),
+                )
+                .order_by(CatalogPartition.partition_key)
+            )
+        )
+        if _partition_snapshot(current_partitions) != snapshot:
+            temporary.unlink(missing_ok=True)
+            raise RuntimeError("年度合并期间 Catalog 分区发生变化，请重新提交合并任务")
+
         revisions = data_root / "revisions" / dataset_id / f"{year:04d}"
         revisions.mkdir(parents=True, exist_ok=True)
         previous_annual: Path | None = None
@@ -353,20 +370,136 @@ def compact_year(
                 os.replace(previous_annual, target)
             raise
 
-        file_row = upsert_file(
-            session,
-            dataset_id=dataset_id,
-            path=target_rel,
-            row_count=merged.num_rows,
-            size_bytes=compacted_size,
-            sha256=compacted_sha256,
-        )
-        for item in partitions:
-            item.file_id = file_row.id
-            item.file_path = target_rel
+        try:
+            file_row = upsert_file(
+                session,
+                dataset_id=dataset_id,
+                path=target_rel,
+                row_count=merged_rows,
+                size_bytes=compacted_size,
+                sha256=compacted_sha256,
+            )
+            for item in current_partitions:
+                item.file_id = file_row.id
+                item.file_path = target_rel
+            session.commit()
+        except Exception:
+            session.rollback()
+            target.unlink(missing_ok=True)
+            if previous_annual is not None and previous_annual.is_file():
+                os.replace(previous_annual, target)
+            raise
 
+        cleanup_warnings = _archive_compacted_sources(
+            session,
+            data_root=data_root,
+            dataset_id=dataset_id,
+            sources=[path for path in sources if path != target_rel],
+            revisions=revisions,
+        )
+
+    return {
+        "dataset_id": dataset_id,
+        "year": year,
+        "status": "compacted",
+        "partitions": len(partitions),
+        "source_files": len(sources),
+        "rows": merged_rows,
+        "path": target_rel,
+        "cleanup_warnings": cleanup_warnings,
+    }
+
+
+def _partition_snapshot(partitions: list[CatalogPartition]) -> tuple[tuple[Any, ...], ...]:
+    """记录合并输入；发布前必须逐项一致，避免覆盖并发修复。"""
+    return tuple(
+        (
+            item.partition_key,
+            item.file_id,
+            item.file_path,
+            item.row_count,
+            item.sha256,
+            item.collection_run_id,
+            item.published_at.isoformat() if item.published_at else None,
+        )
+        for item in partitions
+    )
+
+
+def _write_year_candidate(
+    *,
+    data_root: Path,
+    sources: list[str],
+    keys_by_source: dict[str, set[str]],
+    partition_field: str,
+    temporary: Path,
+) -> tuple[int, Counter[str]]:
+    """分批读取当前有效分区，避免把整个年度一次载入内存。"""
+    writer: pq.ParquetWriter | None = None
+    output_schema: pa.Schema | None = None
+    actual_rows: Counter[str] = Counter()
+    merged_rows = 0
+    try:
         for path in sources:
-            if path == target_rel:
+            parquet = pq.ParquetFile(data_root / path)
+            source_schema = parquet.schema_arrow
+            if partition_field not in source_schema.names:
+                raise ValueError(f"文件 {path} 缺少逻辑分区字段 {partition_field}")
+            if output_schema is None:
+                output_schema = source_schema
+            elif not source_schema.equals(output_schema, check_metadata=False):
+                raise ValueError(f"文件 {path} 的 Schema 与其他合并输入不一致")
+            wanted = keys_by_source[path]
+            for batch in parquet.iter_batches(batch_size=131_072):
+                table = pa.Table.from_batches([batch])
+                normalized = [
+                    value.isoformat() if hasattr(value, "isoformat") else str(value)
+                    for value in table[partition_field].to_pylist()
+                ]
+                mask = [value in wanted for value in normalized]
+                if not any(mask):
+                    continue
+                filtered = table.filter(mask)
+                filtered_keys = [
+                    value for value, keep in zip(normalized, mask, strict=True) if keep
+                ]
+                actual_rows.update(filtered_keys)
+                if writer is None:
+                    writer = pq.ParquetWriter(temporary, output_schema, compression="zstd")
+                writer.write_table(filtered)
+                merged_rows += filtered.num_rows
+        if writer is not None:
+            writer.close()
+            writer = None
+        return merged_rows, actual_rows
+    except Exception:
+        if writer is not None:
+            writer.close()
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _archive_compacted_sources(
+    session: Session,
+    *,
+    data_root: Path,
+    dataset_id: str,
+    sources: list[str],
+    revisions: Path,
+) -> list[str]:
+    """Catalog 切换成功后才归档旧 delta；清理失败不影响已发布年度文件。"""
+    warnings: list[str] = []
+    for path in sources:
+        try:
+            stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
+            if stale is None:
+                continue
+            referenced = session.scalar(
+                select(CatalogPartition.id)
+                .where(CatalogPartition.file_id == stale.id)
+                .limit(1)
+            )
+            if referenced is not None:
                 continue
             source = data_root / path
             if source.is_file():
@@ -378,17 +511,9 @@ def compact_year(
                     source,
                     stop=data_root / "datasets" / dataset_id,
                 )
-            stale = session.scalar(select(CatalogFile).where(CatalogFile.path == path))
-            if stale is not None:
-                session.delete(stale)
-        session.commit()
-
-    return {
-        "dataset_id": dataset_id,
-        "year": year,
-        "status": "compacted",
-        "partitions": len(partitions),
-        "source_files": len(sources),
-        "rows": merged.num_rows,
-        "path": target_rel,
-    }
+            session.delete(stale)
+            session.commit()
+        except Exception as error:
+            session.rollback()
+            warnings.append(f"旧文件 {path} 归档失败：{error}")
+    return warnings
