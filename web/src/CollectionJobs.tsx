@@ -497,10 +497,11 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
               const jobRuns = runs[job.id] ?? [];
               const jobLogs = logs[job.id] ?? [];
               const importJob = importJobs.find((item) => item.collection_job_id === job.id);
+              const outputDatasetIds = collectorOutputDatasets(collectors, job);
               return (
               <div className="job-block" key={job.id} id={`job-${job.id}`}>
               <div className={expanded ? "job-row clickable expanded" : "job-row clickable"} onClick={() => void toggleJob(job)}>
-                <span className="job-identity"><strong>{datasetName(datasets, job.dataset_id)}</strong><code>{job.dataset_id}</code><small>{job.id.slice(0, 8)} · 创建于 {formatDateTime(job.created_at)}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}<small>{expanded ? "点击收起明细" : "点击查看明细"}</small></span>
+                <span className="job-identity"><strong>{outputDatasetIds.length > 1 ? `联合更新 · ${outputDatasetIds.length} 个数据集` : datasetName(datasets, job.dataset_id)}</strong>{outputDatasetIds.map((id) => <code key={id}>{id}</code>)}<small>{job.id.slice(0, 8)} · 创建于 {formatDateTime(job.created_at)}</small>{job.retry_of_job_id && <small>重试自 {job.retry_of_job_id.slice(0, 8)}</small>}<small>{expanded ? "点击收起明细" : "点击查看明细"}</small></span>
                 <span>{operationLabels[job.operation]}</span>
                 <span className="job-source"><strong>{inputLabels[job.input_method]}</strong>{job.collector_key && <code>{job.collector_key}</code>}{job.collector_operation && <code>{job.collector_operation}</code>}</span>
                 <span>{job.start_date ? <>{job.start_date}<br />至 {job.end_date}</> : "自动计算"}</span>
@@ -817,6 +818,14 @@ function JobStatus({ status }: { status: CollectionJob["status"] }) {
 
 function datasetName(datasets: DatasetSummary[], id: string) {
   return datasets.find((dataset) => dataset.id === id)?.display_name ?? "未知数据集";
+}
+
+function collectorOutputDatasets(collectors: CollectorDefinition[], job: CollectionJob) {
+  if (!job.collector_key || !job.collector_operation) return [job.dataset_id];
+  const operation = collectors
+    .find((collector) => collector.key === job.collector_key)
+    ?.operations.find((item) => item.key === job.collector_operation);
+  return operation?.datasets.length ? operation.datasets : [job.dataset_id];
 }
 
 function describeReviewError(error: Record<string, unknown>) {

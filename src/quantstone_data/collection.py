@@ -442,48 +442,84 @@ def _execute_daily_job(
             )
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
-            artifact = result.outputs[job.dataset_id][0]
-            log_event(
-                "collection_artifact_staged",
-                job_id=job.id,
-                run_id=run.id,
-                dataset_id=job.dataset_id,
-                partition_key=partition_key,
-                row_count=artifact.row_count,
-            )
-            report = review_dataset(
-                job.dataset_id,
-                ReviewContext(artifact.path, schema, trade_date),
-            ).as_dict()
-            report["partition_key"] = partition_key
+            output_items = []
+            for output_dataset_id in operation.datasets:
+                artifacts = result.outputs[output_dataset_id]
+                if len(artifacts) != 1:
+                    raise CollectionError(
+                        "daily collection must produce exactly one artifact per output"
+                    )
+                output_dataset = session.get(Dataset, output_dataset_id)
+                if output_dataset is None or not output_dataset.storage_policy:
+                    raise CollectionError(
+                        f"joint output dataset is unavailable: {output_dataset_id}"
+                    )
+                output_schema = next(
+                    item
+                    for item in output_dataset.schemas
+                    if item.version == output_dataset.current_schema_version
+                )
+                artifact = artifacts[0]
+                report = review_dataset(
+                    output_dataset_id,
+                    ReviewContext(artifact.path, output_schema, trade_date),
+                ).as_dict()
+                report["dataset_id"] = output_dataset_id
+                report["partition_key"] = partition_key
+                output_items.append(
+                    (output_dataset, artifact, report)
+                )
+                log_event(
+                    "review_completed",
+                    job_id=job.id,
+                    run_id=run.id,
+                    dataset_id=output_dataset_id,
+                    partition_key=partition_key,
+                    passed=report["passed"],
+                    error_count=report["error_count"],
+                )
+
+            report = {
+                "reviewer": " + ".join(operation.datasets),
+                "partition_key": partition_key,
+                "passed": all(item[2]["passed"] for item in output_items),
+                "row_count": sum(item[1].row_count for item in output_items),
+                "error_count": sum(item[2]["error_count"] for item in output_items),
+                "errors": [
+                    {**error, "dataset_id": output_report["dataset_id"]}
+                    for _dataset, _artifact, output_report in output_items
+                    for error in output_report.get("errors", [])
+                ],
+                "outputs": [item[2] for item in output_items],
+            }
             reports.append(report)
-            run.staged_path = artifact.path.relative_to(data_root).as_posix()
-            run.row_count = artifact.row_count
-            log_event(
-                "review_completed",
-                job_id=job.id,
-                run_id=run.id,
-                dataset_id=job.dataset_id,
-                partition_key=partition_key,
-                passed=report["passed"],
-                error_count=report["error_count"],
-            )
+            run.staged_path = run_directory.relative_to(data_root).as_posix()
+            run.row_count = report["row_count"]
             if not report["passed"]:
                 run.status = "review_failed"
                 job.status = CollectionJobStatus.REVIEW_FAILED.value
                 session.commit()
                 break
 
-            publish_partition_transaction(
-                session,
-                data_root=data_root,
-                dataset_id=job.dataset_id,
-                storage_policy=dataset.storage_policy,
-                partition_key=partition_key,
-                artifact_path=artifact.path,
-                row_count=artifact.row_count,
-                run=run,
-            )
+            for output_dataset, artifact, _output_report in output_items:
+                log_event(
+                    "collection_artifact_staged",
+                    job_id=job.id,
+                    run_id=run.id,
+                    dataset_id=output_dataset.id,
+                    partition_key=partition_key,
+                    row_count=artifact.row_count,
+                )
+                publish_partition_transaction(
+                    session,
+                    data_root=data_root,
+                    dataset_id=output_dataset.id,
+                    storage_policy=output_dataset.storage_policy,
+                    partition_key=partition_key,
+                    artifact_path=artifact.path,
+                    row_count=artifact.row_count,
+                    run=run,
+                )
             shutil.rmtree(run_directory, ignore_errors=True)
         except Exception as error:
             run_id = run.id
@@ -516,7 +552,7 @@ def _execute_daily_job(
     report_path = data_root / "staging" / job.id / "review.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     aggregate = {
-        "reviewer": job.dataset_id,
+        "reviewer": " + ".join(operation.datasets),
         "passed": bool(reports) and all(item["passed"] for item in reports),
         "row_count": sum(item["row_count"] for item in reports),
         "error_count": sum(item["error_count"] for item in reports),
@@ -827,6 +863,23 @@ def create_collection_job(
     if binding:
         operation_definition = get_operation(binding["collector_key"], binding["operation"])
         assert operation_definition is not None
+        for output_dataset_id in operation_definition.datasets:
+            output_dataset = session.get(Dataset, output_dataset_id)
+            if output_dataset is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"联合输出数据集尚未创建：{output_dataset_id}",
+                )
+            if output_dataset.status != DatasetStatus.ACTIVE.value:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"联合输出数据集尚未启用：{output_dataset_id}",
+                )
+            if not output_dataset.storage_policy:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"联合输出数据集缺少存储策略：{output_dataset_id}",
+                )
         try:
             validate_operation_parameters(
                 operation_definition,

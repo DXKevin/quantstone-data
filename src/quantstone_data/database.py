@@ -368,15 +368,15 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
         wind_bindings = {
             "wind.cn.stock.l2_order.sz": (
                 '[{"purpose":"initial","collector_key":"wind_l2_sz",'
-                '"operation":"l2_order_initial","parameters":{}},'
+                '"operation":"wind_l2_initial","parameters":{}},'
                 '{"purpose":"incremental","collector_key":"wind_l2_sz",'
-                '"operation":"l2_order_incremental","parameters":{}}]'
+                '"operation":"wind_l2_incremental","parameters":{}}]'
             ),
             "wind.cn.stock.l2_trade.sz": (
                 '[{"purpose":"initial","collector_key":"wind_l2_sz",'
-                '"operation":"l2_trade_initial","parameters":{}},'
+                '"operation":"wind_l2_initial","parameters":{}},'
                 '{"purpose":"incremental","collector_key":"wind_l2_sz",'
-                '"operation":"l2_trade_incremental","parameters":{}}]'
+                '"operation":"wind_l2_incremental","parameters":{}}]'
             ),
         }
         for dataset_id, bindings in wind_bindings.items():
@@ -384,7 +384,8 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 text(
                     "UPDATE datasets SET collection_bindings = :bindings "
                     "WHERE id = :dataset_id AND (collection_bindings IS NULL "
-                    "OR collection_bindings = '[]')"
+                    "OR collection_bindings = '[]' OR collection_bindings LIKE '%l2_order_%' "
+                    "OR collection_bindings LIKE '%l2_trade_%')"
                 ),
                 {"dataset_id": dataset_id, "bindings": bindings},
             )

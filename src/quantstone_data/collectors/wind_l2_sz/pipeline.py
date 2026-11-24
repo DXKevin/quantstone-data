@@ -197,11 +197,10 @@ def _extract(archive: Path, root: Path, run_date: date) -> Path:
     return expected
 
 
-def _collect(
+def collect_wind_l2(
     context: CollectionContext,
     parameters: dict,
     _field_contracts: list[dict],
-    spec: WindSpec,
 ) -> CollectionResult:
     if context.data_root is None:
         raise RuntimeError("Wind L2 采集器缺少 data_root")
@@ -209,30 +208,24 @@ def _collect(
     work_root = context.data_root / "downloads" / "wind_l2"
     archive = work_root / "archives" / f"{run_date:%Y%m}" / f"{run_date:%Y%m%d}.7z"
     extract_root = work_root / "extracted"
-    target = context.staging_dir / "outputs" / spec.output_name
+    outputs: dict[str, list[DatasetArtifact]] = {}
     with _PIPELINE_LOCK:
         ensure_archive(run_date, archive)
         source = _extract(archive, extract_root, run_date)
-        rows = convert_extracted_day(source, target, spec, run_date)
-        (source / f".quantstone-{spec.key}-converted").touch()
-        if all((source / f".quantstone-{key}-converted").exists() for key in ("order", "trade")):
-            shutil.rmtree(source)
-            archive.unlink(missing_ok=True)
-    artifact = DatasetArtifact(
-        dataset_id=spec.dataset_id,
-        path=target,
-        partition={"trade_date": run_date.isoformat()},
-        row_count=rows,
-    )
+        for spec in (ORDER, TRADE):
+            target = context.staging_dir / "outputs" / spec.output_name
+            rows = convert_extracted_day(source, target, spec, run_date)
+            outputs[spec.dataset_id] = [
+                DatasetArtifact(
+                    dataset_id=spec.dataset_id,
+                    path=target,
+                    partition={"trade_date": run_date.isoformat()},
+                    row_count=rows,
+                )
+            ]
+        shutil.rmtree(source)
+        archive.unlink(missing_ok=True)
     return CollectionResult(
-        outputs={spec.dataset_id: [artifact]},
+        outputs=outputs,
         provenance={"source": "baidu_netdisk", "archive": archive.name},
     )
-
-
-def collect_order(context: CollectionContext, parameters: dict, fields: list[dict]):
-    return _collect(context, parameters, fields, ORDER)
-
-
-def collect_trade(context: CollectionContext, parameters: dict, fields: list[dict]):
-    return _collect(context, parameters, fields, TRADE)

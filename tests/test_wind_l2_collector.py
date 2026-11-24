@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
+from quantstone_data.collection_protocol import CollectionContext
 from quantstone_data.collector_registry import COLLECTORS
+from quantstone_data.collectors.wind_l2_sz import pipeline
 from quantstone_data.collectors.wind_l2_sz.pipeline import (
     ORDER,
     TRADE,
@@ -74,17 +76,49 @@ def test_convert_wind_trade_csv_preserves_nullable_codes(tmp_path: Path) -> None
 def test_wind_collector_and_preset_bindings_are_registered() -> None:
     collector = COLLECTORS["wind_l2_sz"]
     assert set(collector.operations) == {
-        "l2_order_initial",
-        "l2_order_incremental",
-        "l2_trade_initial",
-        "l2_trade_incremental",
+        "wind_l2_initial",
+        "wind_l2_incremental",
     }
+    assert all(
+        set(operation.datasets) == {ORDER.dataset_id, TRADE.dataset_id}
+        for operation in collector.operations.values()
+    )
     contracts = {item.contract.id: item.contract for item in DATASET_PRESETS}
     assert [item.operation for item in contracts[ORDER.dataset_id].collection_bindings] == [
-        "l2_order_initial",
-        "l2_order_incremental",
+        "wind_l2_initial",
+        "wind_l2_incremental",
     ]
     assert [item.operation for item in contracts[TRADE.dataset_id].collection_bindings] == [
-        "l2_trade_initial",
-        "l2_trade_incremental",
+        "wind_l2_initial",
+        "wind_l2_incremental",
     ]
+
+
+def test_wind_joint_collection_produces_both_outputs(tmp_path: Path, monkeypatch) -> None:
+    run_date = date(2026, 11, 18)
+    extracted = tmp_path / "downloads" / "wind_l2" / "extracted" / "20261118"
+    extracted.mkdir(parents=True)
+
+    def fake_archive(_run_date: date, target: Path) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.touch()
+
+    def fake_convert(_source: Path, target: Path, spec, _expected: date) -> int:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(spec.schema.empty_table(), target)
+        return 10 if spec.key == "order" else 20
+
+    monkeypatch.setattr(pipeline, "ensure_archive", fake_archive)
+    monkeypatch.setattr(pipeline, "_extract", lambda *_args: extracted)
+    monkeypatch.setattr(pipeline, "convert_extracted_day", fake_convert)
+
+    result = pipeline.collect_wind_l2(
+        CollectionContext("run", tmp_path / "staging", "", data_root=tmp_path),
+        {"trade_date": run_date.isoformat()},
+        [],
+    )
+
+    assert set(result.outputs) == {ORDER.dataset_id, TRADE.dataset_id}
+    assert result.outputs[ORDER.dataset_id][0].row_count == 10
+    assert result.outputs[TRADE.dataset_id][0].row_count == 20
+    assert not extracted.exists()

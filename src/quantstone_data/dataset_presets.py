@@ -448,12 +448,12 @@ DATASET_PRESETS = (
                 {
                     "purpose": "initial",
                     "collector_key": "wind_l2_sz",
-                    "operation": "l2_order_initial",
+                    "operation": "wind_l2_initial",
                 },
                 {
                     "purpose": "incremental",
                     "collector_key": "wind_l2_sz",
-                    "operation": "l2_order_incremental",
+                    "operation": "wind_l2_incremental",
                 },
             ],
             storage_policy={
@@ -564,12 +564,12 @@ DATASET_PRESETS = (
                 {
                     "purpose": "initial",
                     "collector_key": "wind_l2_sz",
-                    "operation": "l2_trade_initial",
+                    "operation": "wind_l2_initial",
                 },
                 {
                     "purpose": "incremental",
                     "collector_key": "wind_l2_sz",
-                    "operation": "l2_trade_incremental",
+                    "operation": "wind_l2_incremental",
                 },
             ],
             storage_policy={
