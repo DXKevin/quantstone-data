@@ -39,6 +39,15 @@ def _rows(day: str = "2026-11-23") -> list[dict]:
     ]
 
 
+def test_repair_uses_incremental_daily_path() -> None:
+    from quantstone_data.collectors.tushare_cn_stock.definition import COLLECTOR
+    from quantstone_data.collectors.tushare_cn_stock.index_daily import collect_incremental
+
+    operation = COLLECTOR.operations["index_daily_repair"]
+    assert operation.function is collect_incremental
+    assert operation.rate_limit is not None
+
+
 def test_index_universe_contains_main_indices() -> None:
     definitions = index_daily.load_index_universe()
     codes = [item.ts_code for item in definitions]

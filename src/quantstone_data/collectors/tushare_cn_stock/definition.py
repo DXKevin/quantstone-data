@@ -100,11 +100,12 @@ OPERATIONS = (
     CollectorOperation(
         key="index_daily_repair",
         name="指数日线修复",
-        description="按年批量重新拉取指定日期范围的主要指数日线，替换受影响分区。",
+        description="按交易日重新拉取指定日期范围的主要指数日线，替换受影响分区。",
         purpose="repair",
         parameters=DATE_RANGE_PARAMETERS,
         datasets=(INDEX_DAILY_DATASET_ID,),
-        function=collect_index_daily_initial,
+        function=collect_index_daily_incremental,
+        rate_limit=INDEX_DAILY_RATE_LIMIT,
         retry=INDEX_DAILY_RETRY,
     ),
     CollectorOperation(

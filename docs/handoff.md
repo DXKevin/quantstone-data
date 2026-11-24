@@ -57,7 +57,7 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 本轮完整测试：111 项通过、`ruff check .` 通过、`npm run build` 通过。
+- 本轮完整测试：112 项通过、`ruff check .` 通过、`npm run build` 通过。
 
 ## 2026-11-24 — DeepSeek Harness（index_daily 额度失败修复）
 
@@ -88,8 +88,8 @@
 - 新增预置数据集 `tushare.cn.index.index_daily`，包含 13 个主要指数，主键
   `ts_code + trade_date`，日分区、`yearly_with_delta`、年度合并；
 - 新增 `index_daily_initial` / `index_daily_incremental` 采集操作；
-- 首次和 repair 都按年拉取（非 CSI 一批 + CSI 逐个，每年 3 次），进程内按年缓存后
-  逐日写分区；增量才按交易日调用一次；清单中
+- 首次按年拉取（非 CSI 一批 + CSI 逐个，每年 3 次），进程内按年缓存后逐日写分区；
+  增量和 repair 都按交易日调用一次；清单中
   `start_date` 之前的指数自动跳过，不参与当天校验；到达 `start_date` 后缺失才失败；
 - 指数清单在 `src/quantstone_data/collectors/tushare_cn_stock/index_daily_universe.json`，
   包含 `ts_code/name/start_date`；`start_date` 已按 `index_daily` 实际最早交易日探测
@@ -97,8 +97,8 @@
   采用 `index_basic` 的基日/发布日；新增指数只改 JSON；
 - 新增 `tushare.cn.index.index_daily` 审核器，检查 Schema、主键、分区日期和 OHLC；
 - 真实接口测试：`2026-11-23` 返回并发布 13 行；
-- 定向测试 18 项通过；完整套件 111 项通过，`ruff check .` 和前端构建通过；
-- 新增显式 `index_daily_repair` 操作和 repair 绑定，repair 不再回退到增量。
+- 定向测试 19 项通过；完整套件 112 项通过，`ruff check .` 和前端构建通过；
+- 新增显式 `index_daily_repair` 操作和 repair 绑定；repair 复用增量单日路径，首次才按年批量。
 
 下一步：
 
