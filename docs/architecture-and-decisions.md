@@ -537,6 +537,18 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 契约和采集器测试，最后提交覆盖历史范围的 repair 任务重建受影响分区；`start_date` 之后
 缺失才失败，之前自动跳过。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
 
+网盘 A 股 1 分钟线使用数据集 ID `tb_minute.cn.stock.minute_1m`，范围仅沪深股票，
+默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为
+`ts_code/trade_date/bar_time/open/high/low/close/volume/amount/pct_chg/amplitude`，
+主键 `ts_code + trade_date + bar_time`，按交易日日分区，不做年度合并；`bar_time` 是
+`HHMMSS` 整数，`volume` 单位为手，`amount` 单位为元。数据源为百度网盘
+`/quant-data/A股分钟数据/沪深股票`：首次采集读取 `1分钟_按年汇总/YYYY_1min.zip`，
+增量读取 `每日更新/1分钟/YYYY-MM/YYYYMMDD_1min.zip`。首次采集在进程内按年构建日分区
+缓存，逐日发布；增量只生成当天分区。发布后清理本地下载包、解压文件和已处理日缓存，
+百度网盘转存文件保留。该采集器使用可选 `minute` 依赖中的 DuckDB 处理数万只股票的年度
+CSV；同一分钟数据集不添加市场后缀，未来北交所若契约一致可直接并入，只有契约分叉时才
+使用 `.bj` 后缀。
+
 TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
 `ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
 日期类型。该接口可以不传股票代码和日期直接返回全部历史记录；首次采集与增量更新都无参数

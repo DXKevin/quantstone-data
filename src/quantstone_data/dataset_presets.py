@@ -252,6 +252,66 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tb_minute_stock_1m",
+        category="网盘 · A股分钟",
+        contract=DatasetCreate(
+            id="tb_minute.cn.stock.minute_1m",
+            provider="tb_minute",
+            region="cn",
+            instrument="stock",
+            dataset_name="minute_1m",
+            market=None,
+            display_name="沪深股票1分钟线",
+            description=(
+                "A股分钟数据（沪深股票）1分钟不复权行情，源文件为按年压缩包和每日更新压缩包。"
+            ),
+            update_frequency="daily",
+            time_granularity="minute",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_minute",
+                    "operation": "minute_1m_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_minute",
+                    "operation": "minute_1m_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "daily",
+                "write_strategy": "replace_partition",
+                "compaction": None,
+            },
+            primary_key=["ts_code", "trade_date", "bar_time"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "证券代码，例如 600000.SH", nullable=False),
+                field("trade_date", "date", "交易日", nullable=False),
+                field(
+                    "bar_time",
+                    "int32",
+                    "分钟K线开始时间，HHMMSS",
+                    nullable=False,
+                    unit="HHMMSS",
+                ),
+                field("open", "float64", "开盘价", nullable=True, unit="元"),
+                field("high", "float64", "最高价", nullable=True, unit="元"),
+                field("low", "float64", "最低价", nullable=True, unit="元"),
+                field("close", "float64", "收盘价", nullable=True, unit="元"),
+                field("volume", "int64", "成交量", nullable=True, unit="手"),
+                field("amount", "float64", "成交额", nullable=True, unit="元"),
+                field("pct_chg", "float64", "涨跌幅", nullable=True, unit="%"),
+                field("amplitude", "float64", "振幅", nullable=True, unit="%"),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_adj_factor",
         category="TuShare · A股",
         contract=DatasetCreate(

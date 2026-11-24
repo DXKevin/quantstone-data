@@ -1,4 +1,5 @@
 from .collector_types import CollectorDefinition, CollectorOperation
+from .collectors.tb_minute import COLLECTOR as TB_MINUTE
 from .collectors.tushare_cn_stock import COLLECTOR as TUSHARE_CN_STOCK
 from .collectors.wind_l2_sz import COLLECTOR as WIND_L2_SZ
 
@@ -26,7 +27,7 @@ def _build_registry(definitions: tuple[CollectorDefinition, ...]) -> dict[str, C
     return registry
 
 
-COLLECTORS = _build_registry((TUSHARE_CN_STOCK, WIND_L2_SZ))
+COLLECTORS = _build_registry((TUSHARE_CN_STOCK, WIND_L2_SZ, TB_MINUTE))
 
 
 def get_collector(key: str) -> CollectorDefinition | None:

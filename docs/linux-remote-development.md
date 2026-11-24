@@ -29,6 +29,8 @@ cd /opt/quantstone-data
 
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
+# 分钟数据采集器还需要 DuckDB
+.venv/bin/python -m pip install -e '.[minute]'
 
 cd web
 npm install
