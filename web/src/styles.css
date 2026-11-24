@@ -252,15 +252,16 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .toolbar-button { min-height: 32px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 5px; padding: 0 11px; background: white; color: #56625c; font-size: 11px; cursor: pointer; }
 .notice-banner, .warning-banner { display: flex; align-items: center; gap: 9px; margin: -8px 0 18px; padding: 11px 14px; border: 1px solid #bcdaca; background: #edf8f2; color: #166a4a; font-size: 12px; }
 .warning-banner { border-color: #e8d5a8; background: #fff9e9; color: #86600d; }
-.jobs-table { width: 100%; }
-.job-row { min-height: 72px; display: grid; grid-template-columns: minmax(210px, 1.6fr) .7fr .7fr .9fr .9fr .8fr minmax(148px, auto); gap: 12px; align-items: center; padding: 9px 20px; border-bottom: 1px solid #e8ece9; font-size: 11px; }
+.jobs-table { width: 100%; overflow-x: auto; }
+.job-row { min-width: 1160px; min-height: 72px; display: grid; grid-template-columns: minmax(240px, 1.7fr) 110px minmax(150px, 1fr) 135px 80px 125px 260px; gap: 12px; align-items: center; padding: 9px 20px; border-bottom: 1px solid #e8ece9; font-size: 11px; }
+.job-row > span { min-width: 0; }
 .job-row:last-child { border-bottom: 0; }
 .job-head { min-height: 38px; background: #f8faf8; color: #75807b; font-size: 10px; }
 .job-identity strong, .file-cell strong { display: block; margin-bottom: 4px; font-size: 12px; }
 .job-identity code { display: block; color: #4e655b; font-size: 10px; }
 .job-identity small, .file-cell small { display: block; margin-top: 4px; color: #8a948f; font-size: 9px; }
-.job-source { display: flex; flex-direction: column; gap: 4px; }
-.job-source code { color: #4e655b; font-size: 9px; }
+.job-source { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.job-source code { color: #4e655b; font-size: 9px; overflow-wrap: anywhere; }
 .job-status { width: max-content; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #edf0ee; color: #606c66; font-size: 10px; font-weight: 600; }
 .job-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .job-status-awaiting_file { background: #fff3d9; color: #956400; }
@@ -282,7 +283,7 @@ dd { margin: 6px 0 0; font-size: 12px; }
 .spin { animation: spin .9s linear infinite; }
 .mini-upload-button.danger-mini { border-color: #e3b8b8; color: #a33b3b; background: #fff7f7; }
 .mini-upload-button.quiet-mini { color: #7b8781; border-color: #dde5e1; }
-.job-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.job-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
 .review-summary { display: grid; grid-template-columns: 1.5fr 1.2fr .7fr .7fr auto; gap: 18px; align-items: center; margin: -8px 0 18px; padding: 14px 16px; border: 1px solid #bcdaca; background: #f2faf6; font-size: 11px; }
 .review-summary div { display: flex; flex-direction: column; gap: 3px; }
 .review-summary span { color: #728078; font-size: 10px; }
@@ -403,8 +404,7 @@ dd { margin: 6px 0 0; font-size: 12px; }
   .five-columns { grid-template-columns: repeat(2, 1fr); }
   .fields-table { overflow-x: auto; }
   .field-row { min-width: 850px; }
-  .jobs-table { overflow-x: auto; }
-  .job-row { min-width: 860px; grid-template-columns: minmax(180px, 1.4fr) .7fr .7fr .9fr .9fr .9fr minmax(140px, auto); gap: 10px; }
+  .job-row { min-width: 1160px; }
 }
 
 /* 可读性调整：整体上调偏小字号、加深次要文字和危险操作颜色 */
