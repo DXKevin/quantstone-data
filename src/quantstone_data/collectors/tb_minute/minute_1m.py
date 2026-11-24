@@ -62,7 +62,16 @@ SELECT
     CAST("成交额" AS DOUBLE) AS amount,
     CAST("涨幅" AS DOUBLE) AS pct_chg,
     CAST("振幅" AS DOUBLE) AS amplitude
-FROM read_csv('{csv_glob}', header=true, union_by_name=true)
+FROM read_csv(
+    '{csv_glob}',
+    header=true,
+    union_by_name=true,
+    delim=',',
+    quote='',
+    escape='',
+    strict_mode=false,
+    all_varchar=true
+)
 {where}
 """
 
@@ -93,6 +102,23 @@ def _extract(zip_path: Path, target_dir: Path) -> Path:
     return target_dir
 
 
+def _remove_empty_csv_files(csv_dir: Path) -> list[Path]:
+    """移除供应商压缩包中的空白占位 CSV，并返回可解析文件。"""
+    usable: list[Path] = []
+    for path in sorted(csv_dir.rglob("*.csv")):
+        size = path.stat().st_size
+        is_blank = size == 0
+        if not is_blank and size <= 4096:
+            is_blank = not path.read_bytes().strip(b"\xef\xbb\xbf \t\r\n")
+        if is_blank:
+            path.unlink()
+        else:
+            usable.append(path)
+    if not usable:
+        raise ValueError("分钟压缩包中没有可解析的 CSV 文件")
+    return usable
+
+
 def _raise_file_limit() -> None:
     try:
         import resource
@@ -118,6 +144,7 @@ def _duckdb():
 def _build_year_partitions(zip_path: Path, year_dir: Path) -> Path:
     duckdb = _duckdb()
     csv_dir = _extract(zip_path, year_dir / "csv")
+    _remove_empty_csv_files(csv_dir)
     daily_dir = year_dir / "daily"
     if daily_dir.exists():
         for item in sorted(daily_dir.rglob("*"), reverse=True):
@@ -127,11 +154,14 @@ def _build_year_partitions(zip_path: Path, year_dir: Path) -> Path:
                 item.rmdir()
     daily_dir.mkdir(parents=True, exist_ok=True)
     temp_dir = year_dir / "duckdb_tmp"
+    if temp_dir.exists():
+        _remove_tree(temp_dir)
     temp_dir.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
     con.execute("PRAGMA threads=4")
     con.execute("PRAGMA memory_limit='4GB'")
     con.execute(f"PRAGMA temp_directory='{temp_dir.as_posix()}'")
+    succeeded = False
     try:
         sql = _normalize_sql((csv_dir / "*.csv").as_posix())
         con.execute(
@@ -139,19 +169,13 @@ def _build_year_partitions(zip_path: Path, year_dir: Path) -> Path:
             "(FORMAT PARQUET, PARTITION_BY (trade_date), "
             "OVERWRITE_OR_IGNORE, COMPRESSION ZSTD)"
         )
+        succeeded = True
     finally:
         con.close()
-        for item in sorted(csv_dir.rglob("*"), reverse=True):
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                item.rmdir()
-        for item in sorted(temp_dir.rglob("*"), reverse=True):
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                item.rmdir()
-        zip_path.unlink(missing_ok=True)
+        if succeeded:
+            _remove_tree(csv_dir)
+            _remove_tree(temp_dir)
+            zip_path.unlink(missing_ok=True)
     (daily_dir / ".complete").write_text("ok", encoding="utf-8")
     return daily_dir
 

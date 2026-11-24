@@ -123,6 +123,39 @@ def test_year_cache_partitions_by_trade_date(tmp_path: Path) -> None:
     assert table.num_rows == 4
 
 
+def test_year_cache_ignores_empty_supplier_csv(tmp_path: Path) -> None:
+    zip_path = tmp_path / "2026_1min.zip"
+    _make_zip(zip_path)
+    with zipfile.ZipFile(zip_path, "a") as archive:
+        archive.writestr("sh601091_2026.csv", b"")
+
+    daily_dir = minute_1m._build_year_partitions(zip_path, tmp_path / "year")
+
+    assert sorted(item.name for item in daily_dir.glob("trade_date=*")) == [
+        "trade_date=2026-11-23",
+        "trade_date=2026-11-24",
+    ]
+
+
+def test_year_cache_accepts_unescaped_quote_in_unused_name(tmp_path: Path) -> None:
+    zip_path = tmp_path / "2026_1min.zip"
+    _make_zip(zip_path)
+    malformed = tmp_path / "csv" / "sh601091_2026.csv"
+    malformed.write_text(
+        "时间,代码,名称,开盘价,收盘价,最高价,最低价,成交量,成交额,涨幅,振幅\n"
+        '2026/11/23 09:30,sh601091,沈鼓集团",13,13,13,13,100,1300,0,0\n',
+        encoding="utf-8-sig",
+    )
+    with zipfile.ZipFile(zip_path, "a") as archive:
+        archive.write(malformed, malformed.name)
+
+    daily_dir = minute_1m._build_year_partitions(zip_path, tmp_path / "year")
+    table = minute_1m._read_daily(daily_dir, "2026-11-23")
+
+    assert table.num_rows == 5
+    assert "601091.SH" in table["ts_code"].to_pylist()
+
+
 def test_minute_reviewer_accepts_contract_artifact(tmp_path: Path) -> None:
     zip_path = tmp_path / "20261123_1min.zip"
     _make_zip(zip_path)
