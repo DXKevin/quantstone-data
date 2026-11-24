@@ -428,6 +428,24 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "bindings": index_daily_bindings,
             },
         )
+        minute_bindings = (
+            '[{"purpose":"initial","collector_key":"tb_minute",'
+            '"operation":"minute_1m_initial","parameters":{}},'
+            '{"purpose":"incremental","collector_key":"tb_minute",'
+            '"operation":"minute_1m_incremental","parameters":{}},'
+            '{"purpose":"repair","collector_key":"tb_minute",'
+            '"operation":"minute_1m_repair","parameters":{}}]'
+        )
+        connection.execute(
+            text(
+                "UPDATE datasets SET collection_bindings = :bindings "
+                "WHERE id = :dataset_id"
+            ),
+            {
+                "dataset_id": "tb_minute.cn.stock.minute_1m",
+                "bindings": minute_bindings,
+            },
+        )
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

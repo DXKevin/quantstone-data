@@ -95,6 +95,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     assert {item["operation"] for item in minute_1m["collection_bindings"]} == {
         "minute_1m_initial",
         "minute_1m_incremental",
+        "minute_1m_repair",
     }
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"

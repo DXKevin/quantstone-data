@@ -27,6 +27,16 @@ OPERATIONS = (
         retry=RetryPolicy(attempts=3, delay_seconds=10, max_delay_seconds=60),
     ),
     CollectorOperation(
+        key="minute_1m_repair",
+        name="沪深股票1分钟修复",
+        description="按日期范围重新采集沪深股票1分钟日包，替换受影响分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(DATASET_ID,),
+        function=collect_incremental,
+        retry=RetryPolicy(attempts=3, delay_seconds=10, max_delay_seconds=60),
+    ),
+    CollectorOperation(
         key="minute_1m_incremental",
         name="沪深股票1分钟增量更新",
         description="从每日更新压缩包补充沪深股票1分钟数据。",

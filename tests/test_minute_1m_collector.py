@@ -15,6 +15,13 @@ from quantstone_data.reviewer_types import ReviewContext
 from quantstone_data.reviewers.tb_minute.cn.stock.minute_1m.reviewer import review
 
 
+def test_repair_uses_incremental_path() -> None:
+    from quantstone_data.collectors.tb_minute.definition import COLLECTOR
+    from quantstone_data.collectors.tb_minute.minute_1m import collect_incremental
+
+    assert COLLECTOR.operations["minute_1m_repair"].function is collect_incremental
+
+
 def _write_csv(path: Path, code: str, rows: list[tuple[str, float, int, float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8-sig", newline="") as handle:

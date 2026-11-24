@@ -280,6 +280,12 @@ DATASET_PRESETS = (
                     "operation": "minute_1m_incremental",
                     "parameters": {},
                 },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tb_minute",
+                    "operation": "minute_1m_repair",
+                    "parameters": {},
+                },
             ],
             storage_policy={
                 "logical_partition_field": "trade_date",
