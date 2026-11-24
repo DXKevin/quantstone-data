@@ -1739,8 +1739,11 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 - 状态 Schema、审核报告与 SQLite 并发定向测试：5 项通过；
 - `ruff check src tests`：通过；
 - `web/npm run build`：通过。
+- 服务重启后用空目录创建真实修复任务：API 创建响应立即返回 `collection_job_id`，统一任务列表
+  可查到 `input_method=directory_import`、`operation=repair` 的同一记录；测试任务、内部 ImportJob
+  和空目录随后全部清理，服务保持正常。
 
-下一步：重启服务后创建一条目录扫描任务，确认其从创建开始只在统一任务表出现。
+下一步：无。
 
 遗留问题：既有 TestClient 集成测试在当前 Codex 环境仍卡在 lifespan 启动；该现象在反向应用
 功能改动后同样存在。
