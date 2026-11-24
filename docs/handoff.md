@@ -68,7 +68,9 @@
 - 采集器每个交易日调用一次 `index_daily(trade_date=...)`，过滤到清单内指数；清单中
   `start_date` 之前的指数自动跳过，不参与当天校验；到达 `start_date` 后缺失才失败；
 - 指数清单在 `src/quantstone_data/collectors/tushare_cn_stock/index_daily_universe.json`，
-  包含 `ts_code/name/start_date`，新增指数只改 JSON；
+  包含 `ts_code/name/start_date`；`start_date` 已按 `index_daily` 实际最早交易日探测
+  （000001 从 1990-12-19、932000 从 2013-12-31、000688 从 2019-12-31 等），不是直接
+  采用 `index_basic` 的基日/发布日；新增指数只改 JSON；
 - 新增 `tushare.cn.index.index_daily` 审核器，检查 Schema、主键、分区日期和 OHLC；
 - 真实接口测试：`2026-11-23` 返回并发布 13 行；
 - 定向测试 17 项通过；完整套件 109 项通过，`ruff check .` 和前端构建通过。

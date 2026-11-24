@@ -531,9 +531,11 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 不静默少写。
 
 指数清单保存在采集器同目录的 `index_daily_universe.json`，每项包含 `ts_code`、`name` 和
-`start_date`，不写死在采集函数里。新增指数时只改该 JSON，运行契约和采集器测试，然后提交
-覆盖历史范围的 repair 任务重建受影响分区；`start_date` 用于允许新指数在更晚日期才开始
-出现，日期更早时不要求返回。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
+`start_date`，不写死在采集函数里。`start_date` 不能直接取 `index_basic` 的 `base_date` 或
+`list_date`，必须以 `index_daily` 实际返回的最早 `trade_date` 为准；代理限制单次日期范围
+为 3,000 天，探测时需要分段向前/向后查询。新增指数时先探测并写入准确 `start_date`，再运行
+契约和采集器测试，最后提交覆盖历史范围的 repair 任务重建受影响分区；`start_date` 之后
+缺失才失败，之前自动跳过。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
 
 TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
 `ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
