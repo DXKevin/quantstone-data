@@ -146,7 +146,7 @@ DATASET_PRESETS = (
             market=None,
             display_name="指数基本信息",
             description=(
-                "TuShare index_basic 指数基本信息，覆盖 MSCI、CSI、SSE、SZSE、CICC、SW、OTH。"
+                "TuShare index_basic 指数基本信息，覆盖 CSI、SSE、SZSE、SW。"
             ),
             update_frequency="daily",
             time_granularity="none",

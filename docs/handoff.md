@@ -45,10 +45,12 @@
 
 - 新增预置数据集 `tushare.cn.index.index_basic`，使用 snapshot 存储和 `ts_code` 主键；
 - 契约包含 TuShare 官方 13 个输出字段，`base_date`、`list_date`、`exp_date` 存为 date；
-- 首次和增量采集均遍历 `MSCI/CSI/SSE/SZSE/CICC/SW/OTH` 七个市场，按 `ts_code` 去重后
+- 首次和增量采集均遍历 `CSI/SSE/SZSE/SW` 四个市场，按 `ts_code` 去重后
   生成完整快照，避免默认参数只返回 SSE；
 - 新增 `index_basic_initial` / `index_basic_incremental` 操作和专用审核器；
 - 用户要求最后自行运行采集任务，因此只创建并启用数据集，不代为创建或执行采集任务。
+- 按当前官方市场表修正为 `CSI/SSE/SZSE/SW` 四个市场；此前列出的
+  `MSCI/CICC/OTH` 在真实接口中均返回 0 行，现已停止无效请求。
 
 验证：
 

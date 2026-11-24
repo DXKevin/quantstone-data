@@ -53,7 +53,7 @@ OPERATIONS = (
     CollectorOperation(
         key="index_basic_initial",
         name="指数基本信息首次采集",
-        description="分别获取 TuShare 七个指数市场，建立完整指数基本信息快照。",
+        description="分别获取 TuShare 四个指数市场，建立完整指数基本信息快照。",
         purpose="initial",
         parameters=(),
         datasets=(INDEX_BASIC_DATASET_ID,),
@@ -62,7 +62,7 @@ OPERATIONS = (
     CollectorOperation(
         key="index_basic_incremental",
         name="指数基本信息增量更新",
-        description="重新获取 TuShare 七个指数市场，替换完整指数基本信息快照。",
+        description="重新获取 TuShare 四个指数市场，替换完整指数基本信息快照。",
         purpose="incremental",
         parameters=(),
         datasets=(INDEX_BASIC_DATASET_ID,),

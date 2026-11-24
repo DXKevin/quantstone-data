@@ -325,6 +325,14 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE p.dataset_id = 'tushare.cn.index.index_basic')"
             )
         )
+        connection.execute(
+            text(
+                "UPDATE datasets SET description = "
+                "'TuShare index_basic 指数基本信息，覆盖 CSI、SSE、SZSE、SW。' "
+                "WHERE id = 'tushare.cn.index.index_basic' AND description = "
+                "'TuShare index_basic 指数基本信息，覆盖 MSCI、CSI、SSE、SZSE、CICC、SW、OTH。'"
+            )
+        )
 
         partition_columns = {
             row[1] for row in connection.execute(text("PRAGMA table_info(catalog_partitions)"))

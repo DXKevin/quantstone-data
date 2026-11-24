@@ -11,7 +11,7 @@ from ...provider_http import post_json
 from .stock_basic import load_api_url, raise_api_error
 
 DATASET_ID = "tushare.cn.index.index_basic"
-MARKETS = ("MSCI", "CSI", "SSE", "SZSE", "CICC", "SW", "OTH")
+MARKETS = ("CSI", "SSE", "SZSE", "SW")
 PAGE_LIMIT = 8000
 
 

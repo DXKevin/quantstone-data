@@ -515,8 +515,8 @@ operation 参数定义校验。凭证、限流和重试不属于数据集绑定�
 采集器从同一行 `ts_code` 的点号前部分恢复代码，避免产生 `.0` 或丢失前导零；供应商原本返回
 的空值保持为空，不用 `ts_code` 补值。
 
-TuShare `index_basic` 同样采用完整快照：每次分别请求 `MSCI`、`CSI`、`SSE`、`SZSE`、
-`CICC`、`SW`、`OTH` 七个市场并按 `ts_code` 去重，避免接口默认只返回 SSE。日期字段转换为
+TuShare `index_basic` 同样采用完整快照：每次分别请求 `CSI`、`SSE`、`SZSE`、`SW`
+四个市场并按 `ts_code` 去重，避免接口默认只返回 SSE。日期字段转换为
 Parquet `date`，其余字段保持供应商语义；首次和增量都替换单个快照文件。单个市场按接口
 8,000 行上限使用 `offset` 分页，不能把首批恰好 8,000 行当作完整结果。虽然官方把
 `base_date/base_point/list_date` 标为必选，真实历史记录仍存在空值，契约按真实数据允许为空。
