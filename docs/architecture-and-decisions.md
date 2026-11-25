@@ -554,6 +554,14 @@ CSV；同一分钟数据集不添加市场后缀，未来北交所若契约一�
 不得使用 `ignore_errors` 丢弃记录。年度转换成功后清理 zip、解压目录和 DuckDB 临时文件；
 转换失败时保留这些现场，供修复后直接重试，避免重复下载数 GB 年度包。
 
+淘宝供应商集合竞价过程数据使用 `tb.cn.stock.auction_process`，按交易日日分区并采用
+`yearly_with_delta`。源字段映射为 `ts_code/trade_date/event_time/event_seq/matched_amount/
+matched_volume/unmatched_volume/book_side`；主键为
+`ts_code + trade_date + event_time + event_seq`。北交所同一证券同一时间可能有多条不同记录，
+必须全部保留并以稳定排序生成 `event_seq`。首次采集优先复用 `YYYYMM.zip` 月包，月包不存在时
+回退 `YYYYMMDD.csv` 单日文件；增量和修复使用单日文件。缓存统一位于
+`cache/auction_process/{monthly,extracted}`，切换月份时清理旧月份，成功解压后删除月压缩包。
+
 TuShare 股票曾用名使用数据集 ID `tushare.cn.stock.namechange`，保留官方
 `ts_code/name/start_date/end_date/ann_date/change_reason` 六个字段，日期字段在落盘时标准化为
 日期类型。该接口可以不传股票代码和日期直接返回全部历史记录；首次采集与增量更新都无参数

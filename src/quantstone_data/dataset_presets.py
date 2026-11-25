@@ -145,9 +145,7 @@ DATASET_PRESETS = (
             dataset_name="index_basic",
             market=None,
             display_name="指数基本信息",
-            description=(
-                "TuShare index_basic 指数基本信息，覆盖 CSI、SSE、SZSE、SW。"
-            ),
+            description=("TuShare index_basic 指数基本信息，覆盖 CSI、SSE、SZSE、SW。"),
             update_frequency="daily",
             time_granularity="none",
             collection_bindings=[
@@ -314,6 +312,72 @@ DATASET_PRESETS = (
                 field("amount", "float64", "成交额", nullable=True, unit="元"),
                 field("pct_chg", "float64", "涨跌幅", nullable=True, unit="%"),
                 field("amplitude", "float64", "振幅", nullable=True, unit="%"),
+            ],
+        ),
+    ),
+    DatasetPreset(
+        key="tb_stock_auction_process",
+        category="淘宝 · A股",
+        contract=DatasetCreate(
+            id="tb.cn.stock.auction_process",
+            provider="tb",
+            region="cn",
+            instrument="stock",
+            dataset_name="auction_process",
+            market=None,
+            display_name="A股集合竞价过程",
+            description="A股开盘集合竞价期间的匹配金额、匹配量、未匹配量和盘口方向。",
+            update_frequency="daily",
+            time_granularity="second",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_auction",
+                    "operation": "auction_process_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_auction",
+                    "operation": "auction_process_incremental",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tb_auction",
+                    "operation": "auction_process_repair",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ts_code", "trade_date", "event_time", "event_seq"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "证券代码", nullable=False, source_name="股票代码"),
+                field("trade_date", "date", "交易日", nullable=False),
+                field(
+                    "event_time",
+                    "int32",
+                    "竞价时间，HHMMSSmmm",
+                    nullable=False,
+                    unit="HHMMSSmmm",
+                    source_name="时间",
+                ),
+                field("event_seq", "int32", "同证券同时间记录序号", nullable=False),
+                field(
+                    "matched_amount", "float64", "匹配金额", unit="元", source_name="匹配金额（元）"
+                ),
+                field("matched_volume", "int64", "匹配量", unit="手", source_name="匹配量（手）"),
+                field(
+                    "unmatched_volume", "int64", "未匹配量", unit="手", source_name="未匹配量（手）"
+                ),
+                field("book_side", "string", "盘口买卖方向", source_name="盘口买卖"),
             ],
         ),
     ),
