@@ -17,6 +17,8 @@ from .index_daily import collect_incremental as collect_index_daily_incremental
 from .index_daily import collect_initial as collect_index_daily_initial
 from .namechange import collect_incremental as collect_namechange_incremental
 from .namechange import collect_initial as collect_namechange_initial
+from .stk_limit import collect_incremental as collect_stk_limit_incremental
+from .stk_limit import collect_initial as collect_stk_limit_initial
 from .stock_basic import (
     collect_incremental as collect_stock_basic_incremental,
 )
@@ -25,6 +27,8 @@ from .stock_basic import (
 )
 from .stock_st import collect_incremental as collect_stock_st_incremental
 from .stock_st import collect_initial as collect_stock_st_initial
+from .suspend_d import collect_incremental as collect_suspend_d_incremental
+from .suspend_d import collect_initial as collect_suspend_d_initial
 from .trade_cal import collect_incremental as collect_trade_cal_incremental
 from .trade_cal import collect_initial as collect_trade_cal_initial
 
@@ -36,6 +40,8 @@ NAMECHANGE_DATASET_ID = "tushare.cn.stock.namechange"
 STOCK_BASIC_DATASET_ID = "tushare.cn.stock.stock_basic"
 STOCK_ST_DATASET_ID = "tushare.cn.stock.stock_st"
 TRADE_CAL_DATASET_ID = "tushare.cn.stock.trade_cal"
+STK_LIMIT_DATASET_ID = "tushare.cn.stock.stk_limit"
+SUSPEND_D_DATASET_ID = "tushare.cn.stock.suspend_d"
 
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
@@ -56,6 +62,9 @@ INDEX_DAILY_RETRY = RetryPolicy(
 # 当前代理在连续约 180 次请求后返回英文限流提示，保守控制在每分钟 150 次。
 ADJ_FACTOR_RATE_LIMIT = RateLimit(calls=150, period_seconds=60, scope="adj_factor")
 ADJ_FACTOR_RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=65)
+LIMIT_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="stk_limit")
+SUSPEND_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="suspend_d")
+LIMIT_RETRY = RetryPolicy(attempts=6, delay_seconds=30, max_delay_seconds=300)
 
 OPERATIONS = (
     CollectorOperation(
@@ -223,6 +232,72 @@ OPERATIONS = (
         parameters=INCREMENTAL_PARAMETERS,
         datasets=(TRADE_CAL_DATASET_ID,),
         function=collect_trade_cal_incremental,
+    ),
+    CollectorOperation(
+        key="stk_limit_initial",
+        name="股票涨跌停价格首次采集",
+        description="按交易日首次采集 TuShare stk_limit 全市场股票涨跌停价格。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(STK_LIMIT_DATASET_ID,),
+        function=collect_stk_limit_initial,
+        rate_limit=LIMIT_RATE_LIMIT,
+        retry=LIMIT_RETRY,
+    ),
+    CollectorOperation(
+        key="stk_limit_incremental",
+        name="股票涨跌停价格增量更新",
+        description="从数据集当前水位之后补充 TuShare stk_limit 数据。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(STK_LIMIT_DATASET_ID,),
+        function=collect_stk_limit_incremental,
+        rate_limit=LIMIT_RATE_LIMIT,
+        retry=LIMIT_RETRY,
+    ),
+    CollectorOperation(
+        key="stk_limit_repair",
+        name="股票涨跌停价格修复",
+        description="按交易日重新采集指定日期范围的 stk_limit 数据，替换受影响分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(STK_LIMIT_DATASET_ID,),
+        function=collect_stk_limit_incremental,
+        rate_limit=LIMIT_RATE_LIMIT,
+        retry=LIMIT_RETRY,
+    ),
+    CollectorOperation(
+        key="suspend_d_initial",
+        name="股票停复牌首次采集",
+        description="按交易日首次采集 TuShare suspend_d 每日停复牌信息。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(SUSPEND_D_DATASET_ID,),
+        function=collect_suspend_d_initial,
+        rate_limit=SUSPEND_RATE_LIMIT,
+        retry=LIMIT_RETRY,
+    ),
+    CollectorOperation(
+        key="suspend_d_incremental",
+        name="股票停复牌增量更新",
+        description="从数据集当前水位之后补充 TuShare suspend_d 数据。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(SUSPEND_D_DATASET_ID,),
+        function=collect_suspend_d_incremental,
+        rate_limit=SUSPEND_RATE_LIMIT,
+        retry=LIMIT_RETRY,
+    ),
+    CollectorOperation(
+        key="suspend_d_repair",
+        name="股票停复牌修复",
+        description="按交易日重新采集指定日期范围的 suspend_d 数据，替换受影响分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(SUSPEND_D_DATASET_ID,),
+        function=collect_suspend_d_incremental,
+        rate_limit=SUSPEND_RATE_LIMIT,
+        retry=LIMIT_RETRY,
     ),
 )
 

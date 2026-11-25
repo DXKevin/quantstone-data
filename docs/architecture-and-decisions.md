@@ -566,6 +566,16 @@ TuShare `etf_limit` 使用数据集 ID `tushare.cn.etf.etf_limit`，按交易日
 3,000 行，当前每日约 2,200 行，按交易日请求一次即可。交易所字段是 `SSE`/`SZSE`，
 不是股票接口常用的 `SH`/`SZ`。
 
+TuShare `stk_limit` 使用数据集 ID `tushare.cn.stock.stk_limit`，按交易日日分区，
+主键 `ts_code + trade_date`，存储策略 `yearly_with_delta` 并支持年度合并。字段为
+`ts_code/trade_date/pre_close/up_limit/down_limit/asset_type/exchange`；接口单次上限
+5,800 行，当前每日约 5,600 行，交易所字段为 `SSE`/`SZSE`/`BSE`。
+
+TuShare `suspend_d` 使用数据集 ID `tushare.cn.stock.suspend_d`，按交易日日分区，
+主键 `ts_code + trade_date`，存储策略 `yearly_with_delta` 并支持年度合并。字段为
+`ts_code/trade_date/suspend_timing/suspend_type`；`suspend_timing` 仅在日内停牌时有值，
+`suspend_type` 为 `S`（停牌）或 `R`（复牌）。
+
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
 `tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为
