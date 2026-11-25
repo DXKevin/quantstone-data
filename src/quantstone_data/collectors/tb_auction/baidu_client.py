@@ -115,6 +115,25 @@ def _download_own(remote_path: str, target: Path) -> Path:
     return target
 
 
+def _transfer_shared_file(api, remote_dir: str, source, share_url: str) -> None:
+    """转存分享文件，并把百度临时存储故障交给采集框架重试。"""
+    from baidupcs_py.baidupcs.errors import BaiduPCSError
+
+    try:
+        api.transfer_shared_paths(
+            remote_dir,
+            [source.fs_id],
+            source.uk,
+            source.share_id,
+            source.bdstoken,
+            share_url,
+        )
+    except BaiduPCSError as error:
+        if error.error_code == 4:
+            raise TimeoutError(f"百度网盘临时存储异常：{error}") from error
+        raise
+
+
 def fetch_shared_file(relative_path: str, target: Path, folder: str) -> Path:
     """把分享中的单个文件转存到月数据/日数据目录，下载后保留转存文件。"""
     if folder not in {"月数据", "日数据"}:
@@ -151,13 +170,6 @@ def fetch_shared_file(relative_path: str, target: Path, folder: str) -> Path:
     else:
         if api.exists(remote_path):
             api.remove(remote_path)
-        api.transfer_shared_paths(
-            remote_dir,
-            [source.fs_id],
-            source.uk,
-            source.share_id,
-            source.bdstoken,
-            share_url,
-        )
+        _transfer_shared_file(api, remote_dir, source, share_url)
     _download_own(remote_path, target)
     return target
