@@ -555,6 +555,11 @@ TuShare `fund_daily` 使用数据集 ID `tushare.cn.etf.fund_daily`，按交易�
 实际也会返回封闭式基金等其他场内基金，因此基础信息层不按 `etf_basic` 反向过滤。
 字段保持供应商语义：`vol` 单位为手，`amount` 单位为千元。
 
+TuShare `fund_adj` 使用数据集 ID `tushare.cn.etf.fund_adj`，按交易日日分区，
+主键 `ts_code + trade_date`，存储策略 `yearly_with_delta` 并支持年度合并。字段为
+`ts_code/trade_date/adj_factor`。接口单次最多返回 2,000 行，采集器使用 `offset`/`limit`
+分页，直到返回不足一页为止；不能只取第一页，否则会漏掉超过 2,000 只基金的日期。
+
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
 `tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为

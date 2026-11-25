@@ -495,6 +495,56 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tushare_etf_fund_adj",
+        category="TuShare · ETF",
+        contract=DatasetCreate(
+            id="tushare.cn.etf.fund_adj",
+            provider="tushare",
+            region="cn",
+            instrument="etf",
+            dataset_name="fund_adj",
+            market=None,
+            display_name="基金复权因子",
+            description="TuShare fund_adj 场内基金每日复权因子。",
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tushare_cn_etf",
+                    "operation": "fund_adj_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tushare_cn_etf",
+                    "operation": "fund_adj_incremental",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tushare_cn_etf",
+                    "operation": "fund_adj_repair",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ts_code", "trade_date"],
+            time_field="trade_date",
+            fields=[
+                field("ts_code", "string", "基金代码", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("adj_factor", "float64", "复权因子", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_adj_factor",
         category="TuShare · A股",
         contract=DatasetCreate(

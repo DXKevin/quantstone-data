@@ -44,6 +44,7 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
     assert set(REVIEWERS) == {
         "tushare.cn.etf.etf_basic",
         "tushare.cn.etf.fund_daily",
+        "tushare.cn.etf.fund_adj",
         "tushare.cn.index.index_basic",
         "tushare.cn.index.index_daily",
         "tushare.cn.stock.adj_factor",
