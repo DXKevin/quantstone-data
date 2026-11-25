@@ -3,6 +3,7 @@ from ...collector_types import (
     CollectorOperation,
     CollectorParameter,
     RateLimit,
+    RetryPolicy,
 )
 from .etf_basic import collect_incremental, collect_initial
 from .etf_limit import collect_incremental as collect_etf_limit_incremental
@@ -20,6 +21,9 @@ RATE_LIMIT = RateLimit(calls=100, period_seconds=60, scope="etf_basic")
 FUND_DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="fund_daily")
 FUND_ADJ_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="fund_adj")
 ETF_LIMIT_RATE_LIMIT = RateLimit(calls=100, period_seconds=60, scope="etf_limit")
+# 代理在上游抖动时会连续返回 502；保留更长的退避窗口。
+FUND_ADJ_RETRY = RetryPolicy(attempts=6, delay_seconds=30, max_delay_seconds=300)
+ETF_LIMIT_RETRY = RetryPolicy(attempts=6, delay_seconds=30, max_delay_seconds=300)
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
     CollectorParameter("end_date", "date", True, "采集结束日期"),
@@ -88,6 +92,7 @@ OPERATIONS = (
         datasets=(FUND_ADJ_DATASET_ID,),
         function=collect_fund_adj_initial,
         rate_limit=FUND_ADJ_RATE_LIMIT,
+        retry=FUND_ADJ_RETRY,
     ),
     CollectorOperation(
         key="fund_adj_incremental",
@@ -98,6 +103,7 @@ OPERATIONS = (
         datasets=(FUND_ADJ_DATASET_ID,),
         function=collect_fund_adj_incremental,
         rate_limit=FUND_ADJ_RATE_LIMIT,
+        retry=FUND_ADJ_RETRY,
     ),
     CollectorOperation(
         key="fund_adj_repair",
@@ -108,6 +114,7 @@ OPERATIONS = (
         datasets=(FUND_ADJ_DATASET_ID,),
         function=collect_fund_adj_incremental,
         rate_limit=FUND_ADJ_RATE_LIMIT,
+        retry=FUND_ADJ_RETRY,
     ),
     CollectorOperation(
         key="etf_limit_initial",
@@ -118,6 +125,7 @@ OPERATIONS = (
         datasets=(ETF_LIMIT_DATASET_ID,),
         function=collect_etf_limit_initial,
         rate_limit=ETF_LIMIT_RATE_LIMIT,
+        retry=ETF_LIMIT_RETRY,
     ),
     CollectorOperation(
         key="etf_limit_incremental",
@@ -128,6 +136,7 @@ OPERATIONS = (
         datasets=(ETF_LIMIT_DATASET_ID,),
         function=collect_etf_limit_incremental,
         rate_limit=ETF_LIMIT_RATE_LIMIT,
+        retry=ETF_LIMIT_RETRY,
     ),
     CollectorOperation(
         key="etf_limit_repair",
@@ -138,6 +147,7 @@ OPERATIONS = (
         datasets=(ETF_LIMIT_DATASET_ID,),
         function=collect_etf_limit_incremental,
         rate_limit=ETF_LIMIT_RATE_LIMIT,
+        retry=ETF_LIMIT_RETRY,
     ),
 )
 
