@@ -205,7 +205,7 @@ def collect_wind_l2(
     if context.data_root is None:
         raise RuntimeError("Wind L2 采集器缺少 data_root")
     run_date = date.fromisoformat(str(parameters["trade_date"]))
-    work_root = context.data_root / "downloads" / "wind_l2"
+    work_root = context.data_root / "cache" / "wind_l2"
     archive = work_root / "archives" / f"{run_date:%Y%m}" / f"{run_date:%Y%m%d}.7z"
     extract_root = work_root / "extracted"
     outputs: dict[str, list[DatasetArtifact]] = {}

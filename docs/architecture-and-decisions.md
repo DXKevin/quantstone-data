@@ -187,7 +187,7 @@ wind.cn.stock.l2_trade.sz
 
 Wind 深市 L2 已接入正式采集器 `wind_l2_sz`。它按交易日从百度分享目录查找
 `YYYYMM/YYYYMMDD.7z`，先转存至个人网盘，再校验远端大小并下载到数据根目录的
-`downloads/wind_l2/`。服务器使用系统 `7z` 解压，PyArrow 按股票 CSV 批次读取 GBK 文本，只保留
+`cache/wind_l2/`。服务器使用系统 `7z` 解压，PyArrow 按股票 CSV 批次读取 GBK 文本，只保留
 代码首位为 `0/3` 的深市股票，直接生成当前契约的 `l2_order.parquet` 或 `l2_trade.parquet`，不再
 生成旧中文字段中间 Parquet，也不把全天数据一次性载入内存。订单与成交任务共享下载、解压目录并
 在进程内串行；同一天两种输出都转换完成后删除压缩包和解压目录。下载凭证只从环境变量读取。

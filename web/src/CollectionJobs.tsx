@@ -283,6 +283,13 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
     }
   }
 
+  async function refreshJobs() {
+    await loadJobs();
+    if (!expandedJobId) return;
+    if (detailTab === "logs") await loadLogs(expandedJobId);
+    else await loadRuns(expandedJobId);
+  }
+
   async function toggleJob(job: CollectionJob) {
     if (expandedJobId === job.id) {
       setExpandedJobId(null);
@@ -481,7 +488,7 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
       <section className="panel">
         <div className="panel-toolbar">
           <div><h2>任务记录</h2><span>共 {jobTotal} 个任务</span></div>
-          <button className="toolbar-button" onClick={() => void loadJobs()}><RefreshCw size={15} />刷新</button>
+          <button className="toolbar-button" onClick={() => void refreshJobs()}><RefreshCw size={15} />刷新任务</button>
         </div>
         {loading ? (
           <div className="state-box"><div className="loader" /><p>正在加载采集任务…</p></div>
@@ -549,7 +556,6 @@ export default function CollectionJobs({ datasets, collectors, navigation, reque
                         </label>
                       )}
                     </div>
-                    <button type="button" className="toolbar-button" onClick={() => void (detailTab === "logs" ? loadLogs(job.id) : loadRuns(job.id))}><RefreshCw size={14} />刷新</button>
                   </div>
                   {job.error && <div className="job-error-banner"><AlertCircle size={15} /><span><strong>任务失败原因</strong>{job.error}</span></div>}
                   {detailTab === "runs" && (jobRuns.length ? (

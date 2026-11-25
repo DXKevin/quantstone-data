@@ -67,6 +67,7 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingStart, setPendingStart] = useState<PendingStart | null>(null);
+  const [coverageRefresh, setCoverageRefresh] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +91,11 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function refreshAll() {
+    await load();
+    setCoverageRefresh((value) => value + 1);
+  }
 
   const totals = useMemo(
     () => ({
@@ -216,13 +222,13 @@ export default function OverviewPage({ datasets, collectors, onOpen, onOpenColle
           <h1>数据概览</h1>
           <p className="subtitle">按数据集聚合已发布的分区、行数、体积和覆盖情况，并汇总最近采集运行。</p>
         </div>
-        <button className="toolbar-button" onClick={() => void load()}><RefreshCw size={15} />刷新</button>
+        <button className="toolbar-button" onClick={() => void refreshAll()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新全部</button>
       </header>
 
       {actionNotice && <div className="notice-banner"><CheckCircle2 size={17} />{actionNotice}</div>}
       {actionError && !pendingStart && <div className="form-error"><AlertCircle size={17} />{actionError}</div>}
 
-      <CoverageHeatmap onOpen={onOpen} />
+      <CoverageHeatmap onOpen={onOpen} refreshToken={coverageRefresh} />
 
       <section className="summary-strip">
         <div><span>数据集</span><strong>{totals.datasets}</strong></div>

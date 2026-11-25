@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CoverageResponse } from "./api";
 
@@ -12,7 +12,7 @@ const statusLabels: Record<string, string> = {
   pending: "待采集",
 };
 
-export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => void }) {
+export default function CoverageHeatmap({ onOpen, refreshToken = 0 }: { onOpen: (id: string) => void; refreshToken?: number }) {
   const [days, setDays] = useState(90);
   const [data, setData] = useState<CoverageResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
 
   useEffect(() => {
     void load(days);
-  }, [days, load]);
+  }, [days, load, refreshToken]);
 
   const months = useMemo(() => groups(data?.dates ?? []), [data]);
 
@@ -66,7 +66,6 @@ export default function CoverageHeatmap({ onOpen }: { onOpen: (id: string) => vo
               </button>
             ))}
           </div>
-          <button className="toolbar-button" onClick={() => void load(days)}><RefreshCw size={14} />刷新</button>
         </div>
       </div>
 

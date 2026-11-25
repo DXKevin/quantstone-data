@@ -76,7 +76,7 @@ export default function DatasetPreview({ dataset }: { dataset: DatasetDetail }) 
         <div><h2>数据预览</h2><p>未筛选时预览 {PREVIEW_LIMIT} 行；按主键查询时最多展示 {QUERY_LIMIT.toLocaleString()} 行。</p></div>
         <div className="preview-actions">
           {preview && <span>读取 {preview.files_read} 个文件 · 展示 {preview.row_count.toLocaleString()} 行</span>}
-          <button type="button" className="toolbar-button" onClick={() => void load(filters)} disabled={loading}><RefreshCw size={14} />刷新</button>
+          <button type="button" className="toolbar-button" onClick={() => void load(appliedFilters)} disabled={loading}><RefreshCw size={14} />重新读取</button>
         </div>
       </div>
 
