@@ -43,6 +43,7 @@ def test_collector_registry_describes_operations_and_outputs(tmp_path: Path) -> 
 def test_reviewer_registry_uses_dataset_ids() -> None:
     assert set(REVIEWERS) == {
         "tushare.cn.etf.basic",
+        "tushare.cn.etf.fund_daily",
         "tushare.cn.index.index_basic",
         "tushare.cn.index.index_daily",
         "tushare.cn.stock.adj_factor",

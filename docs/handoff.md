@@ -19,8 +19,8 @@
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
-- 当前 15 个数据集均为 active：TuShare 9 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
-- Catalog 实际为 **22,106 个分区、197,827,332,965 行、1.99 TB**；数据根
+- 当前 16 个数据集均为 active：TuShare 10 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
+- Catalog 实际为 **22,107 个分区、197,827,335,177 行、1.99 TB**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
@@ -36,6 +36,8 @@
   49,706 行，覆盖 2010-01-04 至 2026-11-23；不要再重复采集；
 - `tushare.cn.etf.basic` 已完成首次和增量快照，当前 1 个 snapshot、3,266 行；
   分别请求 L/D/P 三种状态并按 ts_code 去重，保留 `.OF` 和字母后缀代码；
+- `tushare.cn.etf.fund_daily` 已完成 2026-11-24 首次和 repair 验证，当前 1 个分区、
+  2,212 行；按交易日采集接口返回的全部场内基金，未按 ETF 清单反向过滤；
 - `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
   2026-11-24 采集，共 **2,889 个分区、2,718,527,482 行**；
 - `tb_lhsjk.cn.stock.auction_process` 已采集 2020-01-02 至 2026-11-24，共
@@ -66,7 +68,22 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 本轮完整测试：128 项通过、`ruff check .` 通过、`npm run build` 通过。
+- 本轮完整测试：130 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-25 — DeepSeek Harness（TuShare 场内基金日线）
+
+完成：
+
+- 新增并启用 `tushare.cn.etf.fund_daily`，按交易日日分区，主键
+  `ts_code + trade_date`，支持年度合并；
+- 新增 `tushare_cn_etf` 的 `fund_daily_initial` / `fund_daily_incremental` /
+  `fund_daily_repair` 操作，按交易日请求一次 `fund_daily`；
+- 契约字段为 `ts_code/trade_date/open/high/low/close/pre_close/change/pct_chg/vol/amount`；
+- 保存接口返回的全部场内基金；接口虽名为 ETF 日线，也会返回封闭式基金等其他场内基金，
+  不按 `etf_basic` 反向过滤；
+- 新增专用审核器，检查字段、非空、主键和 OHLC 关系；
+- 真实首次和 repair 任务均成功，发布 2026-11-24 的 2,212 行；
+- 完整测试 130 项通过，`ruff` 和前端构建通过。
 
 ## 2026-11-25 — DeepSeek Harness（TuShare ETF 基础信息）
 

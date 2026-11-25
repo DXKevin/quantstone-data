@@ -549,6 +549,12 @@ TuShare `etf_basic` 使用数据集 ID `tushare.cn.etf.basic`，存储为单个 
 （`.SH/.SZ`）和场外基金代码（`.OF`），也包含带字母后缀的代码（例如 `159908J.SZ`），
 采集器按供应商原值保留，不在基础信息层过滤；需要交易所 ETF 时由使用方按代码或交易所筛选。
 
+TuShare `fund_daily` 使用数据集 ID `tushare.cn.etf.fund_daily`，按交易日日分区，
+主键 `ts_code + trade_date`，存储策略 `yearly_with_delta` 并支持年度合并。首次、增量
+和 repair 都按交易日请求一次，保存接口返回的全部场内基金；接口虽然名为 ETF 日线，
+实际也会返回封闭式基金等其他场内基金，因此基础信息层不按 `etf_basic` 反向过滤。
+字段保持供应商语义：`vol` 单位为手，`amount` 单位为千元。
+
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
 `tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为

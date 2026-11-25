@@ -20,6 +20,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tb_sbkj2077.cn.stock.minute_1m",
             "tb_lhsjk.cn.stock.auction_process",
             "tushare.cn.etf.basic",
+            "tushare.cn.etf.fund_daily",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
@@ -42,6 +43,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
     etf_basic = contracts["tushare.cn.etf.basic"]
+    etf_fund_daily = contracts["tushare.cn.etf.fund_daily"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
@@ -118,6 +120,21 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "custod_name",
         "mgt_fee",
         "etf_type",
+    ]
+    assert etf_fund_daily["storage_policy"]["layout"] == "yearly_with_delta"
+    assert etf_fund_daily["primary_key"] == ["ts_code", "trade_date"]
+    assert [item["name"] for item in etf_fund_daily["fields"]] == [
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "change",
+        "pct_chg",
+        "vol",
+        "amount",
     ]
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
