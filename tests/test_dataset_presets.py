@@ -19,6 +19,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tushare.cn.index.index_daily",
             "tb_sbkj2077.cn.stock.minute_1m",
             "tb_lhsjk.cn.stock.auction_process",
+            "tushare.cn.etf.basic",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
@@ -40,6 +41,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
+    etf_basic = contracts["tushare.cn.etf.basic"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
@@ -98,6 +100,25 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "minute_1m_incremental",
         "minute_1m_repair",
     }
+    assert etf_basic["instrument"] == "etf"
+    assert etf_basic["storage_policy"]["layout"] == "snapshot"
+    assert etf_basic["primary_key"] == ["ts_code"]
+    assert [item["name"] for item in etf_basic["fields"]] == [
+        "ts_code",
+        "csname",
+        "extname",
+        "cname",
+        "index_code",
+        "index_name",
+        "setup_date",
+        "list_date",
+        "list_status",
+        "exchange",
+        "mgr_name",
+        "custod_name",
+        "mgt_fee",
+        "etf_type",
+    ]
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"
     assert l2_order["time_granularity"] == "tick"
