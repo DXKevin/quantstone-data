@@ -8,16 +8,16 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 from quantstone_data.collection_protocol import CollectionContext
-from quantstone_data.collectors.tb_minute import minute_1m
+from quantstone_data.collectors.tb_lhsjk_023199 import minute_1m
 from quantstone_data.dataset_presets import DATASET_PRESETS
 from quantstone_data.models import DatasetField, DatasetSchemaVersion
 from quantstone_data.reviewer_types import ReviewContext
-from quantstone_data.reviewers.tb_minute.cn.stock.minute_1m.reviewer import review
+from quantstone_data.reviewers.tb_lhsjk_023199.cn.stock.minute_1m.reviewer import review
 
 
 def test_repair_uses_incremental_path() -> None:
-    from quantstone_data.collectors.tb_minute.definition import COLLECTOR
-    from quantstone_data.collectors.tb_minute.minute_1m import collect_incremental
+    from quantstone_data.collectors.tb_lhsjk_023199.definition import COLLECTOR
+    from quantstone_data.collectors.tb_lhsjk_023199.minute_1m import collect_incremental
 
     assert COLLECTOR.operations["minute_1m_repair"].function is collect_incremental
 
@@ -76,7 +76,7 @@ def _schema() -> DatasetSchemaVersion:
     contract = next(
         item.contract
         for item in DATASET_PRESETS
-        if item.contract.id == "tb_minute.cn.stock.minute_1m"
+        if item.contract.id == "tb_lhsjk_023199.cn.stock.minute_1m"
     )
     schema = DatasetSchemaVersion(
         version=1,

@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from . import baidu_client
 
-DATASET_ID = "tb_minute.cn.stock.minute_1m"
+DATASET_ID = "tb_lhsjk_023199.cn.stock.minute_1m"
 ANNUAL_ROOT = "沪深股票/1分钟_按年汇总"
 DAILY_ROOT = "沪深股票/每日更新/1分钟"
 CACHE_ROOT_NAME = "minute_1m"

@@ -94,7 +94,7 @@ def review(context: ReviewContext) -> ReviewReport:
                 break
 
     return ReviewReport(
-        reviewer="tb_minute.cn.stock.minute_1m",
+        reviewer="tb_lhsjk_023199.cn.stock.minute_1m",
         passed=not errors,
         row_count=metadata.num_rows,
         errors=tuple(errors),

@@ -15,6 +15,7 @@ from .database import (
     create_session_factory,
     default_data_root,
     default_database_url,
+    migrate_minute_provider_id,
     upgrade_sqlite_schema,
 )
 from .dataset_categories import router as dataset_categories_router
@@ -42,6 +43,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         engine = session_factory.kw["bind"]
         Base.metadata.create_all(engine)
         upgrade_sqlite_schema(engine)
+        migrated_minute_provider = migrate_minute_provider_id(engine, resolved_data_root)
         with session_factory() as session:
             migrated_l2_directories = migrate_l2_directory_paths(
                 session, resolved_data_root
@@ -53,6 +55,12 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
             log_event(
                 "l2_directory_paths_migrated",
                 directories=migrated_l2_directories,
+            )
+        if migrated_minute_provider:
+            log_event(
+                "minute_provider_id_migrated",
+                old_id="tb_minute.cn.stock.minute_1m",
+                new_id="tb_lhsjk_023199.cn.stock.minute_1m",
             )
         if recovered_jobs or recovered_maintenance or recovered_imports:
             log_event(

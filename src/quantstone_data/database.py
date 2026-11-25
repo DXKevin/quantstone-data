@@ -429,11 +429,11 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             },
         )
         minute_bindings = (
-            '[{"purpose":"initial","collector_key":"tb_minute",'
+            '[{"purpose":"initial","collector_key":"tb_lhsjk_023199",'
             '"operation":"minute_1m_initial","parameters":{}},'
-            '{"purpose":"incremental","collector_key":"tb_minute",'
+            '{"purpose":"incremental","collector_key":"tb_lhsjk_023199",'
             '"operation":"minute_1m_incremental","parameters":{}},'
-            '{"purpose":"repair","collector_key":"tb_minute",'
+            '{"purpose":"repair","collector_key":"tb_lhsjk_023199",'
             '"operation":"minute_1m_repair","parameters":{}}]'
         )
         connection.execute(
@@ -442,10 +442,109 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 "WHERE id = :dataset_id"
             ),
             {
-                "dataset_id": "tb_minute.cn.stock.minute_1m",
+                "dataset_id": "tb_lhsjk_023199.cn.stock.minute_1m",
                 "bindings": minute_bindings,
             },
         )
+
+
+def migrate_minute_provider_id(engine: Engine, data_root: Path) -> bool:
+    """把分钟数据的临时淘宝渠道代号原地迁移为稳定卖家代号。"""
+    if engine.dialect.name != "sqlite":
+        return False
+    old_id = "tb_minute.cn.stock.minute_1m"
+    new_id = "tb_lhsjk_023199.cn.stock.minute_1m"
+    old_collector = "tb_minute"
+    new_collector = "tb_lhsjk_023199"
+    with engine.connect() as connection:
+        exists = connection.scalar(
+            text("SELECT COUNT(*) FROM datasets WHERE id = :dataset_id"),
+            {"dataset_id": old_id},
+        )
+        new_exists = connection.scalar(
+            text("SELECT COUNT(*) FROM datasets WHERE id = :dataset_id"),
+            {"dataset_id": new_id},
+        )
+    old_directory = data_root / "datasets" / old_id
+    new_directory = data_root / "datasets" / new_id
+    if not exists:
+        if new_exists and old_directory.is_dir() and not new_directory.exists():
+            old_directory.rename(new_directory)
+        return False
+    if new_exists:
+        raise RuntimeError(f"分钟数据迁移目标已存在：{new_id}")
+    if old_directory.is_dir() and new_directory.exists():
+        raise RuntimeError(f"分钟数据迁移目录冲突：{new_directory}")
+
+    directory_renamed = False
+    if old_directory.is_dir():
+        old_directory.rename(new_directory)
+        directory_renamed = True
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO datasets (id, provider, region, instrument, dataset_name, "
+                    "market, display_name, description, category_id, status, update_frequency, "
+                    "time_granularity, is_historical, current_schema_version, collection_bindings, "
+                    "storage_policy, created_at, updated_at) "
+                    "SELECT :new_id, :new_provider, region, instrument, dataset_name, market, "
+                    "display_name, description, category_id, status, update_frequency, "
+                    "time_granularity, is_historical, current_schema_version, "
+                    "replace(collection_bindings, :old_collector, :new_collector), storage_policy, "
+                    "created_at, updated_at FROM datasets WHERE id = :old_id"
+                ),
+                {
+                    "old_id": old_id,
+                    "new_id": new_id,
+                    "new_provider": new_collector,
+                    "old_collector": old_collector,
+                    "new_collector": new_collector,
+                },
+            )
+            for table in (
+                "dataset_schema_versions",
+                "collection_jobs",
+                "maintenance_jobs",
+                "catalog_files",
+                "catalog_partitions",
+                "import_jobs",
+            ):
+                connection.execute(
+                    text(f"UPDATE {table} SET dataset_id = :new_id WHERE dataset_id = :old_id"),
+                    {"old_id": old_id, "new_id": new_id},
+                )
+            connection.execute(
+                text(
+                    "UPDATE collection_jobs SET collector_key = :new_collector "
+                    "WHERE collector_key = :old_collector"
+                ),
+                {"old_collector": old_collector, "new_collector": new_collector},
+            )
+            for table, column in (
+                ("catalog_files", "path"),
+                ("catalog_partitions", "file_path"),
+                ("collection_runs", "published_path"),
+            ):
+                connection.execute(
+                    text(
+                        f"UPDATE {table} SET {column} = replace({column}, :old_id, :new_id) "
+                        f"WHERE {column} LIKE :old_pattern"
+                    ),
+                    {
+                        "old_id": old_id,
+                        "new_id": new_id,
+                        "old_pattern": f"%{old_id}%",
+                    },
+                )
+            connection.execute(
+                text("DELETE FROM datasets WHERE id = :old_id"), {"old_id": old_id}
+            )
+    except Exception:
+        if directory_renamed and new_directory.is_dir() and not old_directory.exists():
+            new_directory.rename(old_directory)
+        raise
+    return True
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

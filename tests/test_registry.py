@@ -50,7 +50,7 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
         "tushare.cn.stock.stock_basic",
         "tushare.cn.stock.stock_st",
         "tushare.cn.stock.trade_cal",
-        "tb_minute.cn.stock.minute_1m",
+        "tb_lhsjk_023199.cn.stock.minute_1m",
         "wind.cn.stock.l2_order.sz",
         "wind.cn.stock.l2_trade.sz",
         "zhongtai.cn.stock.l2_order.sz",

@@ -1,6 +1,6 @@
 from .collector_types import CollectorDefinition, CollectorOperation
 from .collectors.tb_auction import COLLECTOR as TB_AUCTION
-from .collectors.tb_minute import COLLECTOR as TB_MINUTE
+from .collectors.tb_lhsjk_023199 import COLLECTOR as TB_MINUTE
 from .collectors.tushare_cn_stock import COLLECTOR as TUSHARE_CN_STOCK
 from .collectors.wind_l2_sz import COLLECTOR as WIND_L2_SZ
 

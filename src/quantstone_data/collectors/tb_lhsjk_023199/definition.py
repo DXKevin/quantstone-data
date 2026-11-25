@@ -6,7 +6,7 @@ from ...collector_types import (
 )
 from .minute_1m import collect_incremental, collect_initial
 
-DATASET_ID = "tb_minute.cn.stock.minute_1m"
+DATASET_ID = "tb_lhsjk_023199.cn.stock.minute_1m"
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
     CollectorParameter("end_date", "date", True, "采集结束日期"),
@@ -49,8 +49,8 @@ OPERATIONS = (
 )
 
 COLLECTOR = CollectorDefinition(
-    key="tb_minute",
-    name="A股分钟数据（网盘）",
-    description="从百度网盘 A股分钟数据 采集沪深股票分钟线。",
+    key="tb_lhsjk_023199",
+    name="lhsjk_023199 A股分钟数据",
+    description="采集供应商 lhsjk_023199 通过百度网盘交付的沪深股票分钟线。",
     operations={operation.key: operation for operation in OPERATIONS},
 )

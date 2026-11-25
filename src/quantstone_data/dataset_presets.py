@@ -250,11 +250,11 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
-        key="tb_minute_stock_1m",
-        category="网盘 · A股分钟",
+        key="tb_lhsjk_023199_stock_1m",
+        category="lhsjk_023199 · A股分钟",
         contract=DatasetCreate(
-            id="tb_minute.cn.stock.minute_1m",
-            provider="tb_minute",
+            id="tb_lhsjk_023199.cn.stock.minute_1m",
+            provider="tb_lhsjk_023199",
             region="cn",
             instrument="stock",
             dataset_name="minute_1m",
@@ -268,19 +268,19 @@ DATASET_PRESETS = (
             collection_bindings=[
                 {
                     "purpose": "initial",
-                    "collector_key": "tb_minute",
+                    "collector_key": "tb_lhsjk_023199",
                     "operation": "minute_1m_initial",
                     "parameters": {},
                 },
                 {
                     "purpose": "incremental",
-                    "collector_key": "tb_minute",
+                    "collector_key": "tb_lhsjk_023199",
                     "operation": "minute_1m_incremental",
                     "parameters": {},
                 },
                 {
                     "purpose": "repair",
-                    "collector_key": "tb_minute",
+                    "collector_key": "tb_lhsjk_023199",
                     "operation": "minute_1m_repair",
                     "parameters": {},
                 },

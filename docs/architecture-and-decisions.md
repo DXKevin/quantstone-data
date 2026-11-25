@@ -542,7 +542,8 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 契约和采集器测试，最后提交覆盖历史范围的 repair 任务重建受影响分区；`start_date` 之后
 缺失才失败，之前自动跳过。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
 
-网盘 A 股 1 分钟线使用数据集 ID `tb_minute.cn.stock.minute_1m`，范围仅沪深股票，
+供应商 lhsjk_023199 的 A 股 1 分钟线使用数据集 ID
+`tb_lhsjk_023199.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为
 `ts_code/trade_date/bar_time/open/high/low/close/volume/amount/pct_chg/amplitude`，
 主键 `ts_code + trade_date + bar_time`，按交易日日分区，不做年度合并；`bar_time` 是
