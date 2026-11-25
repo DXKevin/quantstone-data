@@ -80,7 +80,7 @@ const statusLabels = {
 const purposeLabels: Record<CollectionPurpose, string> = {
   initial: "首次采集",
   incremental: "增量更新",
-  repair: "缺口修复",
+  repair: "范围补采 / 修复",
   replace: "范围重建",
 };
 

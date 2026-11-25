@@ -36,12 +36,12 @@ OPERATIONS = (
     ),
     CollectorOperation(
         "auction_process_repair",
-        "集合竞价修复",
-        "按日期重新读取单日文件。",
+        "集合竞价按月历史补采 / 修复",
+        "按日期范围复用月包补采历史；月包不存在时回退单日文件。",
         "repair",
         DATES,
         (DATASET_ID,),
-        collect_daily,
+        collect_initial,
         retry=RetryPolicy(attempts=3, delay_seconds=10, max_delay_seconds=60),
     ),
 )

@@ -35,7 +35,7 @@ import {
 const operationLabels: Record<CollectionOperation, string> = {
   initial: "首次采集",
   incremental: "增量更新",
-  repair: "缺口修复",
+  repair: "范围补采 / 修复",
   replace: "范围重建",
 };
 
@@ -746,7 +746,7 @@ function CreateCollectionJob(props: {
             <label className="input-field"><span>任务目的<b>*</b></span><select value={operation} onChange={(event) => setOperation(event.target.value as CollectionOperation)}>{Object.entries(operationLabels).filter(([value]) => inputMethod !== "collector" || supportedPurposes.includes(value as CollectionOperation)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           <div className="operation-help">{operationDescription(operation)}</div>
-          {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollector?.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{operation === "repair" ? "使用该采集器重新获取指定交易日，并以新 delta 替换当前逻辑分区。" : selectedCollectorOperation.description}</span></div>{operation === "repair" ? <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /><small>修复单日时，开始和结束选择同一天。</small></label></div> : selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
+          {inputMethod === "collector" && selectedCollectorOperation && <div className="collector-parameter-form"><div className="binding-preview"><strong>{selectedCollectorOperation.name}</strong><span>{selectedCollector?.key} · {selectedCollectorOperation.key}</span><span>{selectedCollectorOperation.description}</span></div>{operation === "repair" ? <div className="form-grid two-columns date-grid"><label className="input-field"><span>开始日期<b>*</b></span><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label><label className="input-field"><span>结束日期<b>*</b></span><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /><small>可选择单日、整月或跨月日期范围。</small></label></div> : selectedCollectorOperation.parameters.length ? <div className="form-grid two-columns date-grid">{selectedCollectorOperation.parameters.map((parameter) => <CollectorParameterInput key={parameter.name} parameter={parameter} value={parameterValues[parameter.name] ?? ""} onChange={(value) => setParameterValues((current) => ({ ...current, [parameter.name]: value }))} />)}</div> : <div className="operation-help">该操作不需要运行参数。</div>}</div>}
         </div>
       </section>
 

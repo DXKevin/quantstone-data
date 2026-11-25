@@ -4,6 +4,14 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 from quantstone_data.collectors.tb_auction.auction_process import convert_csv
+from quantstone_data.collectors.tb_auction.definition import COLLECTOR
+
+
+def test_repair_reuses_monthly_initial_collector() -> None:
+    assert (
+        COLLECTOR.operations["auction_process_repair"].function
+        is COLLECTOR.operations["auction_process_initial"].function
+    )
 
 
 def test_convert_csv_preserves_duplicate_code_time_rows(tmp_path: Path) -> None:
