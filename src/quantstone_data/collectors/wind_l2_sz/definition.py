@@ -46,7 +46,7 @@ OPERATIONS = (
 )
 
 COLLECTOR = CollectorDefinition(
-    key="wind_l2_sz",
+    key="l2_sz_baidu",
     name="Wind A股 L2（百度网盘）",
     description="按交易日下载一次 Wind L2 压缩包，联合生成深市逐笔委托和逐笔成交数据。",
     operations={item.key: item for item in OPERATIONS},

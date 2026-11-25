@@ -676,3 +676,65 @@ def migrate_provider_ids(engine: Engine, data_root: Path) -> list[tuple[str, str
                 new_revisions.rename(old_revisions)
             raise
     return migrated
+
+
+NEUTRAL_COLLECTOR_KEYS = (
+    ("wind_l2_sz", "l2_sz_baidu"),
+    ("tb_auction", "auction_baidu"),
+    ("tb_lhsjk_023199", "minute_baidu"),
+)
+
+
+def migrate_neutral_collector_keys(engine: Engine) -> list[tuple[str, str]]:
+    """把带供应商品牌的采集器/扫描器内部 key 迁移为中性名称。"""
+    if engine.dialect.name != "sqlite":
+        return []
+    migrated: list[tuple[str, str]] = []
+    with engine.begin() as connection:
+        for old_key, new_key in NEUTRAL_COLLECTOR_KEYS:
+            connection.execute(
+                text(
+                    "UPDATE collection_jobs SET collector_key = :new_key "
+                    "WHERE collector_key = :old_key"
+                ),
+                {"old_key": old_key, "new_key": new_key},
+            )
+            connection.execute(
+                text(
+                    "UPDATE import_jobs SET scanner_key = :new_key "
+                    "WHERE scanner_key = :old_key"
+                ),
+                {"old_key": old_key, "new_key": new_key},
+            )
+            rows = connection.execute(
+                text(
+                    "SELECT id, collection_bindings FROM datasets "
+                    "WHERE collection_bindings LIKE :pattern"
+                ),
+                {"pattern": f"%{old_key}%"},
+            ).fetchall()
+            for dataset_id, raw in rows:
+                try:
+                    bindings = json.loads(raw or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                changed = False
+                for binding in bindings:
+                    if isinstance(binding, dict) and binding.get("collector_key") == old_key:
+                        binding["collector_key"] = new_key
+                        changed = True
+                if changed:
+                    connection.execute(
+                        text(
+                            "UPDATE datasets SET collection_bindings = :bindings "
+                            "WHERE id = :dataset_id"
+                        ),
+                        {
+                            "dataset_id": dataset_id,
+                            "bindings": json.dumps(
+                                bindings, ensure_ascii=False, separators=(",", ":")
+                            ),
+                        },
+                    )
+            migrated.append((old_key, new_key))
+    return migrated

@@ -1,7 +1,7 @@
 from ...scanner_types import ScannerDefinition, ScannerOperation
 
 WIND_L2_SZ = ScannerDefinition(
-    key="wind_l2_sz",
+    key="l2_sz_baidu",
     name="Wind A股 L2（深市）",
     description="扫描已转换的深市逐笔委托/成交 Parquet，校验后按交易日导入。",
     operations=(

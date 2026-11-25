@@ -190,7 +190,7 @@ tb_xxlpd.cn.stock.l2_trade.sz
 1.24 GB / 1.70 GB，分别约 1.16 亿 / 1.04 亿行。沪市字段值域不同且当前样本只有 order
 文件，需单独建立契约。
 
-Wind 深市 L2 已接入正式采集器 `wind_l2_sz`。它按交易日从百度分享目录查找
+Wind 深市 L2 已接入正式采集器 `l2_sz_baidu`。它按交易日从百度分享目录查找
 `YYYYMM/YYYYMMDD.7z`，先转存至个人网盘，再校验远端大小并下载到数据根目录的
 `cache/wind_l2/`。服务器使用系统 `7z` 解压，PyArrow 按股票 CSV 批次读取 GBK 文本，只保留
 代码首位为 `0/3` 的深市股票，直接生成当前契约的 `l2_order.parquet` 或 `l2_trade.parquet`，不再
@@ -422,7 +422,7 @@ QuantStone 入库是两个独立步骤。
 系统启动时自动遍历磁盘。文件清单生成后，审核和发布继续复用数据集现有流程。
 
 目录扫描器使用显式的 `scanner_key + operation` 注册，operation 声明目标数据集和文件名。
-当前已实现 `wind_l2_sz` 和 `zhongtai_l2_sz` 扫描器，各包含 `import_order` 和
+当前已实现 `l2_sz_baidu` 和 `zhongtai_l2_sz` 扫描器，各包含 `import_order` 和
 `import_trade` 两个操作；源目录
 必须位于数据根目录的 `imports/` 或 `QUANTSTONE_IMPORT_ROOTS` 配置的允许根目录内。
 导入任务使用独立 `ImportJob` 状态：

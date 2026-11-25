@@ -111,7 +111,7 @@ def test_directory_import_scans_reviews_and_publishes(tmp_path: Path) -> None:
             "/api/v1/import-jobs",
             json={
                 "dataset_id": ORDER_ID,
-                "scanner_key": "wind_l2_sz",
+                "scanner_key": "l2_sz_baidu",
                 "operation": "import_order",
                 "purpose": "repair",
                 "source_root": str(source.parent.parent),
@@ -191,7 +191,7 @@ def test_legacy_l2_partition_keys_are_migrated_to_iso_dates(tmp_path: Path) -> N
             "/api/v1/import-jobs",
             json={
                 "dataset_id": ORDER_ID,
-                "scanner_key": "wind_l2_sz",
+                "scanner_key": "l2_sz_baidu",
                 "operation": "import_order",
                 "source_root": str(source.parent.parent),
             },

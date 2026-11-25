@@ -16,6 +16,7 @@ from .database import (
     default_data_root,
     default_database_url,
     migrate_minute_provider_id,
+    migrate_neutral_collector_keys,
     migrate_provider_ids,
     upgrade_sqlite_schema,
 )
@@ -46,6 +47,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         upgrade_sqlite_schema(engine)
         migrated_minute_provider = migrate_minute_provider_id(engine, resolved_data_root)
         migrated_provider_ids = migrate_provider_ids(engine, resolved_data_root)
+        migrated_collector_keys = migrate_neutral_collector_keys(engine)
         with session_factory() as session:
             migrated_l2_directories = migrate_l2_directory_paths(
                 session, resolved_data_root
@@ -70,6 +72,14 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
                 renames=[
                     {"old_id": old, "new_id": new}
                     for old, new in migrated_provider_ids
+                ],
+            )
+        if migrated_collector_keys:
+            log_event(
+                "collector_keys_migrated",
+                renames=[
+                    {"old_key": old, "new_key": new}
+                    for old, new in migrated_collector_keys
                 ],
             )
         if recovered_jobs or recovered_maintenance or recovered_imports:

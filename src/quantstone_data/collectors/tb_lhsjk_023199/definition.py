@@ -49,7 +49,7 @@ OPERATIONS = (
 )
 
 COLLECTOR = CollectorDefinition(
-    key="tb_lhsjk_023199",
+    key="minute_baidu",
     name="lhsjk_023199 A股分钟数据",
     description="采集供应商 lhsjk_023199 通过百度网盘交付的沪深股票分钟线。",
     operations={operation.key: operation for operation in OPERATIONS},

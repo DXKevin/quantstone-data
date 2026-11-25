@@ -268,19 +268,19 @@ DATASET_PRESETS = (
             collection_bindings=[
                 {
                     "purpose": "initial",
-                    "collector_key": "tb_lhsjk_023199",
+                    "collector_key": "minute_baidu",
                     "operation": "minute_1m_initial",
                     "parameters": {},
                 },
                 {
                     "purpose": "incremental",
-                    "collector_key": "tb_lhsjk_023199",
+                    "collector_key": "minute_baidu",
                     "operation": "minute_1m_incremental",
                     "parameters": {},
                 },
                 {
                     "purpose": "repair",
-                    "collector_key": "tb_lhsjk_023199",
+                    "collector_key": "minute_baidu",
                     "operation": "minute_1m_repair",
                     "parameters": {},
                 },
@@ -332,19 +332,19 @@ DATASET_PRESETS = (
             collection_bindings=[
                 {
                     "purpose": "initial",
-                    "collector_key": "tb_auction",
+                    "collector_key": "auction_baidu",
                     "operation": "auction_process_initial",
                     "parameters": {},
                 },
                 {
                     "purpose": "incremental",
-                    "collector_key": "tb_auction",
+                    "collector_key": "auction_baidu",
                     "operation": "auction_process_incremental",
                     "parameters": {},
                 },
                 {
                     "purpose": "repair",
-                    "collector_key": "tb_auction",
+                    "collector_key": "auction_baidu",
                     "operation": "auction_process_repair",
                     "parameters": {},
                 },
@@ -694,12 +694,12 @@ DATASET_PRESETS = (
             collection_bindings=[
                 {
                     "purpose": "initial",
-                    "collector_key": "wind_l2_sz",
+                    "collector_key": "l2_sz_baidu",
                     "operation": "wind_l2_initial",
                 },
                 {
                     "purpose": "incremental",
-                    "collector_key": "wind_l2_sz",
+                    "collector_key": "l2_sz_baidu",
                     "operation": "wind_l2_incremental",
                 },
             ],
@@ -810,12 +810,12 @@ DATASET_PRESETS = (
             collection_bindings=[
                 {
                     "purpose": "initial",
-                    "collector_key": "wind_l2_sz",
+                    "collector_key": "l2_sz_baidu",
                     "operation": "wind_l2_initial",
                 },
                 {
                     "purpose": "incremental",
-                    "collector_key": "wind_l2_sz",
+                    "collector_key": "l2_sz_baidu",
                     "operation": "wind_l2_incremental",
                 },
             ],

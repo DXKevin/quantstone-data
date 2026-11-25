@@ -74,7 +74,7 @@ def test_convert_wind_trade_csv_preserves_nullable_codes(tmp_path: Path) -> None
 
 
 def test_wind_collector_and_preset_bindings_are_registered() -> None:
-    collector = COLLECTORS["wind_l2_sz"]
+    collector = COLLECTORS["l2_sz_baidu"]
     assert set(collector.operations) == {
         "wind_l2_initial",
         "wind_l2_incremental",

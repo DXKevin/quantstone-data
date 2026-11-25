@@ -77,7 +77,7 @@
 - 同步 provider、预置契约、采集器/审核器注册、扫描器 dataset ID 和测试；
 - 启动迁移原地重命名 `datasets/` 和 `revisions/` 目录，更新 Registry、Schema、Catalog、
   采集/维护/导入任务和文件路径，不复制 Parquet；
-- 采集器内部 key（`wind_l2_sz`、`tb_auction`、`tb_lhsjk_023199`）保持不变，避免额外任务迁移。
+- 采集器/扫描器内部 key 同步改为中性名称：`l2_sz_baidu`、`auction_baidu`、`minute_baidu`；同步迁移任务、导入任务和数据集绑定。
 
 验证：
 
@@ -228,7 +228,7 @@
 - Wind 20260311–20261119 共 171 天已完成 order 转换和 Catalog 导入，合计
   23,478,980,276 行；trade 已转换 171 天，但 Catalog 目前只导入 20261118 一天、104,411,003 行；
 - 正式目录导入功能已实现：`ImportJob`、扫描器、清单、审核、执行、取消 API，前端“采集 → 目录导入”；
-- Wind 扫描器 `wind_l2_sz`、中泰扫描器 `zhongtai_l2_sz` 均已注册，各有 order/trade 两个操作；
+- Wind 扫描器 `l2_sz_baidu`、中泰扫描器 `zhongtai_l2_sz` 均已注册，各有 order/trade 两个操作；
 - 中泰深市 L2 `zhongtai.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用，字段名/类型/主键与 Wind 对齐；
 - 中泰设置为 `manual` + `is_historical=true`，不进日更完成率和覆盖热力图；
 - 数据集契约新增 `is_historical`，前端可勾选，热力图和日更统计会排除历史数据集；
@@ -642,7 +642,7 @@ OfferApplSeqNum   -> ask_order_no
 - 转换脚本在 `20261118` 上验证：order 116,393,103 行、trade 104,411,003 行，耗时约
   45 秒，输出约 0.91 GB / 1.23 GB；`exchange_code` 恢复六位字符串，`order_code` 输出
   字符串 `"0"`，主键组合单日唯一；
-- 已实现正式目录导入功能：`ImportJob` 模型、`wind_l2_sz` 扫描器、清单/审核/执行/取消
+- 已实现正式目录导入功能：`ImportJob` 模型、`l2_sz_baidu` 扫描器、清单/审核/执行/取消
   API、L2 审核器、前端“采集 → 目录导入”页面；
 - 已把 `20261118` 的 order/trade 从 `imports/wind_l2_test` 扫描并导入 Catalog：
   两个数据集各有 1 个分区，行数与转换输出一致；

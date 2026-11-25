@@ -222,7 +222,7 @@ def test_repair_date_range_is_forwarded_to_collector_parameters(tmp_path: Path) 
     payload["collection_bindings"] = [
         {
             "purpose": "repair",
-            "collector_key": "tb_auction",
+            "collector_key": "auction_baidu",
             "operation": "auction_process_repair",
         }
     ]

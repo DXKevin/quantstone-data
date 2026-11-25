@@ -4,6 +4,7 @@ from quantstone_data.database import (
     Base,
     create_session_factory,
     migrate_minute_provider_id,
+    migrate_neutral_collector_keys,
     migrate_provider_ids,
 )
 from quantstone_data.models import (
@@ -97,15 +98,20 @@ def test_minute_provider_migration_keeps_catalog_and_moves_directory(tmp_path: P
             "tb_sbkj2077.cn.stock.minute_1m",
         )
     ]
+    assert migrate_neutral_collector_keys(engine) == [
+        ("wind_l2_sz", "l2_sz_baidu"),
+        ("tb_auction", "auction_baidu"),
+        ("tb_lhsjk_023199", "minute_baidu"),
+    ]
 
     with factory() as session:
         assert session.get(Dataset, OLD_ID) is None
         dataset = session.get(Dataset, NEW_ID)
         assert dataset is not None
         assert dataset.provider == "tb_sbkj2077"
-        assert dataset.collection_bindings[0]["collector_key"] == "tb_lhsjk_023199"
+        assert dataset.collection_bindings[0]["collector_key"] == "minute_baidu"
         assert session.get(CollectionJob, job.id).dataset_id == NEW_ID
-        assert session.get(CollectionJob, job.id).collector_key == "tb_lhsjk_023199"
+        assert session.get(CollectionJob, job.id).collector_key == "minute_baidu"
         assert session.get(CollectionRun, run.id).published_path == (
             f"datasets/{NEW_ID}/2026-11-24.parquet"
         )

@@ -46,7 +46,7 @@ OPERATIONS = (
     ),
 )
 COLLECTOR = CollectorDefinition(
-    "tb_auction",
+    "auction_baidu",
     "A股集合竞价（网盘）",
     "从百度网盘采集集合竞价过程数据。",
     {item.key: item for item in OPERATIONS},

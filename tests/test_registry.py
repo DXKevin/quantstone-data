@@ -67,7 +67,7 @@ def test_scanner_registry_lists_wind_and_zhongtai(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     scanners = {item["key"]: item for item in response.json()}
-    assert set(scanners) == {"wind_l2_sz", "zhongtai_l2_sz"}
+    assert set(scanners) == {"l2_sz_baidu", "zhongtai_l2_sz"}
     assert {
         item["key"] for item in scanners["zhongtai_l2_sz"]["operations"]
     } == {"import_order", "import_trade"}
