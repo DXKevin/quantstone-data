@@ -857,7 +857,7 @@ def create_collection_job(
 
     parameters = dict(binding.get("parameters", {})) if binding else {}
     parameters.update(payload.parameters)
-    if payload.start_date and payload.operation is not CollectionOperation.REPAIR:
+    if payload.start_date:
         parameters["start_date"] = payload.start_date.isoformat()
         parameters["end_date"] = payload.end_date.isoformat()
     if binding:

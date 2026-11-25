@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from quantstone_data.collectors.tushare_cn_stock.stock_basic import CollectionError
 from quantstone_data.main import create_app
+from quantstone_data.models import CollectionJob
 
 TERMINAL_STATUSES = {"cancelled", "failed", "review_failed", "review_passed", "succeeded"}
 
@@ -213,6 +214,50 @@ def test_collector_job_requires_a_binding_for_its_purpose(tmp_path: Path) -> Non
         assert response.status_code == 409
 
     assert "does not support this collection purpose" in response.text
+
+
+def test_repair_date_range_is_forwarded_to_collector_parameters(tmp_path: Path) -> None:
+    payload = dataset_payload("tb.cn.stock.auction_process")
+    payload["collection_bindings"] = [
+        {
+            "purpose": "repair",
+            "collector_key": "tb_auction",
+            "operation": "auction_process_repair",
+        }
+    ]
+
+    with create_client(tmp_path) as client:
+        assert client.post("/api/v1/datasets", json=payload).status_code == 201
+        assert client.post(f"/api/v1/datasets/{payload['id']}/activate").status_code == 200
+        with client.app.state.session_factory() as session:
+            session.add(
+                CollectionJob(
+                    id="11111111-1111-1111-1111-111111111111",
+                    dataset_id=payload["id"],
+                    operation="initial",
+                    input_method="collector",
+                    status="succeeded",
+                    parameters={},
+                )
+            )
+            session.commit()
+
+        response = client.post(
+            "/api/v1/collection-jobs",
+            json={
+                "dataset_id": payload["id"],
+                "operation": "repair",
+                "input_method": "collector",
+                "start_date": "2026-10-01",
+                "end_date": "2026-10-31",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["parameters"] == {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-31",
+    }
 
 
 def test_manual_file_import_is_staged_with_integrity_metadata(tmp_path: Path) -> None:
