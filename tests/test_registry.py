@@ -45,6 +45,7 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
         "tushare.cn.etf.etf_basic",
         "tushare.cn.etf.fund_daily",
         "tushare.cn.etf.fund_adj",
+        "tushare.cn.etf.etf_limit",
         "tushare.cn.index.index_basic",
         "tushare.cn.index.index_daily",
         "tushare.cn.stock.adj_factor",

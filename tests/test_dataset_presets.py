@@ -22,6 +22,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tushare.cn.etf.etf_basic",
             "tushare.cn.etf.fund_daily",
             "tushare.cn.etf.fund_adj",
+            "tushare.cn.etf.etf_limit",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
@@ -46,6 +47,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     etf_basic = contracts["tushare.cn.etf.etf_basic"]
     etf_fund_daily = contracts["tushare.cn.etf.fund_daily"]
     etf_fund_adj = contracts["tushare.cn.etf.fund_adj"]
+    etf_limit = contracts["tushare.cn.etf.etf_limit"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
@@ -143,6 +145,16 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "ts_code",
         "trade_date",
         "adj_factor",
+    ]
+    assert etf_limit["primary_key"] == ["ts_code", "trade_date"]
+    assert [item["name"] for item in etf_limit["fields"]] == [
+        "ts_code",
+        "trade_date",
+        "pre_close",
+        "up_limit",
+        "down_limit",
+        "asset_type",
+        "exchange",
     ]
     assert l2_order["market"] == "sz"
     assert l2_order["update_frequency"] == "daily"

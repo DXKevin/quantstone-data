@@ -5,6 +5,8 @@ from ...collector_types import (
     RateLimit,
 )
 from .etf_basic import collect_incremental, collect_initial
+from .etf_limit import collect_incremental as collect_etf_limit_incremental
+from .etf_limit import collect_initial as collect_etf_limit_initial
 from .fund_adj import collect_incremental as collect_fund_adj_incremental
 from .fund_adj import collect_initial as collect_fund_adj_initial
 from .fund_daily import collect_incremental as collect_fund_daily_incremental
@@ -13,9 +15,11 @@ from .fund_daily import collect_initial as collect_fund_daily_initial
 BASIC_DATASET_ID = "tushare.cn.etf.etf_basic"
 FUND_DAILY_DATASET_ID = "tushare.cn.etf.fund_daily"
 FUND_ADJ_DATASET_ID = "tushare.cn.etf.fund_adj"
+ETF_LIMIT_DATASET_ID = "tushare.cn.etf.etf_limit"
 RATE_LIMIT = RateLimit(calls=100, period_seconds=60, scope="etf_basic")
 FUND_DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="fund_daily")
 FUND_ADJ_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="fund_adj")
+ETF_LIMIT_RATE_LIMIT = RateLimit(calls=100, period_seconds=60, scope="etf_limit")
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
     CollectorParameter("end_date", "date", True, "采集结束日期"),
@@ -104,6 +108,36 @@ OPERATIONS = (
         datasets=(FUND_ADJ_DATASET_ID,),
         function=collect_fund_adj_incremental,
         rate_limit=FUND_ADJ_RATE_LIMIT,
+    ),
+    CollectorOperation(
+        key="etf_limit_initial",
+        name="ETF涨跌停价格首次采集",
+        description="按交易日首次采集 TuShare etf_limit ETF 每日涨跌停价格。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(ETF_LIMIT_DATASET_ID,),
+        function=collect_etf_limit_initial,
+        rate_limit=ETF_LIMIT_RATE_LIMIT,
+    ),
+    CollectorOperation(
+        key="etf_limit_incremental",
+        name="ETF涨跌停价格增量更新",
+        description="从数据集当前水位之后补充 TuShare etf_limit 数据。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(ETF_LIMIT_DATASET_ID,),
+        function=collect_etf_limit_incremental,
+        rate_limit=ETF_LIMIT_RATE_LIMIT,
+    ),
+    CollectorOperation(
+        key="etf_limit_repair",
+        name="ETF涨跌停价格修复",
+        description="按交易日重新采集指定日期范围的 etf_limit 数据，替换受影响分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(ETF_LIMIT_DATASET_ID,),
+        function=collect_etf_limit_incremental,
+        rate_limit=ETF_LIMIT_RATE_LIMIT,
     ),
 )
 

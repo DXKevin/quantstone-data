@@ -20,7 +20,8 @@
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
 - 当前 17 个数据集均为 active：TuShare 11 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
-- Catalog 实际为 **24,996 个分区、197,830,190,371 行、1.99 TB**；数据根
+- Catalog 正在因 `tushare.cn.etf.fund_adj` repair 任务 `5f964094` 增长；任务结束后重新统计
+  分区和行数。数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
@@ -70,7 +71,23 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 本轮完整测试：132 项通过、`ruff check .` 通过、`npm run build` 通过。
+- 本轮完整测试：134 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-25 — DeepSeek Harness（TuShare ETF 涨跌停价格）
+
+完成：
+
+- 新增 `tushare.cn.etf.etf_limit` 契约、预置、采集器操作和审核器；
+- 字段 `ts_code/trade_date/pre_close/up_limit/down_limit/asset_type/exchange`，
+  主键 `ts_code + trade_date`，按交易日日分区，支持年度合并；
+- 新增 `etf_limit_initial` / `etf_limit_incremental` / `etf_limit_repair`；
+- 测试 134 项通过，`ruff` 和前端构建通过。
+
+未完成：
+
+- 尚未激活和真实采集。当前 `tushare.cn.etf.fund_adj` 的 repair 任务
+  `5f964094-4509-4a9a-8812-e6ac2d9684ec` 正在运行，**不要重启后端**；
+- 任务结束后需重启、创建数据集、激活，并用 2026-11-24 做首次采集验证。
 
 ## 2026-11-25 — DeepSeek Harness（TuShare 基金复权因子）
 
