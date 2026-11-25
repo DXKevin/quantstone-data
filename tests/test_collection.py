@@ -218,6 +218,7 @@ def test_collector_job_requires_a_binding_for_its_purpose(tmp_path: Path) -> Non
 
 def test_repair_date_range_is_forwarded_to_collector_parameters(tmp_path: Path) -> None:
     payload = dataset_payload("tb.cn.stock.auction_process")
+    payload["storage_policy"] = {"layout": "snapshot", "write_strategy": "replace_snapshot"}
     payload["collection_bindings"] = [
         {
             "purpose": "repair",

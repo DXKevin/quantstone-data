@@ -18,6 +18,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tushare.cn.index.index_basic",
             "tushare.cn.index.index_daily",
             "tb_lhsjk_023199.cn.stock.minute_1m",
+            "tb.cn.stock.auction_process",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",

@@ -252,7 +252,10 @@ def test_download_exports_all_filtered_rows_as_csv_or_parquet(tmp_path: Path) ->
     assert set(parquet_table["symbol"].to_pylist()) == {"000001.SZ"}
 
     assert unfiltered_response.status_code == 422
-    assert "至少填写一个主键" in unfiltered_response.json()["detail"]
+    assert (
+        "分区数据下载前必须指定日期范围或至少一个主键筛选条件"
+        in unfiltered_response.json()["detail"]
+    )
 
 
 def test_download_accepts_a_date_range_without_primary_key_filter(tmp_path: Path) -> None:
