@@ -8,6 +8,9 @@ from baidupcs_py.baidupcs.errors import BaiduPCSError
 from quantstone_data.collectors.tb_auction.auction_process import convert_csv
 from quantstone_data.collectors.tb_auction.baidu_client import _transfer_shared_file
 from quantstone_data.collectors.tb_auction.definition import COLLECTOR
+from quantstone_data.reviewers.tb.cn.stock.auction_process.reviewer import (
+    _event_time_in_auction_window,
+)
 
 
 def test_repair_reuses_monthly_initial_collector() -> None:
@@ -30,6 +33,14 @@ def test_baidu_storage_error_is_marked_retryable() -> None:
 
     with pytest.raises(TimeoutError, match="百度网盘临时存储异常"):
         _transfer_shared_file(FailingApi(), "/target", source, "https://example.com")
+
+
+def test_review_window_accepts_delayed_auction_snapshots() -> None:
+    assert _event_time_in_auction_window(91500000)
+    assert _event_time_in_auction_window(92603000)
+    assert _event_time_in_auction_window(93000000)
+    assert not _event_time_in_auction_window(91459000)
+    assert not _event_time_in_auction_window(93001000)
 
 
 def test_convert_csv_preserves_duplicate_code_time_rows(tmp_path: Path) -> None:

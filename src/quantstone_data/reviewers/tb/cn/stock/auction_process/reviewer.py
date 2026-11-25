@@ -7,6 +7,13 @@ import pyarrow.parquet as pq
 from ......field_types import arrow_type
 from ......reviewer_types import ReviewContext, ReviewReport
 
+EVENT_TIME_MIN = 91500000
+EVENT_TIME_MAX = 93000000
+
+
+def _event_time_in_auction_window(value: int) -> bool:
+    return EVENT_TIME_MIN <= value <= EVENT_TIME_MAX
+
 
 def _column_index(context: ReviewContext, name: str) -> int | None:
     for index, field in enumerate(context.schema.fields):
@@ -83,7 +90,9 @@ def review(context: ReviewContext) -> ReviewReport:
             stats = metadata.row_group(group).column(event_index).statistics
             if stats is None or stats.min is None:
                 continue
-            if stats.min < 91500000 or stats.max > 92601000:
+            if not _event_time_in_auction_window(stats.min) or not _event_time_in_auction_window(
+                stats.max
+            ):
                 errors.append(
                     {
                         "rule": "event_time_range",
