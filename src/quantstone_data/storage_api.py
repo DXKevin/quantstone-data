@@ -5,10 +5,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .database import get_session
-from .models import Dataset
+from .models import CatalogPartition, Dataset
 from .storage import (
     MissingCatalogFilesError,
     export_dataset_rows,
@@ -81,6 +82,8 @@ def download_rows(
     background_tasks: BackgroundTasks,
     session: SessionDep,
     format: str = "parquet",
+    start: date | None = None,
+    end: date | None = None,
 ) -> FileResponse:
     target: Path | None = None
     try:
@@ -90,7 +93,9 @@ def download_rows(
         schema = next(
             item for item in dataset.schemas if item.version == dataset.current_schema_version
         )
-        supplied = _query_filters(request, schema.primary_key_fields, {"format"})
+        supplied = _query_filters(
+            request, schema.primary_key_fields, {"format", "start", "end"}
+        )
         suffix = "csv" if format == "csv" else "parquet"
         target = (
             request.app.state.data_root
@@ -105,6 +110,8 @@ def download_rows(
             supplied,
             target,
             format,
+            start=start,
+            end=end,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail="dataset not found") from error
@@ -129,3 +136,37 @@ def download_rows(
         headers={"X-Row-Count": str(result["row_count"])},
         background=background_tasks,
     )
+
+
+@router.get("/{dataset_id}/coverage")
+def dataset_coverage(dataset_id: str, request: Request, session: SessionDep) -> dict:
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    count, rows, size_bytes, first, last = session.execute(
+        select(
+            func.count(CatalogPartition.id),
+            func.coalesce(func.sum(CatalogPartition.row_count), 0),
+            func.coalesce(func.sum(CatalogPartition.size_bytes), 0),
+            func.min(CatalogPartition.partition_key),
+            func.max(CatalogPartition.partition_key),
+        ).where(CatalogPartition.dataset_id == dataset_id)
+    ).one()
+    missing_files = sum(
+        1
+        for path in session.scalars(
+            select(CatalogPartition.file_path)
+            .where(CatalogPartition.dataset_id == dataset_id)
+            .distinct()
+        )
+        if not (request.app.state.data_root / path).is_file()
+    )
+    return {
+        "dataset_id": dataset_id,
+        "partition_count": count,
+        "row_count": rows,
+        "size_bytes": size_bytes,
+        "first_partition": first,
+        "last_partition": last,
+        "missing_files": missing_files,
+    }

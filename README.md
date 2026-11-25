@@ -63,6 +63,32 @@ uvicorn quantstone_data.main:app --reload
 API 默认地址为 `http://127.0.0.1:8000`，交互式接口文档位于
 `http://127.0.0.1:8000/docs`。
 
+## Python 数据读取 SDK
+
+安装项目后可直接使用 SDK。SDK 返回 PyArrow Table，日期、整数等类型与数据契约保持一致：
+
+```python
+from quantstone_data import QuantStoneClient
+
+qs = QuantStoneClient("http://<服务器IP>:5173/api/v1")
+
+print(qs.datasets())
+print(qs.describe("tushare.cn.stock.daily"))
+print(qs.coverage("tushare.cn.stock.daily"))
+
+table = qs.read(
+    "tushare.cn.stock.daily",
+    start="2026-11-01",
+    end="2026-11-24",
+    ts_code="000001.SZ",
+)
+print(table)
+```
+
+分区数据必须提供日期范围或至少一个主键条件，防止意外读取完整 L2 数据集。快照数据可以直接
+完整读取。需要保留服务端生成的文件时使用 `qs.download(..., target="data.parquet")`；已安装
+Pandas 时也可以使用 `qs.read_pandas(...)`。
+
 另开一个终端启动前端：
 
 ```bash
@@ -109,6 +135,9 @@ PATCH  /api/v1/dataset-categories/{category_id}
 DELETE /api/v1/dataset-categories/{category_id}
 PUT    /api/v1/datasets/{dataset_id}/category
 GET    /api/v1/datasets/{dataset_id}
+GET    /api/v1/datasets/{dataset_id}/coverage
+GET    /api/v1/datasets/{dataset_id}/rows
+GET    /api/v1/datasets/{dataset_id}/download?start=YYYY-MM-DD&end=YYYY-MM-DD
 PUT    /api/v1/datasets/{dataset_id}
 PATCH  /api/v1/datasets/{dataset_id}
 POST   /api/v1/datasets/{dataset_id}/activate

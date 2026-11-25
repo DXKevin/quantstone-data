@@ -2277,6 +2277,31 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 
 遗留问题：无。
 
+### 2026-11-25 — Codex（Python 量化数据读取 SDK）
+
+完成：
+
+- 新增 `QuantStoneClient`，支持 `datasets`、`describe`、`coverage`、`read`、
+  `read_pandas` 和 `download`；
+- SDK 通过 HTTP API 读取，不依赖服务器 Catalog 文件路径；`read` 返回保留契约类型的
+  PyArrow Table；
+- 下载接口支持 `start` / `end` 日期范围，服务端只读取对应 Catalog 分区；
+- 新增数据集覆盖摘要接口，返回分区数、行数、体积、首尾分区和缺失文件数；
+- 分区数据要求日期范围或主键条件，避免误读完整逐笔数据集；快照允许完整读取。
+
+验证：
+
+- SDK 数据集发现、URL 参数和 Parquet 类型保真测试通过；
+- `ruff check` 通过；同步 `TestClient` 集成测试仍受项目已知 lifespan 卡住问题影响。
+
+下一步：
+
+- 等集合竞价续采任务结束后重启后端，再用真实 HTTP API 验证 SDK。
+
+遗留问题：
+
+- 当前 API 仅适合可信内网，尚未加入访问令牌、权限和限流。
+
 ```markdown
 ### YYYY-MM-DD — Agent 名称
 

@@ -255,6 +255,34 @@ def test_download_exports_all_filtered_rows_as_csv_or_parquet(tmp_path: Path) ->
     assert "至少填写一个主键" in unfiltered_response.json()["detail"]
 
 
+def test_download_accepts_a_date_range_without_primary_key_filter(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        write_partition(client, "2024-01-03", ["000001.SZ"])
+
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"start": "2024-01-03", "end": "2024-01-03"},
+        )
+        coverage = client.get(f"/api/v1/datasets/{DATASET_ID}/coverage")
+
+    assert response.status_code == 200
+    table = pq.read_table(pa.BufferReader(response.content))
+    assert table.num_rows == 1
+    assert table["trade_date"].to_pylist() == [date(2024, 1, 3)]
+    assert coverage.status_code == 200
+    assert coverage.json() == {
+        "dataset_id": DATASET_ID,
+        "partition_count": 2,
+        "row_count": 3,
+        "size_bytes": coverage.json()["size_bytes"],
+        "first_partition": "2024-01-02",
+        "last_partition": "2024-01-03",
+        "missing_files": 0,
+    }
+
+
 def test_read_rows_fails_when_catalog_file_is_missing(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)

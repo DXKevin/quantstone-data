@@ -147,6 +147,8 @@ def export_dataset_rows(
     primary_key_filters: dict[str, str],
     target: Path,
     file_format: str,
+    start: date | None = None,
+    end: date | None = None,
 ) -> dict:
     """把主键筛选出的完整结果写为临时 CSV 或 Parquet 文件。"""
     dataset = session.get(Dataset, dataset_id)
@@ -156,21 +158,23 @@ def export_dataset_rows(
         item for item in dataset.schemas if item.version == dataset.current_schema_version
     )
     primary_keys = set(schema_version.primary_key_fields)
-    if not primary_key_filters:
-        raise ValueError("下载前必须至少填写一个主键筛选条件")
+    partition_field = (dataset.storage_policy or {}).get("logical_partition_field")
+    if partition_field and not primary_key_filters and start is None and end is None:
+        raise ValueError("分区数据下载前必须指定日期范围或至少一个主键筛选条件")
+    if start is not None and end is not None and start > end:
+        raise ValueError("开始日期不能晚于结束日期")
     unknown_filters = set(primary_key_filters) - primary_keys
     if unknown_filters:
         raise ValueError(f"只能按主键字段筛选：{', '.join(sorted(primary_keys))}")
     if file_format not in {"csv", "parquet"}:
         raise ValueError("下载格式只支持 csv 或 parquet")
 
-    partitions = list(
-        session.scalars(
-            select(CatalogPartition)
-            .where(CatalogPartition.dataset_id == dataset_id)
-            .order_by(CatalogPartition.partition_key)
-        )
-    )
+    query = select(CatalogPartition).where(CatalogPartition.dataset_id == dataset_id)
+    if start is not None:
+        query = query.where(CatalogPartition.partition_key >= start.isoformat())
+    if end is not None:
+        query = query.where(CatalogPartition.partition_key <= end.isoformat())
+    partitions = list(session.scalars(query.order_by(CatalogPartition.partition_key)))
     by_file: dict[str, set[str]] = {}
     for item in partitions:
         by_file.setdefault(item.file_path, set()).add(item.partition_key)
@@ -181,7 +185,6 @@ def export_dataset_rows(
         raise MissingCatalogFilesError(missing_files)
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    partition_field = (dataset.storage_policy or {}).get("logical_partition_field")
     parquet_writer: pq.ParquetWriter | None = None
     csv_writer: pacsv.CSVWriter | None = None
     csv_sink: pa.OSFile | None = None
