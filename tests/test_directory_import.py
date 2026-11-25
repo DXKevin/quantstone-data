@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from quantstone_data.field_types import arrow_type
 from quantstone_data.main import create_app
 
-ORDER_ID = "wind.cn.stock.l2_order.sz"
+ORDER_ID = "tb_xxlpd.cn.stock.l2_order.sz"
 TRADE_ID = "zhongtai.cn.stock.l2_trade.sz"
 
 

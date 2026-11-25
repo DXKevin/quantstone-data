@@ -362,6 +362,8 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
         l2_dataset_ids = (
             "wind.cn.stock.l2_order.sz",
             "wind.cn.stock.l2_trade.sz",
+            "tb_xxlpd.cn.stock.l2_order.sz",
+            "tb_xxlpd.cn.stock.l2_trade.sz",
             "zhongtai.cn.stock.l2_order.sz",
             "zhongtai.cn.stock.l2_trade.sz",
         )
@@ -550,3 +552,127 @@ def migrate_minute_provider_id(engine: Engine, data_root: Path) -> bool:
 def get_session(request: Request) -> Generator[Session, None, None]:
     with request.app.state.session_factory() as session:
         yield session
+
+
+PROVIDER_RENAMES = (
+    (
+        "tb.cn.stock.auction_process",
+        "tb_lhsjk.cn.stock.auction_process",
+        "tb_lhsjk",
+    ),
+    (
+        "tb_lhsjk_023199.cn.stock.minute_1m",
+        "tb_sbkj2077.cn.stock.minute_1m",
+        "tb_sbkj2077",
+    ),
+    (
+        "wind.cn.stock.l2_order.sz",
+        "tb_xxlpd.cn.stock.l2_order.sz",
+        "tb_xxlpd",
+    ),
+    (
+        "wind.cn.stock.l2_trade.sz",
+        "tb_xxlpd.cn.stock.l2_trade.sz",
+        "tb_xxlpd",
+    ),
+)
+
+
+def migrate_provider_ids(engine: Engine, data_root: Path) -> list[tuple[str, str]]:
+    """原地重命名数据集供应商 ID，并同步 Catalog、任务和物理目录。"""
+    if engine.dialect.name != "sqlite":
+        return []
+    migrated: list[tuple[str, str]] = []
+    for old_id, new_id, new_provider in PROVIDER_RENAMES:
+        with engine.connect() as connection:
+            exists = connection.scalar(
+                text("SELECT COUNT(*) FROM datasets WHERE id = :dataset_id"),
+                {"dataset_id": old_id},
+            )
+            new_exists = connection.scalar(
+                text("SELECT COUNT(*) FROM datasets WHERE id = :dataset_id"),
+                {"dataset_id": new_id},
+            )
+        old_directory = data_root / "datasets" / old_id
+        new_directory = data_root / "datasets" / new_id
+        old_revisions = data_root / "revisions" / old_id
+        new_revisions = data_root / "revisions" / new_id
+        if not exists:
+            continue
+        if new_exists:
+            raise RuntimeError(f"数据集迁移目标已存在：{new_id}")
+        if old_directory.is_dir() and new_directory.exists():
+            raise RuntimeError(f"数据集迁移目录冲突：{new_directory}")
+        directory_renamed = False
+        revisions_renamed = False
+        if old_directory.is_dir():
+            old_directory.rename(new_directory)
+            directory_renamed = True
+        if old_revisions.is_dir() and not new_revisions.exists():
+            old_revisions.rename(new_revisions)
+            revisions_renamed = True
+        try:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO datasets (id, provider, region, instrument, dataset_name, "
+                        "market, display_name, description, category_id, status, update_frequency, "
+                        "time_granularity, is_historical, current_schema_version, "
+                        "collection_bindings, storage_policy, created_at, updated_at) "
+                        "SELECT :new_id, :new_provider, region, instrument, dataset_name, market, "
+                        "display_name, description, category_id, status, update_frequency, "
+                        "time_granularity, is_historical, current_schema_version, "
+                        "collection_bindings, storage_policy, created_at, updated_at "
+                        "FROM datasets WHERE id = :old_id"
+                    ),
+                    {
+                        "old_id": old_id,
+                        "new_id": new_id,
+                        "new_provider": new_provider,
+                    },
+                )
+                for table in (
+                    "dataset_schema_versions",
+                    "collection_jobs",
+                    "maintenance_jobs",
+                    "catalog_files",
+                    "catalog_partitions",
+                    "import_jobs",
+                ):
+                    connection.execute(
+                        text(
+                            f"UPDATE {table} SET dataset_id = :new_id "
+                            "WHERE dataset_id = :old_id"
+                        ),
+                        {"old_id": old_id, "new_id": new_id},
+                    )
+                for table, column in (
+                    ("catalog_files", "path"),
+                    ("catalog_partitions", "file_path"),
+                    ("collection_runs", "published_path"),
+                    ("collection_runs", "staged_path"),
+                    ("import_jobs", "manifest_path"),
+                ):
+                    connection.execute(
+                        text(
+                            f"UPDATE {table} SET {column} = replace({column}, :old_id, :new_id) "
+                            f"WHERE {column} LIKE :old_pattern"
+                        ),
+                        {
+                            "old_id": old_id,
+                            "new_id": new_id,
+                            "old_pattern": f"%{old_id}%",
+                        },
+                    )
+                connection.execute(
+                    text("DELETE FROM datasets WHERE id = :old_id"),
+                    {"old_id": old_id},
+                )
+            migrated.append((old_id, new_id))
+        except Exception:
+            if directory_renamed and new_directory.is_dir() and not old_directory.exists():
+                new_directory.rename(old_directory)
+            if revisions_renamed and new_revisions.is_dir() and not old_revisions.exists():
+                new_revisions.rename(old_revisions)
+            raise
+    return migrated

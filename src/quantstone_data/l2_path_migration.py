@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from .models import CatalogFile, CatalogPartition, CollectionRun
 
 L2_DATASET_IDS = (
-    "wind.cn.stock.l2_order.sz",
-    "wind.cn.stock.l2_trade.sz",
+    "tb_xxlpd.cn.stock.l2_order.sz",
+    "tb_xxlpd.cn.stock.l2_trade.sz",
     "zhongtai.cn.stock.l2_order.sz",
     "zhongtai.cn.stock.l2_trade.sz",
 )

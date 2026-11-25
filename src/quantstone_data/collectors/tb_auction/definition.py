@@ -6,7 +6,7 @@ from ...collector_types import (
 )
 from .auction_process import collect_daily, collect_initial
 
-DATASET_ID = "tb.cn.stock.auction_process"
+DATASET_ID = "tb_lhsjk.cn.stock.auction_process"
 DATES = (
     CollectorParameter("start_date", "date", True, "开始日期"),
     CollectorParameter("end_date", "date", True, "结束日期"),

@@ -17,8 +17,8 @@ import pyarrow.parquet as pq
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from .baidu import ensure_archive
 
-ORDER_ID = "wind.cn.stock.l2_order.sz"
-TRADE_ID = "wind.cn.stock.l2_trade.sz"
+ORDER_ID = "tb_xxlpd.cn.stock.l2_order.sz"
+TRADE_ID = "tb_xxlpd.cn.stock.l2_trade.sz"
 _PIPELINE_LOCK = threading.Lock()
 
 

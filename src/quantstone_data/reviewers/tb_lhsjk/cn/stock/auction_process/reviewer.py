@@ -7,6 +7,13 @@ import pyarrow.parquet as pq
 from ......field_types import arrow_type
 from ......reviewer_types import ReviewContext, ReviewReport
 
+EVENT_TIME_MIN = 91500000
+EVENT_TIME_MAX = 93000000
+
+
+def _event_time_in_auction_window(value: int) -> bool:
+    return EVENT_TIME_MIN <= value <= EVENT_TIME_MAX
+
 
 def _column_index(context: ReviewContext, name: str) -> int | None:
     for index, field in enumerate(context.schema.fields):
@@ -77,16 +84,18 @@ def review(context: ReviewContext) -> ReviewReport:
                 }
             )
 
-    bar_index = _column_index(context, "bar_time")
-    if bar_index is not None:
+    event_index = _column_index(context, "event_time")
+    if event_index is not None:
         for group in range(metadata.num_row_groups):
-            stats = metadata.row_group(group).column(bar_index).statistics
+            stats = metadata.row_group(group).column(event_index).statistics
             if stats is None or stats.min is None:
                 continue
-            if stats.min < 93000 or stats.max > 150000:
+            if not _event_time_in_auction_window(stats.min) or not _event_time_in_auction_window(
+                stats.max
+            ):
                 errors.append(
                     {
-                        "rule": "bar_time_range",
+                        "rule": "event_time_range",
                         "min": stats.min,
                         "max": stats.max,
                     }
@@ -94,7 +103,7 @@ def review(context: ReviewContext) -> ReviewReport:
                 break
 
     return ReviewReport(
-        reviewer="tb_lhsjk_023199.cn.stock.minute_1m",
+        reviewer="tb_lhsjk.cn.stock.auction_process",
         passed=not errors,
         row_count=metadata.num_rows,
         errors=tuple(errors),

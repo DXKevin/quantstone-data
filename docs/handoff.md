@@ -33,7 +33,7 @@
   `ace1fc71-0161-4265-8da1-537e9c6bf74c` 是修复前记录，保留即可，不要重试覆盖；
 - `tushare.cn.index.index_daily` 已完成重新首次采集和年度合并，当前 4,100 个分区、
   49,706 行，覆盖 2010-01-04 至 2026-11-23；不要再重复采集；
-- `tb_lhsjk_023199.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
+- `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
   2026-11-23 首次采集，共 **2,888 个分区、2,717,268,498 行**；2026 年单独任务
   `91b1f4e1` 成功发布 214 个分区、268,373,990 行；
 - Wind L2 旧单输出任务留下的 `2026-11-20/2026-11-23` trade 缺口已由联合修复任务
@@ -41,7 +41,7 @@
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
   不在 Git 仓库内；
 - Python 读取 SDK 已加入：`QuantStoneClient` 支持 `datasets/describe/coverage/read/read_pandas/download`；
-- 分钟数据供应商标识已迁移为 `tb_lhsjk_023199`，正式数据 2,889 个分区、2,718,527,482 行，
+- 分钟数据供应商标识已迁移为 `tb_sbkj2077`，正式数据 2,889 个分区、2,718,527,482 行，
   旧路径为 0。
 
 尚未完成：
@@ -67,7 +67,7 @@
 ## 2026-11-24 — DeepSeek Harness（分钟数据集重建）
 
 - 用户要求从 2015 年开始采集；已严格删除并重建
-  `tb_lhsjk_023199.cn.stock.minute_1m`；
+  `tb_sbkj2077.cn.stock.minute_1m`；
 - 删除前 2 个测试分区（2000-06-09、2026-11-23）和任务记录已清理；
 - 当前 active、0 个 Catalog 分区、0 个任务；本地分钟缓存已删除；
 - 首次采集应选择 `2015-01-01` 至 `2026-11-23`；全量尚未启动。
@@ -76,7 +76,7 @@
 
 完成：
 
-- 新增 `tb_lhsjk_023199.cn.stock.minute_1m` 契约并启用：沪深股票、1 分钟、不复权，
+- 新增 `tb_sbkj2077.cn.stock.minute_1m` 契约并启用：沪深股票、1 分钟、不复权，
   不保存名称，日分区，不做年度合并；
 - 首次采集按年读取 `1分钟_按年汇总/YYYY_1min.zip`，在本地构建按日缓存后逐日发布；
   增量读取 `每日更新/1分钟/YYYY-MM/YYYYMMDD_1min.zip`；
@@ -203,7 +203,7 @@
 
 本轮完成：
 
-- Wind 深市 L2 `wind.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用；
+- Wind 深市 L2 `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 已建契约并启用；
 - Wind 20260311–20261119 共 171 天已完成 order 转换和 Catalog 导入，合计
   23,478,980,276 行；trade 已转换 171 天，但 Catalog 目前只导入 20261118 一天、104,411,003 行；
 - 正式目录导入功能已实现：`ImportJob`、扫描器、清单、审核、执行、取消 API，前端“采集 → 目录导入”；
@@ -518,7 +518,7 @@
 1. 先与用户确认多存储根的两个根路径、分片策略和迁移方式，再实现 `storage_roots` /
    `catalog_files.root_id`；不要按物理硬盘建多个 SQLite。
 2. 复核 Wind 173 天、中泰 2,213 天 L2 和 index_daily 4,100 天的 Catalog/文件完整性。
-3. 运行 `tb_lhsjk_023199.cn.stock.minute_1m` 首次采集，起始日期 `2015-01-01`；源分享按需
+3. 运行 `tb_sbkj2077.cn.stock.minute_1m` 首次采集，起始日期 `2015-01-01`；源分享按需
    单文件转存，首次按年、增量按日，发布后清本地缓存。
 4. 如需看 Catalog 审计视图，用户已明确暂时不要；保持按数据集接口和概览热力图即可。
 
@@ -2205,7 +2205,7 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 - `ruff check .`：通过；
 - `web/npm run build`：通过。
 
-下一步：实现 `tb.cn.stock.auction_process` 契约、百度网盘采集器、转换器和审核器，并用一天
+下一步：实现 `tb_lhsjk.cn.stock.auction_process` 契约、百度网盘采集器、转换器和审核器，并用一天
 真实数据跑通全流程。
 
 遗留问题：集合竞价流程尚未进入代码实现。
@@ -2214,7 +2214,7 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 
 完成：
 
-- 新增并启用 `tb.cn.stock.auction_process`，注册首次、增量、修复采集操作和专用审核器；
+- 新增并启用 `tb_lhsjk.cn.stock.auction_process`，注册首次、增量、修复采集操作和专用审核器；
 - 百度分享改用 BaiduPCS 分享元数据遍历，不依赖易变化的网页 `locals-data`；
 - 首次优先月包、缺失时回退单日 CSV，缓存位于 `cache/auction_process`；
 - 主键增加 `event_seq`，真实样本 35 条同代码同时间重复记录全部保留；
@@ -2312,7 +2312,7 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 完成：
 
 - 将临时渠道代号 `tb_minute` 更正为卖家代号 `tb_lhsjk_023199`，数据集 ID 改为
-  `tb_lhsjk_023199.cn.stock.minute_1m`；
+  `tb_sbkj2077.cn.stock.minute_1m`；
 - 同步修改预置契约、采集器、审核器、测试和文档；
 - 新增启动迁移，原地更新 Registry、Schema、Catalog、任务和发布路径，并在同一数据盘直接
   重命名数据集目录，不复制或重写 Parquet。
@@ -2329,7 +2329,7 @@ Catalog 分区并逐个调用单年份接口，现在即可使用；等任务结
 - 无。
 
 遗留问题：无。正式迁移已完成：新 ID 保留 2,889 个分区、2,718,527,482 行和 9 条历史
-任务，物理目录原地改名为 `datasets/tb_lhsjk_023199.cn.stock.minute_1m`（34 GB），旧路径为 0，
+任务，物理目录原地改名为 `datasets/tb_sbkj2077.cn.stock.minute_1m`（34 GB），旧路径为 0，
 外键与文件完整性正常；真实覆盖 API 返回 2015-01-05 至 2026-11-24、缺失文件 0。
 
 ```markdown

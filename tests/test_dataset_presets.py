@@ -17,16 +17,16 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         assert [item["contract"]["id"] for item in presets] == [
             "tushare.cn.index.index_basic",
             "tushare.cn.index.index_daily",
-            "tb_lhsjk_023199.cn.stock.minute_1m",
-            "tb.cn.stock.auction_process",
+            "tb_sbkj2077.cn.stock.minute_1m",
+            "tb_lhsjk.cn.stock.auction_process",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
             "tushare.cn.stock.namechange",
             "tushare.cn.stock.stock_basic",
             "tushare.cn.stock.stock_st",
             "tushare.cn.stock.daily",
-            "wind.cn.stock.l2_order.sz",
-            "wind.cn.stock.l2_trade.sz",
+            "tb_xxlpd.cn.stock.l2_order.sz",
+            "tb_xxlpd.cn.stock.l2_trade.sz",
             "zhongtai.cn.stock.l2_order.sz",
             "zhongtai.cn.stock.l2_trade.sz",
         ]
@@ -39,17 +39,17 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
-    minute_1m = contracts["tb_lhsjk_023199.cn.stock.minute_1m"]
+    minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]
     namechange = contracts["tushare.cn.stock.namechange"]
     stock_basic = contracts["tushare.cn.stock.stock_basic"]
     stock_st = contracts["tushare.cn.stock.stock_st"]
-    l2_order = contracts["wind.cn.stock.l2_order.sz"]
-    l2_trade = contracts["wind.cn.stock.l2_trade.sz"]
+    l2_order = contracts["tb_xxlpd.cn.stock.l2_order.sz"]
+    l2_trade = contracts["tb_xxlpd.cn.stock.l2_trade.sz"]
     zt_order = contracts["zhongtai.cn.stock.l2_order.sz"]
     zt_trade = contracts["zhongtai.cn.stock.l2_trade.sz"]
-    assert l2_order["provider"] == "wind"
+    assert l2_order["provider"] == "tb_xxlpd"
     assert index_basic["instrument"] == "index"
     assert index_basic["storage_policy"]["layout"] == "snapshot"
     assert index_basic["primary_key"] == ["ts_code"]
@@ -76,7 +76,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "index_daily_incremental",
         "index_daily_repair",
     }
-    assert minute_1m["provider"] == "tb_lhsjk_023199"
+    assert minute_1m["provider"] == "tb_sbkj2077"
     assert minute_1m["time_granularity"] == "minute"
     assert minute_1m["primary_key"] == ["ts_code", "trade_date", "bar_time"]
     assert minute_1m["storage_policy"]["layout"] == "daily"

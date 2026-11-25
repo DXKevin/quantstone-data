@@ -1,6 +1,6 @@
 from .reviewer_types import ReviewContext, ReviewerDefinition, ReviewReport
-from .reviewers.tb.cn.stock.auction_process import REVIEWER as TB_AUCTION_PROCESS
-from .reviewers.tb_lhsjk_023199.cn.stock.minute_1m import REVIEWER as TB_MINUTE_1M
+from .reviewers.tb_lhsjk.cn.stock.auction_process import REVIEWER as TB_AUCTION_PROCESS
+from .reviewers.tb_sbkj2077.cn.stock.minute_1m import REVIEWER as TB_MINUTE_1M
 from .reviewers.tushare.cn.index.index_basic import REVIEWER as TUSHARE_INDEX_BASIC
 from .reviewers.tushare.cn.index.index_daily import REVIEWER as TUSHARE_INDEX_DAILY
 from .reviewers.tushare.cn.stock.adj_factor import REVIEWER as TUSHARE_ADJ_FACTOR

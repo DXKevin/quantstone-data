@@ -12,7 +12,7 @@ from quantstone_data.collectors.tb_lhsjk_023199 import minute_1m
 from quantstone_data.dataset_presets import DATASET_PRESETS
 from quantstone_data.models import DatasetField, DatasetSchemaVersion
 from quantstone_data.reviewer_types import ReviewContext
-from quantstone_data.reviewers.tb_lhsjk_023199.cn.stock.minute_1m.reviewer import review
+from quantstone_data.reviewers.tb_sbkj2077.cn.stock.minute_1m.reviewer import review
 
 
 def test_repair_uses_incremental_path() -> None:
@@ -76,7 +76,7 @@ def _schema() -> DatasetSchemaVersion:
     contract = next(
         item.contract
         for item in DATASET_PRESETS
-        if item.contract.id == "tb_lhsjk_023199.cn.stock.minute_1m"
+        if item.contract.id == "tb_sbkj2077.cn.stock.minute_1m"
     )
     schema = DatasetSchemaVersion(
         version=1,

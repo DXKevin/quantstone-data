@@ -122,12 +122,12 @@ def _review(context: ReviewContext, dataset_id: str) -> ReviewReport:
 
 
 ORDER_REVIEWER = ReviewerDefinition(
-    dataset_id="wind.cn.stock.l2_order.sz",
-    function=lambda context: _review(context, "wind.cn.stock.l2_order.sz"),
+    dataset_id="tb_xxlpd.cn.stock.l2_order.sz",
+    function=lambda context: _review(context, "tb_xxlpd.cn.stock.l2_order.sz"),
 )
 TRADE_REVIEWER = ReviewerDefinition(
-    dataset_id="wind.cn.stock.l2_trade.sz",
-    function=lambda context: _review(context, "wind.cn.stock.l2_trade.sz"),
+    dataset_id="tb_xxlpd.cn.stock.l2_trade.sz",
+    function=lambda context: _review(context, "tb_xxlpd.cn.stock.l2_trade.sz"),
 )
 ZHONGTAI_ORDER_REVIEWER = ReviewerDefinition(
     dataset_id="zhongtai.cn.stock.l2_order.sz",

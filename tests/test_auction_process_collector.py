@@ -8,7 +8,7 @@ from baidupcs_py.baidupcs.errors import BaiduPCSError
 from quantstone_data.collectors.tb_auction.auction_process import convert_csv
 from quantstone_data.collectors.tb_auction.baidu_client import _transfer_shared_file
 from quantstone_data.collectors.tb_auction.definition import COLLECTOR
-from quantstone_data.reviewers.tb.cn.stock.auction_process.reviewer import (
+from quantstone_data.reviewers.tb_lhsjk.cn.stock.auction_process.reviewer import (
     _event_time_in_auction_window,
 )
 

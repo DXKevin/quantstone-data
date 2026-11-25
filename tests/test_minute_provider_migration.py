@@ -1,6 +1,11 @@
 from pathlib import Path
 
-from quantstone_data.database import Base, create_session_factory, migrate_minute_provider_id
+from quantstone_data.database import (
+    Base,
+    create_session_factory,
+    migrate_minute_provider_id,
+    migrate_provider_ids,
+)
 from quantstone_data.models import (
     CatalogFile,
     CatalogPartition,
@@ -11,7 +16,7 @@ from quantstone_data.models import (
 )
 
 OLD_ID = "tb_minute.cn.stock.minute_1m"
-NEW_ID = "tb_lhsjk_023199.cn.stock.minute_1m"
+NEW_ID = "tb_sbkj2077.cn.stock.minute_1m"
 
 
 def test_minute_provider_migration_keeps_catalog_and_moves_directory(tmp_path: Path) -> None:
@@ -86,12 +91,18 @@ def test_minute_provider_migration_keeps_catalog_and_moves_directory(tmp_path: P
         session.commit()
 
     assert migrate_minute_provider_id(engine, data_root) is True
+    assert migrate_provider_ids(engine, data_root) == [
+        (
+            "tb_lhsjk_023199.cn.stock.minute_1m",
+            "tb_sbkj2077.cn.stock.minute_1m",
+        )
+    ]
 
     with factory() as session:
         assert session.get(Dataset, OLD_ID) is None
         dataset = session.get(Dataset, NEW_ID)
         assert dataset is not None
-        assert dataset.provider == "tb_lhsjk_023199"
+        assert dataset.provider == "tb_sbkj2077"
         assert dataset.collection_bindings[0]["collector_key"] == "tb_lhsjk_023199"
         assert session.get(CollectionJob, job.id).dataset_id == NEW_ID
         assert session.get(CollectionJob, job.id).collector_key == "tb_lhsjk_023199"

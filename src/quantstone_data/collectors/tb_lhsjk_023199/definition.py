@@ -6,7 +6,7 @@ from ...collector_types import (
 )
 from .minute_1m import collect_incremental, collect_initial
 
-DATASET_ID = "tb_lhsjk_023199.cn.stock.minute_1m"
+DATASET_ID = "tb_sbkj2077.cn.stock.minute_1m"
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "采集开始日期"),
     CollectorParameter("end_date", "date", True, "采集结束日期"),

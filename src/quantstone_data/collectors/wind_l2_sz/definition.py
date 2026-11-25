@@ -1,8 +1,8 @@
 from ...collector_types import CollectorDefinition, CollectorOperation, CollectorParameter
 from .pipeline import collect_wind_l2
 
-ORDER_DATASET_ID = "wind.cn.stock.l2_order.sz"
-TRADE_DATASET_ID = "wind.cn.stock.l2_trade.sz"
+ORDER_DATASET_ID = "tb_xxlpd.cn.stock.l2_order.sz"
+TRADE_DATASET_ID = "tb_xxlpd.cn.stock.l2_trade.sz"
 
 DATE_RANGE_PARAMETERS = (
     CollectorParameter("start_date", "date", True, "首次采集开始日期"),

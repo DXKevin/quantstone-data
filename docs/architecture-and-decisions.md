@@ -176,8 +176,8 @@ tb_l2.cn.stock.l2_trade.sz
 深市 Wind L2 已完成首个实测契约：
 
 ```text
-wind.cn.stock.l2_order.sz
-wind.cn.stock.l2_trade.sz
+tb_xxlpd.cn.stock.l2_order.sz
+tb_xxlpd.cn.stock.l2_trade.sz
 ```
 
 源文件为 `SZ/YYYYMMDD/order.parquet` 和 `SZ/YYYYMMDD/trade.parquet`。`symbol` 和
@@ -543,7 +543,7 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 缺失才失败，之前自动跳过。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
 
 供应商 lhsjk_023199 的 A 股 1 分钟线使用数据集 ID
-`tb_lhsjk_023199.cn.stock.minute_1m`，范围仅沪深股票，
+`tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为
 `ts_code/trade_date/bar_time/open/high/low/close/volume/amount/pct_chg/amplitude`，
 主键 `ts_code + trade_date + bar_time`，按交易日日分区，不做年度合并；`bar_time` 是
@@ -560,7 +560,7 @@ CSV；同一分钟数据集不添加市场后缀，未来北交所若契约一�
 不得使用 `ignore_errors` 丢弃记录。年度转换成功后清理 zip、解压目录和 DuckDB 临时文件；
 转换失败时保留这些现场，供修复后直接重试，避免重复下载数 GB 年度包。
 
-淘宝供应商集合竞价过程数据使用 `tb.cn.stock.auction_process`，按交易日日分区并采用
+淘宝供应商集合竞价过程数据使用 `tb_lhsjk.cn.stock.auction_process`，按交易日日分区并采用
 `yearly_with_delta`。源字段映射为 `ts_code/trade_date/event_time/event_seq/matched_amount/
 matched_volume/unmatched_volume/book_side`；主键为
 `ts_code + trade_date + event_time + event_seq`。北交所同一证券同一时间可能有多条不同记录，

@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 from ...collection_protocol import CollectionContext, CollectionResult, DatasetArtifact
 from . import baidu_client
 
-DATASET_ID = "tb.cn.stock.auction_process"
+DATASET_ID = "tb_lhsjk.cn.stock.auction_process"
 CACHE_ROOT_NAME = "auction_process"
 
 SCHEMA = pa.schema(
