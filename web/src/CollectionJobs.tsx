@@ -658,8 +658,8 @@ function CreateCollectionJob(props: {
 
   useEffect(() => {
     const defaults: Record<string, string> = {
-      "wind.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
-      "wind.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+      "tb_xxlpd.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
+      "tb_xxlpd.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/wind_l2/sz",
       "zhongtai.cn.stock.l2_order.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
       "zhongtai.cn.stock.l2_trade.sz": "/home/hhd_data/quantstone-data/imports/zhongtai_l2/sz",
     };

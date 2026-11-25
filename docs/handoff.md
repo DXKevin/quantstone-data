@@ -22,8 +22,9 @@
 - 当前 14 个数据集均为 active：TuShare 8 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
 - Catalog 实际为 **22,105 个分区、197,827,329,699 行、1.99 TB**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
-- Wind 深市 L2 两个数据集各有 **173 个分区**，覆盖 `2026-03-11` 至 `2026-11-23`：
-  order 23,729,127,620 行、trade 20,941,981,752 行；委托和成交已改为联合首次/增量操作；
+- `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
+  `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
+  两组已改为联合首次/增量操作；
 - 中泰深市 L2 两个数据集各有 **2,213 个分区**，覆盖 `2017-01-03` 至 `2026-03-23`：
   order 80,424,316,422 行、trade 69,267,477,633 行；只保留股票、仅上午
   `09:15–11:30`，`manual` + `is_historical=true`；
@@ -34,15 +35,16 @@
 - `tushare.cn.index.index_daily` 已完成重新首次采集和年度合并，当前 4,100 个分区、
   49,706 行，覆盖 2010-01-04 至 2026-11-23；不要再重复采集；
 - `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
-  2026-11-23 首次采集，共 **2,888 个分区、2,717,268,498 行**；2026 年单独任务
-  `91b1f4e1` 成功发布 214 个分区、268,373,990 行；
+  2026-11-24 采集，共 **2,889 个分区、2,718,527,482 行**；
+- `tb_lhsjk.cn.stock.auction_process` 已采集 2020-01-02 至 2026-11-24，共
+  **1,670 个分区、481,295,947 行**；
 - Wind L2 旧单输出任务留下的 `2026-11-20/2026-11-23` trade 缺口已由联合修复任务
   `bf8a1c1c` 补齐，压缩包和解压缓存已清理；Wind 后续缓存目录统一为 `cache/wind_l2`；
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
   不在 Git 仓库内；
 - Python 读取 SDK 已加入：`QuantStoneClient` 支持 `datasets/describe/coverage/read/read_pandas/download`；
 - 分钟数据供应商标识已迁移为 `tb_sbkj2077`，正式数据 2,889 个分区、2,718,527,482 行，
-  旧路径为 0。
+  旧路径为 0；Wind L2 ID 改为 `tb_xxlpd`，集合竞价 ID 改为 `tb_lhsjk`。
 
 尚未完成：
 
@@ -63,6 +65,25 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：126 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-25 — DeepSeek Harness（供应商 ID 重命名）
+
+完成：
+
+- 集合竞价：`tb.cn.stock.auction_process` → `tb_lhsjk.cn.stock.auction_process`；
+- 分钟：`tb_lhsjk_023199.cn.stock.minute_1m` → `tb_sbkj2077.cn.stock.minute_1m`；
+- Wind L2：`wind.cn.stock.l2_order.sz` / `l2_trade.sz` →
+  `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz`；
+- 同步 provider、预置契约、采集器/审核器注册、扫描器 dataset ID 和测试；
+- 启动迁移原地重命名 `datasets/` 和 `revisions/` 目录，更新 Registry、Schema、Catalog、
+  采集/维护/导入任务和文件路径，不复制 Parquet；
+- 采集器内部 key（`wind_l2_sz`、`tb_auction`、`tb_lhsjk_023199`）保持不变，避免额外任务迁移。
+
+验证：
+
+- 126 项测试通过，`ruff` 和前端构建通过；
+- 真实 Catalog 迁移后 22,105 个分区、197,827,329,699 行保留；
+- 旧 `datasets/` 目录为 0，新目录文件完整。
 
 ## 2026-11-24 — DeepSeek Harness（分钟数据集重建）
 
