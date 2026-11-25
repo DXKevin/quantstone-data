@@ -542,7 +542,7 @@ TuShare 主要指数日线使用数据集 ID `tushare.cn.index.index_daily`，�
 契约和采集器测试，最后提交覆盖历史范围的 repair 任务重建受影响分区；`start_date` 之后
 缺失才失败，之前自动跳过。该流程不改变 Schema 和主键，但新增代码仍必须走 Git 审核。
 
-TuShare `etf_basic` 使用数据集 ID `tushare.cn.etf.basic`，存储为单个 snapshot，
+TuShare `etf_basic` 使用数据集 ID `tushare.cn.etf.etf_basic`，存储为单个 snapshot，
 主键 `ts_code`。契约保留接口的 14 个基础字段，`setup_date/list_date` 标准化为日期类型，
 `mgt_fee` 为 float64，其余保持供应商字符串语义。首次和增量都分别请求 `L`、`D`、`P`
 三种状态并按 `ts_code` 去重，不能用默认状态推测“全部”。接口当前同时返回交易所代码

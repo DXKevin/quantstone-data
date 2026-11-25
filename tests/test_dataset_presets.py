@@ -19,7 +19,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tushare.cn.index.index_daily",
             "tb_sbkj2077.cn.stock.minute_1m",
             "tb_lhsjk.cn.stock.auction_process",
-            "tushare.cn.etf.basic",
+            "tushare.cn.etf.etf_basic",
             "tushare.cn.etf.fund_daily",
             "tushare.cn.stock.adj_factor",
             "tushare.cn.stock.trade_cal",
@@ -42,7 +42,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
-    etf_basic = contracts["tushare.cn.etf.basic"]
+    etf_basic = contracts["tushare.cn.etf.etf_basic"]
     etf_fund_daily = contracts["tushare.cn.etf.fund_daily"]
     adj_factor = contracts["tushare.cn.stock.adj_factor"]
     daily = contracts["tushare.cn.stock.daily"]

@@ -8,7 +8,7 @@ from ...field_types import arrow_type, normalize_value
 from ...provider_http import post_json
 from ..tushare_cn_stock.stock_basic import load_api_url, raise_api_error
 
-DATASET_ID = "tushare.cn.etf.basic"
+DATASET_ID = "tushare.cn.etf.etf_basic"
 LIST_STATUSES = ("L", "D", "P")
 
 

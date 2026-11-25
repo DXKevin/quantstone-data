@@ -52,7 +52,7 @@ def review(context: ReviewContext) -> ReviewReport:
         *_check_domain(table),
     ]
     return ReviewReport(
-        reviewer="tushare.cn.etf.basic",
+        reviewer="tushare.cn.etf.etf_basic",
         passed=not errors,
         row_count=table.num_rows,
         errors=tuple(errors),

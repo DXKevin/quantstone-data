@@ -11,14 +11,14 @@ from quantstone_data.dataset_presets import DATASET_PRESETS
 from quantstone_data.field_types import arrow_type
 from quantstone_data.models import DatasetField, DatasetSchemaVersion
 from quantstone_data.reviewer_types import ReviewContext
-from quantstone_data.reviewers.tushare.cn.etf.basic.reviewer import review
+from quantstone_data.reviewers.tushare.cn.etf.etf_basic.reviewer import review
 
 
 def _contract():
     return next(
         item.contract
         for item in DATASET_PRESETS
-        if item.contract.id == "tushare.cn.etf.basic"
+        if item.contract.id == "tushare.cn.etf.etf_basic"
     )
 
 
@@ -56,7 +56,7 @@ def test_etf_basic_deduplicates_statuses(monkeypatch, tmp_path) -> None:
         token="token",
     )
     result = etf_basic.collect_initial(context, {}, _fields())
-    artifact = result.outputs["tushare.cn.etf.basic"][0]
+    artifact = result.outputs["tushare.cn.etf.etf_basic"][0]
     assert artifact.row_count == 2
     table = pq.read_table(artifact.path)
     assert table["ts_code"].to_pylist() == ["159919.SZ", "510300.SH"]

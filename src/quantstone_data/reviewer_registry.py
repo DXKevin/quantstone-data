@@ -1,7 +1,7 @@
 from .reviewer_types import ReviewContext, ReviewerDefinition, ReviewReport
 from .reviewers.tb_lhsjk.cn.stock.auction_process import REVIEWER as TB_AUCTION_PROCESS
 from .reviewers.tb_sbkj2077.cn.stock.minute_1m import REVIEWER as TB_MINUTE_1M
-from .reviewers.tushare.cn.etf.basic import REVIEWER as TUSHARE_ETF_BASIC
+from .reviewers.tushare.cn.etf.etf_basic import REVIEWER as TUSHARE_ETF_BASIC
 from .reviewers.tushare.cn.etf.fund_daily import REVIEWER as TUSHARE_ETF_FUND_DAILY
 from .reviewers.tushare.cn.index.index_basic import REVIEWER as TUSHARE_INDEX_BASIC
 from .reviewers.tushare.cn.index.index_daily import REVIEWER as TUSHARE_INDEX_DAILY

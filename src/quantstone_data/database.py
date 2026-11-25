@@ -556,6 +556,11 @@ def get_session(request: Request) -> Generator[Session, None, None]:
 
 PROVIDER_RENAMES = (
     (
+        "tushare.cn.etf.basic",
+        "tushare.cn.etf.etf_basic",
+        "tushare",
+    ),
+    (
         "tb.cn.stock.auction_process",
         "tb_lhsjk.cn.stock.auction_process",
         "tb_lhsjk",

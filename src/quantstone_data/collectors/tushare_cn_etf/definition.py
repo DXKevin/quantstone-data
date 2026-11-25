@@ -8,7 +8,7 @@ from .etf_basic import collect_incremental, collect_initial
 from .fund_daily import collect_incremental as collect_fund_daily_incremental
 from .fund_daily import collect_initial as collect_fund_daily_initial
 
-BASIC_DATASET_ID = "tushare.cn.etf.basic"
+BASIC_DATASET_ID = "tushare.cn.etf.etf_basic"
 FUND_DAILY_DATASET_ID = "tushare.cn.etf.fund_daily"
 RATE_LIMIT = RateLimit(calls=100, period_seconds=60, scope="etf_basic")
 FUND_DAILY_RATE_LIMIT = RateLimit(calls=50, period_seconds=60, scope="fund_daily")
