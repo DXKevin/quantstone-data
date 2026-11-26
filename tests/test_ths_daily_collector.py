@@ -82,6 +82,28 @@ def test_ths_daily_collects_complete_partition(monkeypatch, tmp_path) -> None:
     assert result.provenance["reported_total"] == 3
 
 
+def test_ths_daily_retries_incomplete_first_page(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(daily.time, "sleep", lambda _seconds: None)
+    attempts: list[int] = []
+
+    def fake_call(_key: str, trade_date: str, page: int, page_size: int = 2):
+        attempts.append(len(attempts))
+        rows = [_row(1), _row(2), _row(3)]
+        if len(attempts) == 1:
+            return len(rows), rows[:2]
+        return len(rows), rows
+
+    monkeypatch.setattr(daily, "call_api", fake_call)
+    result = daily.collect_daily(
+        CollectionContext("run", tmp_path / "staging", "api-key"),
+        {"trade_date": "2026-11-25"},
+        _fields(),
+    )
+    artifact = result.outputs[daily.DATASET_ID][0]
+    assert artifact.row_count == 3
+    assert len(attempts) == 2
+
+
 def test_ths_daily_rejects_partition_mismatch(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         daily,

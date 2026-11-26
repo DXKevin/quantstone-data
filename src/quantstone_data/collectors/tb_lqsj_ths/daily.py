@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pyarrow as pa
@@ -53,15 +54,12 @@ def _source_value(row: dict, field: dict) -> Any:
     return value
 
 
-def collect_daily(
-    context: CollectionContext, parameters: dict, field_contracts: list[dict]
-) -> CollectionResult:
-    trade_date = parameters["trade_date"]
+def _fetch_daily(token: str, trade_date: str) -> tuple[dict[str, dict], int, int]:
     by_code: dict[str, dict] = {}
     expected_total: int | None = None
     pages = 0
     for page in range(MAX_PAGE + 1):
-        total, rows = call_api(context.token, trade_date, page)
+        total, rows = call_api(token, trade_date, page)
         pages += 1
         if expected_total is None:
             expected_total = total
@@ -84,6 +82,24 @@ def collect_daily(
         raise ThsCollectionError(
             f"THS 板块日线分页不完整：期望 {expected_total or 0} 条，实际 {len(by_code)} 条"
         )
+    return by_code, expected_total, pages
+
+
+def collect_daily(
+    context: CollectionContext, parameters: dict, field_contracts: list[dict]
+) -> CollectionResult:
+    trade_date = parameters["trade_date"]
+    by_code: dict[str, dict] = {}
+    expected_total: int | None = None
+    pages = 0
+    for attempt in range(3):
+        try:
+            by_code, expected_total, pages = _fetch_daily(context.token, trade_date)
+            break
+        except ThsCollectionError:
+            if attempt == 2:
+                raise
+            time.sleep(2 * (attempt + 1))
 
     normalized = [
         {
