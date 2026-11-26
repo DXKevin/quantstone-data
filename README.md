@@ -89,6 +89,31 @@ print(table)
 完整读取。需要保留服务端生成的文件时使用 `qs.download(..., target="data.parquet")`；已安装
 Pandas 时也可以使用 `qs.read_pandas(...)`。
 
+## Rust 数据读取 SDK
+
+仓库内提供同步 Rust crate `rust-sdk/`，通过同一 HTTP API 提供 `datasets`、`describe`、
+`coverage`、`read` 和 `download`。`read` 返回 Arrow RecordBatch 的轻量 `Table` 包装，
+日期和数值类型保持服务端契约；Rust 没有 Pandas 对应物，因此不提供 `read_pandas`。
+
+```toml
+[dependencies]
+quantstone-sdk = { path = "../rust-sdk" }
+```
+
+```rust
+use quantstone_sdk::{QuantStoneClient, ReadOptions};
+
+let client = QuantStoneClient::new("http://127.0.0.1:8000/api/v1")?;
+let table = client.read(
+    "tushare.cn.stock.daily",
+    &ReadOptions::new()
+        .start("2026-11-01")
+        .end("2026-11-24")
+        .filter("ts_code", "000001.SZ"),
+)?;
+println!("{} rows", table.num_rows());
+```
+
 另开一个终端启动前端：
 
 ```bash

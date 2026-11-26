@@ -66,6 +66,8 @@
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
   不在 Git 仓库内；
 - Python 读取 SDK 已加入：`QuantStoneClient` 支持 `datasets/describe/coverage/read/read_pandas/download`；
+- Rust SDK 已加入 `rust-sdk/`：同步 HTTP 客户端，支持 `datasets/describe/coverage/read/download`，
+  `read` 返回 Arrow RecordBatch 的 `Table` 包装；不提供 Pandas 等价方法；
 - 分钟数据供应商标识已迁移为 `tb_sbkj2077`，正式数据 2,889 个分区、2,718,527,482 行，
   旧路径为 0；Wind L2 ID 改为 `tb_xxlpd`，集合竞价 ID 改为 `tb_lhsjk`。
 
@@ -87,7 +89,21 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 本轮完整测试：147 项通过、`ruff check .` 通过、`npm run build` 通过。
+- Python 测试 147 项通过、`ruff` 和前端构建通过；Rust `cargo test` 4 项通过。
+
+## 2026-11-26 — DeepSeek Harness（Rust SDK）
+
+完成：
+
+- 新增独立 crate `rust-sdk/`，包名 `quantstone-sdk`；
+- 同步 HTTP 客户端：`datasets`、`datasets_with_options`、`describe`、`coverage`、`read`、
+  `download`，并提供 `Client` 别名和默认 API 地址；
+- `ReadOptions` / `DownloadOptions` 支持日期范围、主键过滤和 Parquet/CSV；
+- `read` 返回自定义 `Table`，内部保存 Arrow Schema 和 RecordBatch 列表，类型由服务端
+  Parquet 契约保持；不提供 Rust/Pandas 的 `read_pandas`；
+- 错误类型保留服务端 `detail` 文本；
+- `cargo test` 4 项通过，`cargo clippy --all-targets -- -D warnings` 通过；
+- 真实 API 示例 `examples/read_daily.rs` 成功读取 A股日线并得到 17 行、11 列。
 
 ## 2026-11-26 — DeepSeek Harness（THS 日线代码去重）
 

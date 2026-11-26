@@ -102,6 +102,11 @@ Python SDK 以 HTTP API 为稳定边界，不直接读取服务器 SQLite 或拼
 Table。分区数据必须至少指定日期范围或一个主键条件，避免误读完整逐笔数据集；快照数据允许
 完整读取。
 
+Rust SDK 位于仓库 `rust-sdk/`，同样只通过 HTTP API 读取，不直接访问服务器 SQLite 或
+Parquet 路径。方法名和参数语义与 Python SDK 对齐：`datasets`、`describe`、`coverage`、
+`read`、`download`；`read` 返回本 crate 的 Arrow `Table` 包装，因为 Rust Arrow 没有
+PyArrow 同名的 owned Table 类型。Rust 没有 Pandas 对应物，因此不提供 `read_pandas`。
+
 ### 3.2 QuantStone Data 暂不负责
 
 - 强制统一不同供应商的业务字段；
