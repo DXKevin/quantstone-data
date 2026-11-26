@@ -46,8 +46,8 @@
 - `tushare.cn.stock.stk_limit` 已完成 2007-01-04 至 2026-11-24 全量采集：
   4,833 个分区；
 - `tushare.cn.stock.suspend_d` 主键修正为 `ts_code + trade_date + suspend_type`；
-  审核器已支持逗号/分号分隔的多个 `suspend_timing` 区间；续采任务 `ec6ebe4b`
-  从 2012-08-08 继续，2012-08-07 之前的成功分区保留；
+  `suspend_timing` 格式不稳定，审核器已取消时间格式强校验；续采任务 `3465b41d`
+  从 2021-01-12 继续，2021-01-11 之前的成功分区保留；
 - `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
   2026-11-24 采集，共 **2,889 个分区、2,718,527,482 行**；
 - `tb_lhsjk.cn.stock.auction_process` 已采集 2020-01-02 至 2026-11-24，共
@@ -79,6 +79,21 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：138 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-26 — DeepSeek Harness（suspend_timing 格式放宽）
+
+问题：
+
+- suspend_d repair 在 2021-01-12 审核失败，`suspend_timing` 出现
+  `09:46:07-09:56:07` 的带秒格式，原审核器要求 `HH:MM-HH:MM`。
+
+修复：
+
+- 取消 `suspend_timing` 时间格式强校验，仅保留字段、非空、主键和
+  `suspend_type` 域校验；
+- 从失败日 2021-01-12 创建 repair 任务 `3465b41d`，目标 2026-11-25；
+- 2021-01-11 之前的成功分区保留；
+- 完整测试 138 项通过。
 
 ## 2026-11-26 — DeepSeek Harness（suspend_timing 多区间）
 
