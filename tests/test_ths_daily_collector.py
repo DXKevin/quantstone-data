@@ -91,6 +91,8 @@ def test_ths_daily_retries_incomplete_first_page(monkeypatch, tmp_path) -> None:
         rows = [_row(1), _row(2), _row(3)]
         if len(attempts) == 1:
             return len(rows), rows[:2]
+        if len(attempts) == 2:
+            return len(rows), []
         return len(rows), rows
 
     monkeypatch.setattr(daily, "call_api", fake_call)
@@ -101,7 +103,7 @@ def test_ths_daily_retries_incomplete_first_page(monkeypatch, tmp_path) -> None:
     )
     artifact = result.outputs[daily.DATASET_ID][0]
     assert artifact.row_count == 3
-    assert len(attempts) == 2
+    assert len(attempts) == 3
 
 
 def test_ths_daily_rejects_partition_mismatch(monkeypatch, tmp_path) -> None:

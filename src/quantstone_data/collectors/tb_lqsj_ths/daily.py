@@ -12,7 +12,7 @@ from ...provider_http import post_json
 from .sector_categories import MAX_PAGE, ThsCollectionError, load_api_url
 
 DATASET_ID = "tb_lqsj_ths.cn.index.daily"
-PAGE_SIZE = 10000
+PAGE_SIZE = 1000
 
 
 def normalize_ths_code(value: Any) -> str | None:
@@ -57,6 +57,7 @@ def _source_value(row: dict, field: dict) -> Any:
 def _fetch_daily(token: str, trade_date: str) -> tuple[dict[str, dict], int, int]:
     by_code: dict[str, dict] = {}
     expected_total: int | None = None
+    raw_count = 0
     pages = 0
     for page in range(MAX_PAGE + 1):
         total, rows = call_api(token, trade_date, page)
@@ -65,7 +66,9 @@ def _fetch_daily(token: str, trade_date: str) -> tuple[dict[str, dict], int, int
             expected_total = total
         elif total != expected_total:
             raise ThsCollectionError("THS 板块日线分页期间 total 发生变化，请稍后重试")
-        before = len(by_code)
+        if not rows:
+            break
+        raw_count += len(rows)
         for row in rows:
             if row.get("trade_date") != trade_date:
                 raise ThsCollectionError(
@@ -74,13 +77,11 @@ def _fetch_daily(token: str, trade_date: str) -> tuple[dict[str, dict], int, int
             code = normalize_ths_code(row.get("ths_code"))
             if code:
                 by_code[code] = {**row, "ths_code": code}
-        if len(by_code) >= total or len(rows) < PAGE_SIZE:
+        if raw_count >= total:
             break
-        if len(by_code) == before:
-            raise ThsCollectionError("THS 板块日线分页未前进")
-    if expected_total is None or len(by_code) != expected_total:
+    if expected_total is None or raw_count != expected_total:
         raise ThsCollectionError(
-            f"THS 板块日线分页不完整：期望 {expected_total or 0} 条，实际 {len(by_code)} 条"
+            f"THS 板块日线分页不完整：期望 {expected_total or 0} 条，实际 {raw_count} 条"
         )
     return by_code, expected_total, pages
 
