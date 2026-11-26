@@ -14,6 +14,22 @@ DATASET_ID = "tb_lqsj_ths.cn.index.constituent_stocks"
 PAGE_SIZE = 1000
 
 
+def normalize_stock_code(value: Any) -> str:
+    """补齐供应商早期数据的交易所后缀。"""
+    code = str(value or "").strip()
+    if not code or "." in code:
+        return code
+    if code.startswith("920"):
+        return f"{code}.BJ"
+    if code.startswith(("4", "8")):
+        return f"{code}.BJ"
+    if code.startswith(("5", "6", "9")):
+        return f"{code}.SH"
+    if code.startswith(("0", "1", "2", "3")):
+        return f"{code}.SZ"
+    return code
+
+
 def call_api(
     api_key: str, trade_date: str, page: int, page_size: int = PAGE_SIZE
 ) -> tuple[int, list[dict]]:
@@ -76,7 +92,7 @@ def _flatten(
                     f"THS 板块 {index_code} 的 stocks 不是数组"
                 )
             for raw_code in stocks:
-                stock_code = str(raw_code or "").strip()
+                stock_code = normalize_stock_code(raw_code)
                 if not stock_code:
                     continue
                 by_key[(trade_date, index_code, stock_code)] = {

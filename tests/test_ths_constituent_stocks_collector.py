@@ -33,7 +33,7 @@ def test_constituent_stocks_flattens_boards(monkeypatch, tmp_path) -> None:
                 "trade_date": trade_date,
                 "index_code": "881101.TI",
                 "stock_count": 2,
-                "stocks": ["000592.SZ", "600598.SH"],
+                "stocks": ["688001", "600598.SH"],
             },
             {
                 "trade_date": trade_date,
@@ -57,8 +57,8 @@ def test_constituent_stocks_flattens_boards(monkeypatch, tmp_path) -> None:
     assert artifact.partition == {"trade_date": "2026-09-30"}
     assert artifact.row_count == 3
     assert table["stock_code"].to_pylist() == [
-        "000592.SZ",
         "600598.SH",
+        "688001.SH",
         "000048.SZ",
     ]
 

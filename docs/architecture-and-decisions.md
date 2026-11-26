@@ -594,6 +594,8 @@ THS 板块历史成分使用数据集 ID `tb_lqsj_ths.cn.index.constituent_stock
 `/api/index/ths_constituent_stocks_history`：按交易日返回板块列表，每个板块包含
 `stocks` 数组，采集器展开数组并按三元组去重。历史接口不是所有宽基指数都有数据，
 不能以当前板块分类快照推断历史成分；不保存股票名称，需要时关联 `stock_basic`。
+供应商早期数据会返回无交易所后缀的股票代码（如 `688001`），采集器按代码段补齐为
+`688001.SH` 等标准后缀后再审核。
 
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
 `tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
