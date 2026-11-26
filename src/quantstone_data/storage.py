@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 from sqlalchemy import select
@@ -59,6 +61,12 @@ def read_dataset_rows(
     unknown_filters = set(filters) - primary_keys
     if unknown_filters:
         raise ValueError(f"只能按主键字段筛选：{', '.join(sorted(primary_keys))}")
+    wildcard_filters = {
+        name: value for name, value in filters.items() if _has_wildcard(value)
+    }
+    exact_filters = {
+        name: value for name, value in filters.items() if not _has_wildcard(value)
+    }
 
     query = select(CatalogPartition).where(CatalogPartition.dataset_id == dataset_id)
     if start is not None:
@@ -94,13 +102,14 @@ def read_dataset_rows(
                 else wanted
             )
             parquet_filters.append((partition_field, "in", filter_values))
-        for field_name, raw_value in filters.items():
+        for field_name, raw_value in exact_filters.items():
             if field_name not in schema.names:
                 raise ValueError(f"文件 {path} 缺少主键字段 {field_name}")
             parquet_filters.append(
                 (field_name, "=", _coerce_filter_value(raw_value, schema.field(field_name).type))
             )
         table = pq.read_table(file_path, filters=parquet_filters or None)
+        table = _apply_wildcard_filters(table, wildcard_filters)
         files_read += 1
         columns = table.column_names
         matched_count += table.num_rows
@@ -140,6 +149,32 @@ def _coerce_filter_value(value: str, field_type: pa.DataType) -> object:
     return value
 
 
+def _has_wildcard(value: str) -> bool:
+    return "*" in value or "?" in value
+
+
+def _glob_regex(pattern: str) -> str:
+    return "^" + re.escape(pattern).replace(r"\*", ".*").replace(r"\?", ".") + "$"
+
+
+def _apply_wildcard_filters(
+    table: pa.Table, filters: dict[str, str]
+) -> pa.Table:
+    """Apply glob-style string filters after Parquet exact/partition pruning."""
+    if not filters:
+        return table
+    mask = pa.array([True] * table.num_rows)
+    for field_name, pattern in filters.items():
+        if field_name not in table.column_names:
+            raise ValueError(f"文件缺少主键字段 {field_name}")
+        column = table[field_name]
+        if not pa.types.is_string(column.type) and not pa.types.is_large_string(column.type):
+            raise ValueError(f"通配符只支持字符串主键：{field_name}")
+        matched = pc.match_substring_regex(column, _glob_regex(pattern))
+        mask = pc.and_(mask, pc.fill_null(matched, False))
+    return table.filter(mask)
+
+
 def export_dataset_rows(
     session: Session,
     data_root: Path,
@@ -166,6 +201,12 @@ def export_dataset_rows(
     unknown_filters = set(primary_key_filters) - primary_keys
     if unknown_filters:
         raise ValueError(f"只能按主键字段筛选：{', '.join(sorted(primary_keys))}")
+    wildcard_filters = {
+        name: value for name, value in primary_key_filters.items() if _has_wildcard(value)
+    }
+    exact_filters = {
+        name: value for name, value in primary_key_filters.items() if not _has_wildcard(value)
+    }
     if file_format not in {"csv", "parquet"}:
         raise ValueError("下载格式只支持 csv 或 parquet")
 
@@ -207,7 +248,7 @@ def export_dataset_rows(
                     else wanted
                 )
                 parquet_filters.append((partition_field, "in", filter_values))
-            for field_name, raw_value in primary_key_filters.items():
+            for field_name, raw_value in exact_filters.items():
                 if field_name not in arrow_schema.names:
                     raise ValueError(f"文件 {path} 缺少主键字段 {field_name}")
                 parquet_filters.append(
@@ -217,7 +258,8 @@ def export_dataset_rows(
                         _coerce_filter_value(raw_value, arrow_schema.field(field_name).type),
                     )
                 )
-            table = pq.read_table(file_path, filters=parquet_filters)
+            table = pq.read_table(file_path, filters=parquet_filters or None)
+            table = _apply_wildcard_filters(table, wildcard_filters)
             files_read += 1
             row_count += table.num_rows
             if file_format == "parquet":

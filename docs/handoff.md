@@ -121,6 +121,21 @@
 python -m pip install -e sdk/python
 ```
 
+## 2026-11-26 — DeepSeek Harness（读取下载修复与通配符）
+
+问题：
+
+- 快照数据集 `download(...)` 无筛选时返回 422 `Malformed filters`；
+- 根因是导出路径把空 Parquet filter 列表传给 PyArrow；
+- `ts_code=000001.*` 等通配符没有匹配语义。
+
+修复：
+
+- 导出路径改为空 filter 传 `None`，快照无筛选可完整下载；
+- 读取和下载对字符串主键支持 `*`/`?` 通配符，先做分区裁剪，再按字符串匹配；
+- 实测 stock_basic：无筛选下载 5,925 行；`ts_code=000001.*` 返回 1 行；
+- 服务端测试 148 项、Python SDK 1 项、Rust 5 项通过。
+
 ## 2026-11-26 — DeepSeek Harness（Rust SDK）
 
 完成：

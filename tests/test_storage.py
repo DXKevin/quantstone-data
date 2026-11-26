@@ -258,6 +258,50 @@ def test_download_exports_all_filtered_rows_as_csv_or_parquet(tmp_path: Path) ->
     )
 
 
+def test_downloads_unfiltered_snapshot(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        with client.app.state.session_factory() as session:
+            dataset = session.get(Dataset, DATASET_ID)
+            assert dataset is not None
+            dataset.storage_policy = None
+            session.commit()
+
+        response = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"format": "parquet"},
+        )
+
+    assert response.status_code == 200, response.text
+    table = pq.read_table(pa.BufferReader(response.content))
+    assert table.num_rows == 2
+
+
+def test_read_and_download_support_primary_key_glob(tmp_path: Path) -> None:
+    with create_client(tmp_path) as client:
+        create_dataset(client)
+        write_partition(client, "2024-01-02", ["000001.SZ", "600000.SH"])
+        write_partition(client, "2024-01-03", ["000001.SZ", "600000.SH"])
+
+        rows = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/rows",
+            params={"symbol": "000001.*", "limit": 10},
+        )
+        downloaded = client.get(
+            f"/api/v1/datasets/{DATASET_ID}/download",
+            params={"symbol": "000001.*", "format": "parquet"},
+        )
+
+    assert rows.status_code == 200, rows.text
+    assert rows.json()["row_count"] == 2
+    assert rows.json()["matched_count"] == 2
+    assert {row["symbol"] for row in rows.json()["rows"]} == {"000001.SZ"}
+    assert downloaded.status_code == 200, downloaded.text
+    table = pq.read_table(pa.BufferReader(downloaded.content))
+    assert table["symbol"].to_pylist() == ["000001.SZ", "000001.SZ"]
+
+
 def test_download_accepts_a_date_range_without_primary_key_filter(tmp_path: Path) -> None:
     with create_client(tmp_path) as client:
         create_dataset(client)

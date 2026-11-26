@@ -22,4 +22,4 @@ table = qs.read(
 ```
 
 支持 `datasets`、`contracts`、`describe`、`coverage`、`read`、`read_pandas` 和 `download`。分区数据必须提供
-日期范围或至少一个主键条件；快照数据允许完整读取。
+日期范围或至少一个主键条件；快照数据允许完整读取。字符串主键过滤支持 `*`/`?` 通配符。

@@ -100,7 +100,8 @@ BacktestDailyBar
 Python SDK 位于仓库 `sdk/python/`，以 HTTP API 为稳定边界，不直接读取服务器 SQLite 或拼接物理 Parquet 路径。首版
 提供数据集发现、契约描述、覆盖摘要、按日期范围及主键读取，并返回保持契约类型的 PyArrow
 Table。分区数据必须至少指定日期范围或一个主键条件，避免误读完整逐笔数据集；快照数据允许
-完整读取。
+完整读取。主键字符串筛选支持 `*`/`?` 通配符，通配符在分区裁剪后按字符串匹配；无筛选的
+快照下载不再向 Parquet 传空 filter 列表。
 
 `GET /api/v1/datasets/contracts` 批量返回数据集完整契约，默认只返回 active 数据集，
 支持 `active_only=false` 获取全部；Python SDK 对应 `contracts()`，Rust SDK 对应
