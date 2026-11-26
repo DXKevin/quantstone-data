@@ -1,6 +1,7 @@
 from .collector_types import CollectorDefinition, CollectorOperation
 from .collectors.tb_auction import COLLECTOR as TB_AUCTION
 from .collectors.tb_lhsjk_023199 import COLLECTOR as TB_MINUTE
+from .collectors.tb_lqsj_ths import COLLECTOR as TB_LQSJ_THS
 from .collectors.tushare_cn_etf import COLLECTOR as TUSHARE_CN_ETF
 from .collectors.tushare_cn_stock import COLLECTOR as TUSHARE_CN_STOCK
 from .collectors.wind_l2_sz import COLLECTOR as WIND_L2_SZ
@@ -29,7 +30,9 @@ def _build_registry(definitions: tuple[CollectorDefinition, ...]) -> dict[str, C
     return registry
 
 
-COLLECTORS = _build_registry((TUSHARE_CN_STOCK, TUSHARE_CN_ETF, WIND_L2_SZ, TB_MINUTE, TB_AUCTION))
+COLLECTORS = _build_registry(
+    (TUSHARE_CN_STOCK, TUSHARE_CN_ETF, WIND_L2_SZ, TB_MINUTE, TB_AUCTION, TB_LQSJ_THS)
+)
 
 
 def get_collector(key: str) -> CollectorDefinition | None:

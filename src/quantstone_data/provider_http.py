@@ -27,12 +27,13 @@ def post_json(
     payload: dict[str, Any],
     *,
     timeout: float = 60,
+    headers: dict[str, str] | None = None,
 ) -> dict:
     """同一供应商同时只允许一个 HTTP 请求。"""
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **(headers or {})},
         method="POST",
     )
     gate = _gate_for(provider)

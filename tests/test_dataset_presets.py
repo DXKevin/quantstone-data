@@ -15,6 +15,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         assert response.status_code == 200
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
+            "tb_lqsj_ths.cn.index.sector_categories",
             "tushare.cn.index.index_basic",
             "tushare.cn.index.index_daily",
             "tb_sbkj2077.cn.stock.minute_1m",
@@ -43,6 +44,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             assert created.json()["status"] == "draft"
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
+    sector_categories = contracts["tb_lqsj_ths.cn.index.sector_categories"]
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
@@ -62,6 +64,18 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     zt_order = contracts["zhongtai.cn.stock.l2_order.sz"]
     zt_trade = contracts["zhongtai.cn.stock.l2_trade.sz"]
     assert l2_order["provider"] == "tb_xxlpd"
+    assert sector_categories["provider"] == "tb_lqsj_ths"
+    assert sector_categories["storage_policy"]["layout"] == "snapshot"
+    assert sector_categories["primary_key"] == ["index_code"]
+    assert [item["name"] for item in sector_categories["fields"]] == [
+        "index_code",
+        "name",
+        "count",
+        "exchange",
+        "list_date",
+        "type",
+        "code",
+    ]
     assert index_basic["instrument"] == "index"
     assert index_basic["storage_policy"]["layout"] == "snapshot"
     assert index_basic["primary_key"] == ["ts_code"]

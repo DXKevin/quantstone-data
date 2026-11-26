@@ -35,8 +35,8 @@ from .collection_schemas import (
     CollectionReadiness,
     InputMethod,
 )
-from .collector_registry import get_operation, validate_operation_parameters
-from .collectors.tushare_cn_stock.stock_basic import CollectionError, load_token
+from .collector_registry import get_collector, get_operation, validate_operation_parameters
+from .collectors.tushare_cn_stock.stock_basic import CollectionError
 from .database import get_session
 from .execution import run_operation
 from .logging_config import log_event
@@ -71,6 +71,13 @@ TERMINAL_JOB_STATUSES = {
     CollectionJobStatus.REVIEW_FAILED.value,
     CollectionJobStatus.CANCELLED.value,
 }
+
+
+def _load_collector_credential(collector_key: str | None) -> str:
+    collector = get_collector(collector_key or "")
+    if collector is None or collector.credential_loader is None:
+        return ""
+    return collector.credential_loader()
 
 
 def has_completed_initial_collection(session: Session, dataset_id: str) -> bool:
@@ -378,7 +385,7 @@ def _execute_daily_job(
         for field in schema.fields
     ]
     reports: list[dict] = []
-    token = load_token()
+    token = _load_collector_credential(job.collector_key)
     for trade_date in _trading_dates(
         dataset,
         job.start_date,
@@ -643,7 +650,7 @@ def _execute_snapshot_job(
                 CollectionContext(
                     run.id,
                     run_directory,
-                    load_token(),
+                    _load_collector_credential(job.collector_key),
                     current_artifact_path=current_artifact_path,
                     data_root=data_root,
                 ),
@@ -1165,7 +1172,9 @@ def _run_collection(
         row_count = run_operation(
             job.collector_key or "unknown",
             operation,
-            lambda: operation.function(target, fields, load_token()),
+            lambda: operation.function(
+                target, fields, _load_collector_credential(job.collector_key)
+            ),
             job_id=job.id,
         )
         job.source_file_name = target.name

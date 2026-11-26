@@ -25,6 +25,7 @@ from .stock_basic import (
 from .stock_basic import (
     collect_initial as collect_stock_basic_initial,
 )
+from .stock_basic import load_token
 from .stock_st import collect_incremental as collect_stock_st_incremental
 from .stock_st import collect_initial as collect_stock_st_initial
 from .suspend_d import collect_incremental as collect_suspend_d_incremental
@@ -306,4 +307,5 @@ COLLECTOR = CollectorDefinition(
     name="TuShare A股采集器",
     description="通过 TuShare Pro API 采集中国内地 A 股数据。",
     operations={operation.key: operation for operation in OPERATIONS},
+    credential_loader=load_token,
 )

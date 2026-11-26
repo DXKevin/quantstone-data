@@ -1215,3 +1215,19 @@ tb_l2.cn.stock.l2_order.sh
 - 何时将当前单进程后台队列升级为独立 Worker 和持久化消息队列。
 
 Agent 不应把这些待定事项描述成已确定方案。可以先实现最小可替换接口，再根据真实数据和使用体验确定。
+
+## 22. tb_lqsj_ths 板块数据
+
+THS 板块数据通过 `tb_lqsj_ths` 数据产品接口获取，供应商稳定代号使用用户指定的
+`tb_lqsj_ths`。第一份数据集为 `tb_lqsj_ths.cn.index.sector_categories`，对应
+`/api/index/ths_sector_categories`，保存完整板块分类快照。主键为 `index_code`，每次更新
+重新分页获取全部记录并原子替换 snapshot。
+
+契约字段保持接口原始语义：`index_code/name/count/exchange/list_date/type/code`；发布日期
+技术标准化为 Parquet `date`。真实全量响应当前 1,676 条，其中 4 条记录未提供 `count`，因此
+该字段必须允许为空，不能根据接口示例将其设为必选。审核器校验必需字段、非空快照、主键、
+`.TI` 代码后缀、非负成分数量和板块类型域 `N/I/R/S/ST/TH/BB`。
+
+采集器凭证由各 `CollectorDefinition` 自己声明加载器。TuShare 采集器继续读取
+`TUSHARE_TOKEN`，`tb_lqsj_ths` 读取 `TB_LQSJ_THS_API_KEY`，不需要凭证的文件采集器使用空值；
+执行框架不再令所有供应商依赖 TuShare 配置。

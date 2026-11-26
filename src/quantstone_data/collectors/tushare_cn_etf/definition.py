@@ -5,6 +5,7 @@ from ...collector_types import (
     RateLimit,
     RetryPolicy,
 )
+from ..tushare_cn_stock.stock_basic import load_token
 from .etf_basic import collect_incremental, collect_initial
 from .etf_limit import collect_incremental as collect_etf_limit_incremental
 from .etf_limit import collect_initial as collect_etf_limit_initial
@@ -156,4 +157,5 @@ COLLECTOR = CollectorDefinition(
     name="TuShare ETF 采集器",
     description="通过 TuShare Pro API 采集国内 ETF 基础信息。",
     operations={operation.key: operation for operation in OPERATIONS},
+    credential_loader=load_token,
 )

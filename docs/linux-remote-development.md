@@ -48,12 +48,17 @@ Linux 应重新安装 Python 3.11+、Node.js 和项目依赖。
 export QUANTSTONE_DATA_ROOT=/home/hhd_data/quantstone-data
 export TUSHARE_TOKEN='...'
 export TUSHARE_API_URL='http://proxy.example:32817'  # 可选，默认 https://api.tushare.pro
+export TB_LQSJ_THS_API_KEY='...'
+export TB_LQSJ_THS_API_URL='https://data.diemeng.chat'  # 可选
 export WIND_L2_BAIDUPCS_COOKIE='BDUSS=...; STOKEN=...; BAIDUID=...'
 ```
 
 `TUSHARE_API_URL` 必须是兼容 TuShare POST 协议的完整 HTTP(S) 地址。它只改变网络入口，数据集
 供应商仍为 TuShare，不改变数据集 ID、契约、审核器或存储路径。项目的三个 TuShare 采集器
 统一读取该配置，避免部分接口仍访问官方域名。
+
+`tb_lqsj_ths` 数据产品使用独立的 API Key，不复用 `TUSHARE_TOKEN`。API Key 只允许保存在
+进程环境或未提交的 `.env` 中；采集器使用 `X-API-Key` 请求头访问接口。
 
 开发阶段启动：
 

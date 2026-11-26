@@ -47,3 +47,4 @@ class CollectorDefinition:
     name: str
     description: str
     operations: dict[str, CollectorOperation]
+    credential_loader: Callable[[], str] | None = None

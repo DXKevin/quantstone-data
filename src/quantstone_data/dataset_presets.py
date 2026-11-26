@@ -135,6 +135,62 @@ def _zhongtai_trade_fields() -> list[dict[str, str | bool | None]]:
 
 DATASET_PRESETS = (
     DatasetPreset(
+        key="tb_lqsj_ths_sector_categories",
+        category="tb_lqsj_ths · THS 板块",
+        contract=DatasetCreate(
+            id="tb_lqsj_ths.cn.index.sector_categories",
+            provider="tb_lqsj_ths",
+            region="cn",
+            instrument="index",
+            dataset_name="sector_categories",
+            market=None,
+            display_name="THS 板块分类",
+            description=(
+                "tb_lqsj_ths 提供的 THS 板块分类完整快照，覆盖概念、行业、地域、"
+                "特色、风格、主题和宽基指数。"
+            ),
+            update_frequency="daily",
+            time_granularity="none",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "sector_categories_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "sector_categories_incremental",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": None,
+                "calendar_dataset_id": None,
+                "layout": "snapshot",
+                "write_strategy": "replace_snapshot",
+                "compaction": None,
+            },
+            primary_key=["index_code"],
+            time_field=None,
+            fields=[
+                field("index_code", "string", "THS 指数代码", nullable=False),
+                field("name", "string", "板块或指数名称", nullable=False),
+                field("count", "int32", "当前成分股数量；部分板块暂不提供", nullable=True),
+                field("exchange", "string", "市场范围", nullable=False),
+                field("list_date", "date", "发布日期"),
+                field(
+                    "type",
+                    "string",
+                    "指数类型；N概念 I行业 R地域 S特色 ST风格 TH主题 BB宽基",
+                    nullable=False,
+                ),
+                field("code", "string", "不含后缀的指数简码", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_index_basic",
         category="TuShare · 指数",
         contract=DatasetCreate(

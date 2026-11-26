@@ -14,12 +14,13 @@
 - 完成测试、提交并推送后才算正常交接；
 - 不保留无说明的未提交修改。
 
-## 2026-11-24 当前交接摘要（优先阅读）
+## 2026-11-26 当前交接摘要（优先阅读）
 
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
-- 当前 20 个数据集均为 active：TuShare 14 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
+- 当前 21 个数据集均为 active；新增 `tb_lqsj_ths.cn.index.sector_categories`，已完成
+  首次采集并发布 1 个 snapshot、1,676 行；
 - Catalog 实际为 **36,820 个分区、197,849,864,868 行**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
@@ -78,6 +79,30 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：138 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-26 — Codex（THS 板块分类全流程）
+
+完成：
+
+- 新增 `tb_lqsj_ths.cn.index.sector_categories` 快照契约，主键 `index_code`，字段为
+  `index_code/name/count/exchange/list_date/type/code`；
+- 新增 `tb_lqsj_ths_index` 采集器，使用 `X-API-Key`、按 `page=0..14` 完整分页，并校验
+  各页 `total` 稳定及最终记录数完整；
+- 新增专用审核器，校验字段、非空、主键、板块类型、`.TI` 后缀和非负成分数量；
+- 采集器凭证改为各供应商独立加载：TuShare 读取 `TUSHARE_TOKEN`，新供应商读取
+  `TB_LQSJ_THS_API_KEY`，文件采集器不再被迫依赖 TuShare 凭证；
+- API Key 已写入本机未提交 `.env`，未进入 Git；
+- 真实接口验证成功：2 页、1,676 行、7 种板块类型，审核通过；其中 4 行 `count` 为空，
+  契约已按真实数据设为可空。
+
+正式结果：
+
+- 数据集已从预置创建并启用；首次任务 `745a887e-7a2a-48ed-94b3-26be84c9d4c4`
+  成功，Catalog 为 1 个 snapshot、1,676 行、33,378 bytes、无缺失文件；
+- 新增单元测试 3 项通过，真实采集和专用审核器通过，`ruff check .` 与前端构建通过；
+- 当前环境的 FastAPI `TestClient` 在 lifespan 启动前阻塞，完整 pytest 无法结束；版本为
+  FastAPI 0.165.0 / Starlette 1.10.0 / httpx 0.28.1，并提示应安装 `httpx2`。这是测试运行环境
+  的兼容问题，未影响临时 Uvicorn 上的正式 API 全流程；不要把中断的 pytest 误判为业务测试失败。
 
 ## 2026-11-26 — DeepSeek Harness（suspend_timing 格式放宽）
 
