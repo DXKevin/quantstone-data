@@ -77,6 +77,7 @@ from quantstone_sdk import QuantStoneClient
 qs = QuantStoneClient("http://<服务器IP>:5173/api/v1")
 
 print(qs.datasets())
+print(qs.contracts())
 print(qs.describe("tushare.cn.stock.daily"))
 print(qs.coverage("tushare.cn.stock.daily"))
 

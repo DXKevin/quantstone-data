@@ -197,6 +197,11 @@ def test_dataset_lifecycle(tmp_path: Path) -> None:
         assert activated.status_code == 200
         assert activated.json()["status"] == "active"
 
+        contracts = client.get("/api/v1/datasets/contracts")
+        assert contracts.status_code == 200
+        assert [item["id"] for item in contracts.json()] == [dataset_payload()["id"]]
+        assert contracts.json()[0]["schema"]["fields"]
+
         deleting = client.delete(f"/api/v1/datasets/{dataset_payload()['id']}")
         assert deleting.status_code == 409
 

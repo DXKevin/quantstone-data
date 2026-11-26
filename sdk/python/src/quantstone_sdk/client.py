@@ -34,6 +34,13 @@ class QuantStoneClient:
         items = self._json("/datasets")
         return [item for item in items if not active_only or item["status"] == "active"]
 
+    def contracts(self, *, active_only: bool = True) -> list[dict[str, Any]]:
+        """一次返回所有数据集的完整契约，包括字段、主键和存储策略。"""
+        return self._json(
+            "/datasets/contracts",
+            {"active_only": str(active_only).lower()},
+        )
+
     def describe(self, dataset_id: str) -> dict[str, Any]:
         return self._json(f"/datasets/{dataset_id}")
 
@@ -100,9 +107,13 @@ class QuantStoneClient:
             raise self._error(error) from error
         return destination
 
-    def _json(self, path: str) -> Any:
+    def _json(
+        self, path: str, parameters: dict[str, object] | None = None
+    ) -> Any:
         try:
-            with urlopen(Request(self._url(path)), timeout=self.timeout) as response:
+            with urlopen(
+                Request(self._url(path, parameters)), timeout=self.timeout
+            ) as response:
                 return json.load(response)
         except (HTTPError, URLError, TimeoutError, OSError) as error:
             raise self._error(error) from error

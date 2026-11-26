@@ -241,6 +241,18 @@ impl QuantStoneClient {
             .collect())
     }
 
+    /// Return every dataset's complete contract in one request.
+    pub fn contracts(&self) -> Result<Vec<Value>, QuantStoneError> {
+        self.contracts_with_options(true)
+    }
+
+    pub fn contracts_with_options(&self, active_only: bool) -> Result<Vec<Value>, QuantStoneError> {
+        self.get_json_with_pairs(
+            "/datasets/contracts",
+            &[("active_only".to_string(), active_only.to_string())],
+        )
+    }
+
     pub fn describe(&self, dataset_id: &str) -> Result<Value, QuantStoneError> {
         self.get_json(&format!("/datasets/{dataset_id}"))
     }
@@ -291,7 +303,15 @@ impl QuantStoneClient {
     }
 
     fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, QuantStoneError> {
-        let url = self.url(path, &[])?;
+        self.get_json_with_pairs(path, &[])
+    }
+
+    fn get_json_with_pairs<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        pairs: &[(String, String)],
+    ) -> Result<T, QuantStoneError> {
+        let url = self.url(path, pairs)?;
         let response = self.http.get(url).send()?;
         self.decode_json(response)
     }

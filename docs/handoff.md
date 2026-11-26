@@ -30,7 +30,7 @@
   阻断发布；新续采任务 `9c1d6583-2fe9-4d65-b7f3-cb80d00884d6` 已从 2021-02-19 启动，
   失败日审核和发布成功，任务继续运行至 2026-11-25；交接时已推进至 2022-03-30，共有
   271 个 run，状态 running；
-- Catalog 当前约 **40,508 个分区、197,851,343,804 行**；THS 续采仍在运行，结束后重新统计；
+- Catalog 实际为 **41,527 个分区、197,853,102,555 行**；
   数据根 `/home/hhd_data` 已用 2.0 TB、可用 5.3 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
@@ -90,7 +90,18 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 服务端 Python 测试 146 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 4 项通过。
+- 服务端 Python 测试 146 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
+
+## 2026-11-26 — DeepSeek Harness（批量契约接口）
+
+完成：
+
+- 新增 `GET /api/v1/datasets/contracts?active_only=true`，一次返回完整数据集契约；
+- 默认仅 active，`active_only=false` 可获取全部；
+- Python SDK 新增 `contracts(active_only=True)`，Rust SDK 新增
+  `contracts()` / `contracts_with_options()`；
+- 真实接口返回 22 个 active 数据集，首个契约包含 8 个字段；
+- 服务端测试 146 项、Python SDK 1 项、Rust 5 项通过。
 
 ## 2026-11-26 — DeepSeek Harness（SDK 独立项目）
 

@@ -102,6 +102,10 @@ Python SDK 位于仓库 `sdk/python/`，以 HTTP API 为稳定边界，不直接
 Table。分区数据必须至少指定日期范围或一个主键条件，避免误读完整逐笔数据集；快照数据允许
 完整读取。
 
+`GET /api/v1/datasets/contracts` 批量返回数据集完整契约，默认只返回 active 数据集，
+支持 `active_only=false` 获取全部；Python SDK 对应 `contracts()`，Rust SDK 对应
+`contracts()` / `contracts_with_options()`。这样 AI 和工具无需逐个 `describe`。
+
 Rust SDK 位于仓库 `sdk/rust/`，同样只通过 HTTP API 读取，不直接访问服务器 SQLite 或
 Parquet 路径。方法名和参数语义与 Python SDK 对齐：`datasets`、`describe`、`coverage`、
 `read`、`download`；`read` 返回本 crate 的 Arrow `Table` 包装，因为 Rust Arrow 没有

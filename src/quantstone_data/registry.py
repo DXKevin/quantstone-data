@@ -121,6 +121,18 @@ def list_datasets(session: SessionDep) -> list[Dataset]:
     return list(session.scalars(select(Dataset).order_by(Dataset.id)))
 
 
+@router.get("/contracts", response_model=list[DatasetRead])
+def list_dataset_contracts(
+    session: SessionDep,
+    active_only: bool = True,
+) -> list[DatasetRead]:
+    """一次返回数据集的完整契约，供 AI/工具直接发现和读取字段信息。"""
+    query = dataset_query().order_by(Dataset.id)
+    if active_only:
+        query = query.where(Dataset.status == DatasetStatus.ACTIVE.value)
+    return [serialize_dataset(dataset) for dataset in session.scalars(query)]
+
+
 @router.get("/{dataset_id}", response_model=DatasetRead)
 def get_dataset(dataset_id: str, session: SessionDep) -> DatasetRead:
     dataset = session.scalar(dataset_query().where(Dataset.id == dataset_id))

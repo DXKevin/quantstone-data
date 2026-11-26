@@ -4,6 +4,7 @@
 保持一致：
 
 - `datasets` / `datasets_with_options`
+- `contracts` / `contracts_with_options`
 - `describe`
 - `coverage`
 - `read`：返回带 Schema 的 Arrow `Table` 包装

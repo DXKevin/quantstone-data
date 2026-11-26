@@ -46,6 +46,23 @@ fn datasets_filters_to_active() {
 }
 
 #[test]
+fn contracts_returns_complete_contracts() {
+    let server = MockServer::start();
+    server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/datasets/contracts")
+            .query_param("active_only", "true");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body(r#"[{"id":"active","schema":{"primary_key":["ts_code"]}}]"#);
+    });
+
+    let items = client(&server).contracts().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["schema"]["primary_key"][0], "ts_code");
+}
+
+#[test]
 fn read_returns_typed_arrow_table() {
     let server = MockServer::start();
     let body = parquet_fixture();

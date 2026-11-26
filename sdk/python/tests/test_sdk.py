@@ -4,7 +4,6 @@ from datetime import date
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-
 from quantstone_sdk import QuantStoneClient
 
 
@@ -39,12 +38,28 @@ def test_sdk_discovers_active_datasets_and_reads_typed_parquet(monkeypatch) -> N
                     ]
                 ).encode()
             )
+        if request.full_url.endswith("/datasets/contracts?active_only=true"):
+            return Response(
+                json.dumps(
+                    [
+                        {
+                            "id": "active",
+                            "status": "active",
+                            "schema": {"primary_key": ["ts_code"]},
+                        }
+                    ]
+                ).encode()
+            )
         return Response(parquet)
 
     monkeypatch.setattr("quantstone_sdk.client.urlopen", fake_urlopen)
     client = QuantStoneClient("http://quantstone.local/api/v1")
 
     assert [item["id"] for item in client.datasets()] == ["active"]
+    contracts = client.contracts()
+    assert [item["id"] for item in contracts] == ["active"]
+    assert contracts[0]["schema"]["primary_key"] == ["ts_code"]
+    assert requested[-1].endswith("/datasets/contracts?active_only=true")
     result = client.read(
         "tushare.cn.stock.daily",
         start="2026-11-24",
