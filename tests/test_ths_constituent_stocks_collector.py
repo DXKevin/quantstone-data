@@ -63,6 +63,19 @@ def test_constituent_stocks_flattens_boards(monkeypatch, tmp_path) -> None:
     ]
 
 
+def test_constituent_stocks_skips_empty_source_day(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        constituent_stocks, "call_api", lambda *_args, **_kwargs: (0, [])
+    )
+    result = constituent_stocks.collect_initial(
+        CollectionContext("run", tmp_path / "staging", "key"),
+        {"trade_date": "2026-08-25"},
+        _fields(),
+    )
+    assert result.skipped is True
+    assert result.outputs == {}
+
+
 def test_constituent_stocks_reviewer_accepts_partition(tmp_path) -> None:
     fields = _fields()
     schema = pa.schema(

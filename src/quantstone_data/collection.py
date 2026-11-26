@@ -447,6 +447,19 @@ def _execute_daily_job(
                 partial(operation.function, context, {"trade_date": partition_key}, fields),
                 job_id=job.id,
             )
+            if result.skipped:
+                run.status = "skipped"
+                run.error = result.skip_reason
+                session.commit()
+                log_event(
+                    "collection_run_skipped",
+                    job_id=job.id,
+                    run_id=run.id,
+                    dataset_id=job.dataset_id,
+                    partition_key=partition_key,
+                    reason=result.skip_reason,
+                )
+                continue
             if set(result.outputs) != set(operation.datasets):
                 raise CollectionError("collector outputs do not match operation declaration")
             output_items = []

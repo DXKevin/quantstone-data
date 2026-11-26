@@ -119,6 +119,20 @@ def collect_daily(
 ) -> CollectionResult:
     trade_date = parameters["trade_date"]
     source_rows, boards, pages = _flatten(context.token, trade_date)
+    if not source_rows:
+        return CollectionResult(
+            outputs={},
+            provenance={
+                "api": "ths_constituent_stocks_history",
+                "api_url": load_api_url(),
+                "trade_date": trade_date,
+                "boards": boards,
+                "pages": pages,
+                "skipped": True,
+            },
+            skipped=True,
+            skip_reason=f"供应商该日无成分数据：{trade_date}",
+        )
     normalized = [
         {
             field["name"]: normalize_value(_source_value(row, field), field["data_type"])

@@ -23,8 +23,9 @@
 - 当前 22 个数据集均为 active；`tb_lqsj_ths.cn.index.sector_categories` 已发布
   1 个 snapshot、1,676 行；`tb_lqsj_ths.cn.index.daily` 已完成 2007-08-01 至
   2026-11-25 采集，4,695 个分区、3,203,076 行；
-- `tb_lqsj_ths.cn.index.constituent_stocks` 正在从 2014-01-02 补全，2019-06-19
-  起的供应商无后缀代码已按代码段补 `.SH/.SZ/.BJ`；2014-01-02 至 2019-06-18 已发布；
+- `tb_lqsj_ths.cn.index.constituent_stocks` 正在补全 2026-08-25 至 2026-11-25；
+  供应商无后缀代码已按代码段补 `.SH/.SZ/.BJ`，返回 0 板块的日期会标记为 skipped
+  且不发布空分区；2014-01-02 至 2026-08-24 已发布；
 - Catalog 实际为 **约 42,895 个分区、198,088,711,162 行**；
   数据根 `/home/hhd_data` 已用 2.0 TB、可用 5.3 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
@@ -83,7 +84,22 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 服务端 Python 测试 150 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
+- 服务端 Python 测试 151 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
+
+## 2026-11-26 — DeepSeek Harness（空日跳过）
+
+问题：
+
+- THS 成分股 repair 在 2026-08-25 审核失败，供应商该日返回 `total=0`；
+- 2026-08-26、2026-09-25 等日期也存在同类源缺口。
+
+修复：
+
+- 采集协议支持 `skipped` 结果；执行器把该 run 标记为 skipped，不审核、不发布、
+  不阻断后续日期；
+- 成分股采集器在源日完全没有板块时返回 skipped；
+- 从 2026-08-25 创建 repair 任务 `7a0e3f31`，已验证跳过 08-25/08-26 并继续；
+- 完整测试 151 项通过。
 
 ## 2026-11-26 — DeepSeek Harness（THS 成分股补后缀）
 

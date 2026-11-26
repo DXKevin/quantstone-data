@@ -32,3 +32,5 @@ class DatasetArtifact:
 class CollectionResult:
     outputs: dict[str, list[DatasetArtifact]]
     provenance: dict[str, Any] = field(default_factory=dict)
+    skipped: bool = False
+    skip_reason: str | None = None
