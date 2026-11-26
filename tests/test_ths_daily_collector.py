@@ -137,3 +137,24 @@ def test_ths_daily_reviewer_rejects_invalid_ohlc(tmp_path) -> None:
     report = review(ReviewContext(path, _dataset_schema(), date(2026, 11, 25)))
     assert not report.passed
     assert any(error.get("rule") == "ohlc_relationship" for error in report.errors)
+
+
+def test_ths_daily_reviewer_accepts_verified_vendor_ohlc_exception(tmp_path) -> None:
+    fields = _fields()
+    arrow_schema = pa.schema(
+        [pa.field(item["name"], arrow_type(item["data_type"]), item["nullable"]) for item in fields]
+    )
+    row = {
+        **_row(1, "2021-02-02"),
+        "ths_code": "864019.TI",
+        "trade_date": date(2021, 2, 2),
+        "open": 3920.0,
+        "high": 4137.68,
+        "low": 3814.13,
+        "close": 5242.33,
+    }
+    path = tmp_path / "daily.parquet"
+    pq.write_table(pa.Table.from_pylist([row], schema=arrow_schema), path)
+
+    report = review(ReviewContext(path, _dataset_schema(), date(2021, 2, 2)))
+    assert report.passed, report.errors

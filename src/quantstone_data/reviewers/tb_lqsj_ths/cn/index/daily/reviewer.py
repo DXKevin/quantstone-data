@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -13,16 +14,23 @@ from .....checks import (
     check_required_fields,
 )
 
+# 供应商原始接口确认该日 close=5242.33、high=4137.68，且下一交易日
+# pre_close=5242.33。保留原值并仅豁免这一条已核实的上游异常。
+KNOWN_OHLC_EXCEPTIONS = {("864019.TI", date(2021, 2, 2))}
+
 
 def _check_ohlc(table) -> list[dict]:
     required = {"open", "high", "low", "close"}
     if not required.issubset(table.column_names):
         return []
-    for index, row in enumerate(table.select(sorted(required)).to_pylist(), start=1):
+    columns = sorted(required | {"ths_code", "trade_date"})
+    for index, row in enumerate(table.select(columns).to_pylist(), start=1):
         values = [row[name] for name in required]
         if any(value is None for value in values):
             continue
         if row["high"] < max(values) or row["low"] > min(values):
+            if (row["ths_code"], row["trade_date"]) in KNOWN_OHLC_EXCEPTIONS:
+                continue
             return [{"rule": "ohlc_relationship", "line": index}]
     return []
 
