@@ -30,8 +30,8 @@
   阻断发布；新续采任务 `9c1d6583-2fe9-4d65-b7f3-cb80d00884d6` 已从 2021-02-19 启动，
   失败日审核和发布成功，任务继续运行至 2026-11-25；交接时已推进至 2022-03-30，共有
   271 个 run，状态 running；
-- Catalog 实际为 **36,820 个分区、197,849,864,868 行**；数据根
-  `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
+- Catalog 当前约 **40,508 个分区、197,851,343,804 行**；THS 续采仍在运行，结束后重新统计；
+  数据根 `/home/hhd_data` 已用 2.0 TB、可用 5.3 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
   两组已改为联合首次/增量操作；
@@ -88,6 +88,15 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：138 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-26 — DeepSeek Harness（数据根清理）
+
+- 删除已完成导入的原始 Wind L2 源 `imports/wind_l2`（约 175G）、
+  `imports/wind_l2_test`、`imports/zhongtai_l2`；
+- 删除旧分钟缓存 `cache/minute_1m` 和全部旧 staging，保留运行中的 THS
+  任务目录 `staging/9c1d6583-2fe9-4d65-b7f3-cb80d00884d6`；
+- 保留正式 `datasets/`、`imports/jobs` 审计清单、`revisions/` 历史副本和日志；
+- 数据根占用从约 2.2 TB 降至 2.0 TB，Catalog 文件路径全部仍位于 `datasets/`。
 
 ## 2026-11-26 — Codex（THS 板块分类全流程）
 
