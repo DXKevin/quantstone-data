@@ -5,7 +5,7 @@ from datetime import date
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from quantstone_data.sdk import QuantStoneClient
+from quantstone_sdk import QuantStoneClient
 
 
 class Response(io.BytesIO):
@@ -41,7 +41,7 @@ def test_sdk_discovers_active_datasets_and_reads_typed_parquet(monkeypatch) -> N
             )
         return Response(parquet)
 
-    monkeypatch.setattr("quantstone_data.sdk.urlopen", fake_urlopen)
+    monkeypatch.setattr("quantstone_sdk.client.urlopen", fake_urlopen)
     client = QuantStoneClient("http://quantstone.local/api/v1")
 
     assert [item["id"] for item in client.datasets()] == ["active"]

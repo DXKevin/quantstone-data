@@ -97,12 +97,12 @@ BacktestDailyBar
 - 数据目录、运行记录、错误和隔离数据管理；
 - 通用 API/SDK：发现数据集、查看 Schema、查看覆盖、读取数据。
 
-Python SDK 以 HTTP API 为稳定边界，不直接读取服务器 SQLite 或拼接物理 Parquet 路径。首版
+Python SDK 位于仓库 `sdk/python/`，以 HTTP API 为稳定边界，不直接读取服务器 SQLite 或拼接物理 Parquet 路径。首版
 提供数据集发现、契约描述、覆盖摘要、按日期范围及主键读取，并返回保持契约类型的 PyArrow
 Table。分区数据必须至少指定日期范围或一个主键条件，避免误读完整逐笔数据集；快照数据允许
 完整读取。
 
-Rust SDK 位于仓库 `rust-sdk/`，同样只通过 HTTP API 读取，不直接访问服务器 SQLite 或
+Rust SDK 位于仓库 `sdk/rust/`，同样只通过 HTTP API 读取，不直接访问服务器 SQLite 或
 Parquet 路径。方法名和参数语义与 Python SDK 对齐：`datasets`、`describe`、`coverage`、
 `read`、`download`；`read` 返回本 crate 的 Arrow `Table` 包装，因为 Rust Arrow 没有
 PyArrow 同名的 owned Table 类型。Rust 没有 Pandas 对应物，因此不提供 `read_pandas`。

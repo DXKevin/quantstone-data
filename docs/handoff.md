@@ -65,8 +65,9 @@
   `bf8a1c1c` 补齐，压缩包和解压缓存已清理；Wind 后续缓存目录统一为 `cache/wind_l2`；
 - 中泰真实数据已完成转换和导入；临时脚本仍保留在 `/home/quantadmin/l2_migration/`，
   不在 Git 仓库内；
-- Python 读取 SDK 已加入：`QuantStoneClient` 支持 `datasets/describe/coverage/read/read_pandas/download`；
-- Rust SDK 已加入 `rust-sdk/`：同步 HTTP 客户端，支持 `datasets/describe/coverage/read/download`，
+- 独立 Python SDK 位于 `sdk/python/`，包名 `quantstone-sdk`，导入 `quantstone_sdk`；
+  支持 `datasets/describe/coverage/read/read_pandas/download`；
+- Rust SDK 位于 `sdk/rust/`：同步 HTTP 客户端，支持 `datasets/describe/coverage/read/download`，
   `read` 返回 Arrow RecordBatch 的 `Table` 包装；不提供 Pandas 等价方法；
 - 分钟数据供应商标识已迁移为 `tb_sbkj2077`，正式数据 2,889 个分区、2,718,527,482 行，
   旧路径为 0；Wind L2 ID 改为 `tb_xxlpd`，集合竞价 ID 改为 `tb_lhsjk`。
@@ -89,13 +90,31 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- Python 测试 147 项通过、`ruff` 和前端构建通过；Rust `cargo test` 4 项通过。
+- 服务端 Python 测试 146 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 4 项通过。
+
+## 2026-11-26 — DeepSeek Harness（SDK 独立项目）
+
+完成：
+
+- Python SDK 从服务端包拆到 `sdk/python/`，独立包名 `quantstone-sdk`，导入路径
+  `quantstone_sdk`；服务端 `quantstone_data` 不再导出客户端；
+- 保留原 Python SDK 的 `datasets/describe/coverage/read/read_pandas/download` 行为；
+- Rust SDK 移到 `sdk/rust/`，保持原有方法语义；
+- 新增 `sdk/README.md` 说明两个独立 SDK；
+- 验证：Python SDK 1 项通过、Rust 4 项通过、服务端 146 项通过，
+  `ruff`/`cargo clippy`/前端构建通过。
+
+安装：
+
+```bash
+python -m pip install -e sdk/python
+```
 
 ## 2026-11-26 — DeepSeek Harness（Rust SDK）
 
 完成：
 
-- 新增独立 crate `rust-sdk/`，包名 `quantstone-sdk`；
+- 新增独立 crate `sdk/rust/`，包名 `quantstone-sdk`；
 - 同步 HTTP 客户端：`datasets`、`datasets_with_options`、`describe`、`coverage`、`read`、
   `download`，并提供 `Client` 别名和默认 API 地址；
 - `ReadOptions` / `DownloadOptions` 支持日期范围、主键过滤和 Parquet/CSV；

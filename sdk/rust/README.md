@@ -20,7 +20,7 @@ Parquet 契约保持。
 
 ```toml
 [dependencies]
-quantstone-sdk = { path = "../rust-sdk" }
+quantstone-sdk = { path = "../sdk/rust" }
 ```
 
 ```rust

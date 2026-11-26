@@ -67,8 +67,12 @@ API 默认地址为 `http://127.0.0.1:8000`，交互式接口文档位于
 
 安装项目后可直接使用 SDK。SDK 返回 PyArrow Table，日期、整数等类型与数据契约保持一致：
 
+```bash
+python -m pip install -e sdk/python
+```
+
 ```python
-from quantstone_data import QuantStoneClient
+from quantstone_sdk import QuantStoneClient
 
 qs = QuantStoneClient("http://<服务器IP>:5173/api/v1")
 
@@ -91,13 +95,13 @@ Pandas 时也可以使用 `qs.read_pandas(...)`。
 
 ## Rust 数据读取 SDK
 
-仓库内提供同步 Rust crate `rust-sdk/`，通过同一 HTTP API 提供 `datasets`、`describe`、
+仓库内提供同步 Rust crate `sdk/rust/`，通过同一 HTTP API 提供 `datasets`、`describe`、
 `coverage`、`read` 和 `download`。`read` 返回 Arrow RecordBatch 的轻量 `Table` 包装，
 日期和数值类型保持服务端契约；Rust 没有 Pandas 对应物，因此不提供 `read_pandas`。
 
 ```toml
 [dependencies]
-quantstone-sdk = { path = "../rust-sdk" }
+quantstone-sdk = { path = "sdk/rust" }
 ```
 
 ```rust
