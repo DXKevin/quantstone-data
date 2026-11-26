@@ -20,7 +20,8 @@
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
 - 当前 20 个数据集均为 active：TuShare 14 个、Wind L2 2 个、中泰 L2 2 个、集合竞价 1 个、分钟 1 个；
-- Catalog 实际为 **27,887 个分区、197,833,240,575 行**；数据根
+- Catalog 当前约 **33,073 个分区、197,849,425,714 行**；`suspend_d` repair 正在运行，
+  结束后重新统计。数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
@@ -42,8 +43,10 @@
   当前 **2,889 个分区、3,044,532 行**；`08705889` 已成功结束；
 - `tushare.cn.etf.etf_limit` 已启用并完成 2026-11-24 首次采集：1 个分区、2,244 行；
   主键 `ts_code + trade_date`，交易所字段为 SSE/SZSE；
-- `tushare.cn.stock.stk_limit` 已完成 2026-11-24 首次采集：1 个分区、5,658 行；
-- `tushare.cn.stock.suspend_d` 已完成 2026-11-24 首次采集：1 个分区、11 行；
+- `tushare.cn.stock.stk_limit` 已完成 2007-01-04 至 2026-11-24 全量采集：
+  4,833 个分区；
+- `tushare.cn.stock.suspend_d` 主键修正为 `ts_code + trade_date + suspend_type`；
+  历史 repair 任务 `de36098d` 正在从 2011-05-23 继续，已成功分区保留；
 - `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
   2026-11-24 采集，共 **2,889 个分区、2,718,527,482 行**；
 - `tb_lhsjk.cn.stock.auction_process` 已采集 2020-01-02 至 2026-11-24，共
@@ -75,6 +78,22 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：138 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-26 — DeepSeek Harness（suspend_d 主键修复）
+
+问题：
+
+- `suspend_d` repair 在 2011-05-23 审核失败，主键重复；
+- 同日同股票 `600572.SH` 同时存在 `S` 和 `R` 两条记录，原主键
+  `ts_code + trade_date` 不成立。
+
+修复：
+
+- 契约和已有 Schema 主键改为 `ts_code + trade_date + suspend_type`；
+- 审核器按新主键校验；成功分区保留；
+- 新增启动迁移，把已有 `dataset_schema_versions.primary_key` 原地更新；
+- 从失败日 `2011-05-23` 创建 repair 任务 `de36098d`，目标到 `2026-11-25`；
+- 完整测试 138 项通过，`ruff` 和前端构建通过。
 
 ## 2026-11-25 — DeepSeek Harness（股票涨跌停与停复牌）
 

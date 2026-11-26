@@ -743,3 +743,19 @@ def migrate_neutral_collector_keys(engine: Engine) -> list[tuple[str, str]]:
                     )
             migrated.append((old_key, new_key))
     return migrated
+
+
+def migrate_suspend_d_primary_key(engine: Engine) -> bool:
+    """suspend_d 同日同股票可能有 S/R 两条记录，主键加入 suspend_type。"""
+    if engine.dialect.name != "sqlite":
+        return False
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                "UPDATE dataset_schema_versions "
+                "SET primary_key = 'ts_code,trade_date,suspend_type' "
+                "WHERE dataset_id = 'tushare.cn.stock.suspend_d' "
+                "AND primary_key = 'ts_code,trade_date'"
+            )
+        )
+    return bool(result.rowcount)

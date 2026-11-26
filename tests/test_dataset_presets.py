@@ -170,7 +170,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "asset_type",
         "exchange",
     ]
-    assert suspend_d["primary_key"] == ["ts_code", "trade_date"]
+    assert suspend_d["primary_key"] == ["ts_code", "trade_date", "suspend_type"]
     assert [item["name"] for item in suspend_d["fields"]] == [
         "ts_code",
         "trade_date",

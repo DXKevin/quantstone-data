@@ -18,6 +18,7 @@ from .database import (
     migrate_minute_provider_id,
     migrate_neutral_collector_keys,
     migrate_provider_ids,
+    migrate_suspend_d_primary_key,
     upgrade_sqlite_schema,
 )
 from .dataset_categories import router as dataset_categories_router
@@ -48,6 +49,7 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
         migrated_minute_provider = migrate_minute_provider_id(engine, resolved_data_root)
         migrated_provider_ids = migrate_provider_ids(engine, resolved_data_root)
         migrated_collector_keys = migrate_neutral_collector_keys(engine)
+        migrated_suspend_primary_key = migrate_suspend_d_primary_key(engine)
         with session_factory() as session:
             migrated_l2_directories = migrate_l2_directory_paths(
                 session, resolved_data_root
@@ -81,6 +83,12 @@ def create_app(database_url: str | None = None, data_root: str | Path | None = N
                     {"old_key": old, "new_key": new}
                     for old, new in migrated_collector_keys
                 ],
+            )
+        if migrated_suspend_primary_key:
+            log_event(
+                "suspend_d_primary_key_migrated",
+                dataset_id="tushare.cn.stock.suspend_d",
+                primary_key="ts_code,trade_date,suspend_type",
             )
         if recovered_jobs or recovered_maintenance or recovered_imports:
             log_event(

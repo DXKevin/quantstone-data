@@ -64,14 +64,14 @@ def test_suspend_d_reviewer_accepts_partition(tmp_path) -> None:
     rows = [
         {**_row("000001.SZ", "S"), "trade_date": date(2026, 11, 24)},
         {
-            **_row("600000.SH", "R", "09:30-10:00"),
+            **_row("000001.SZ", "R", "09:30-10:00"),
             "trade_date": date(2026, 11, 24),
         },
     ]
     path = tmp_path / "partition.parquet"
     pq.write_table(pa.Table.from_pylist(rows, schema=schema), path)
     dataset_schema = DatasetSchemaVersion(
-        version=1, primary_key="ts_code,trade_date", time_field="trade_date"
+        version=1, primary_key="ts_code,trade_date,suspend_type", time_field="trade_date"
     )
     dataset_schema.fields = [
         DatasetField(

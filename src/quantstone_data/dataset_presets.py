@@ -693,7 +693,7 @@ DATASET_PRESETS = (
                 "write_strategy": "replace_partition",
                 "compaction": "yearly",
             },
-            primary_key=["ts_code", "trade_date"],
+            primary_key=["ts_code", "trade_date", "suspend_type"],
             time_field="trade_date",
             fields=[
                 field("ts_code", "string", "TS股票代码", nullable=False),
