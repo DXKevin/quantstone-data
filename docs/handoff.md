@@ -22,6 +22,9 @@
 - 当前 22 个数据集均为 active；`tb_lqsj_ths.cn.index.sector_categories` 已发布
   1 个 snapshot、1,676 行；`tb_lqsj_ths.cn.index.daily` 已发布 2026-11-25 单日分区、
   1,871 行；
+- THS 板块日线全历史 repair 任务 `f69e193d-218b-40fa-b507-0a464d56cfdc` 正在后台运行，
+  范围 2007-08-01 至 2026-11-25；接口最早数据日已确认是 2007-08-01，按每分钟 30 次
+  保守限速预计约 2.5–3 小时完成。不要重启后端或重复创建同范围任务；
 - Catalog 实际为 **36,820 个分区、197,849,864,868 行**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
@@ -122,6 +125,8 @@
   2026-11-25 为 1,871 条；不能拿当前分类快照强制校验历史覆盖。
 - 本轮采集器测试 44 项通过，`ruff check .` 与前端构建通过；完整 pytest 仍受上一节记录的
   `TestClient` 环境兼容问题影响。
+- 已启动全历史 repair 任务 `f69e193d-218b-40fa-b507-0a464d56cfdc`；启动检查为 running，
+  首批 30 个历史交易日已发布。正式前后端已重启并保持运行。
 
 ## 2026-11-26 — DeepSeek Harness（suspend_timing 格式放宽）
 
