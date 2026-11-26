@@ -1,4 +1,13 @@
-from ...collector_types import CollectorDefinition, CollectorOperation, RateLimit, RetryPolicy
+from ...collector_types import (
+    CollectorDefinition,
+    CollectorOperation,
+    CollectorParameter,
+    RateLimit,
+    RetryPolicy,
+)
+from .daily import DATASET_ID as DAILY_DATASET_ID
+from .daily import collect_incremental as collect_daily_incremental
+from .daily import collect_initial as collect_daily_initial
 from .sector_categories import (
     DATASET_ID,
     collect_incremental,
@@ -8,6 +17,13 @@ from .sector_categories import (
 
 RATE_LIMIT = RateLimit(calls=30, period_seconds=60, scope="ths_index")
 RETRY = RetryPolicy(attempts=5, delay_seconds=5, max_delay_seconds=60)
+DATE_RANGE_PARAMETERS = (
+    CollectorParameter("start_date", "date", True, "采集开始日期"),
+    CollectorParameter("end_date", "date", True, "采集结束日期"),
+)
+INCREMENTAL_PARAMETERS = (
+    CollectorParameter("end_date", "date", False, "可选的更新截止日期，默认当天"),
+)
 
 OPERATIONS = (
     CollectorOperation(
@@ -29,6 +45,39 @@ OPERATIONS = (
         parameters=(),
         datasets=(DATASET_ID,),
         function=collect_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="daily_initial",
+        name="THS 板块日线首次采集",
+        description="按交易日首次采集全部可用 THS 板块日线。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(DAILY_DATASET_ID,),
+        function=collect_daily_initial,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="daily_incremental",
+        name="THS 板块日线增量更新",
+        description="从当前水位之后按交易日补充 THS 板块日线。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(DAILY_DATASET_ID,),
+        function=collect_daily_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="daily_repair",
+        name="THS 板块日线修复",
+        description="重新采集指定日期范围并替换受影响的日分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(DAILY_DATASET_ID,),
+        function=collect_daily_incremental,
         rate_limit=RATE_LIMIT,
         retry=RETRY,
     ),

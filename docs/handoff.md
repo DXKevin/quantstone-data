@@ -19,8 +19,9 @@
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
-- 当前 21 个数据集均为 active；新增 `tb_lqsj_ths.cn.index.sector_categories`，已完成
-  首次采集并发布 1 个 snapshot、1,676 行；
+- 当前 22 个数据集均为 active；`tb_lqsj_ths.cn.index.sector_categories` 已发布
+  1 个 snapshot、1,676 行；`tb_lqsj_ths.cn.index.daily` 已发布 2026-11-25 单日分区、
+  1,871 行；
 - Catalog 实际为 **36,820 个分区、197,849,864,868 行**；数据根
   `/home/hhd_data` 已用 2.2 TB、可用 5.2 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
@@ -103,6 +104,24 @@
 - 当前环境的 FastAPI `TestClient` 在 lifespan 启动前阻塞，完整 pytest 无法结束；版本为
   FastAPI 0.165.0 / Starlette 1.10.0 / httpx 0.28.1，并提示应安装 `httpx2`。这是测试运行环境
   的兼容问题，未影响临时 Uvicorn 上的正式 API 全流程；不要把中断的 pytest 误判为业务测试失败。
+
+## 2026-11-26 — Codex（THS 板块日线全流程）
+
+完成：
+
+- 新增并启用 `tb_lqsj_ths.cn.index.daily`，主键 `ths_code + trade_date`，按交易日日分区，
+  使用 `yearly_with_delta` 并支持首次、增量和日期范围修复；
+- 契约保留接口 12 个字段：`ths_code/trade_date/open/high/low/close/pre_close/avg_price/`
+  `change/pct_change/vol/turnover_rate`；
+- 采集器按单日请求、循环分页并核对供应商 `total`，不使用当前板块分类数量判断历史完整性；
+- 修正供应商特殊指数代码格式漂移：`TI.700012R` 技术标准化为 `700012R.TI`，避免同一指数
+  的历史时间序列被拆分；
+- 正式首次任务 `89dba06e-519f-460b-a24f-4ed4dd2bf37a` 成功，发布 2026-11-25：
+  1 个分区、1,871 行、93,221 bytes、无缺失文件；
+- 真实抽样确认单日板块数随历史变化：2010-01-04 为 68 条、2025-08-13 为 1,523 条，
+  2026-11-25 为 1,871 条；不能拿当前分类快照强制校验历史覆盖。
+- 本轮采集器测试 44 项通过，`ruff check .` 与前端构建通过；完整 pytest 仍受上一节记录的
+  `TestClient` 环境兼容问题影响。
 
 ## 2026-11-26 — DeepSeek Harness（suspend_timing 格式放宽）
 

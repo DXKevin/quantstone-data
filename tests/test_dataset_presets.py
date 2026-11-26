@@ -16,6 +16,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         presets = response.json()
         assert [item["contract"]["id"] for item in presets] == [
             "tb_lqsj_ths.cn.index.sector_categories",
+            "tb_lqsj_ths.cn.index.daily",
             "tushare.cn.index.index_basic",
             "tushare.cn.index.index_daily",
             "tb_sbkj2077.cn.stock.minute_1m",
@@ -45,6 +46,7 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
 
     contracts = {item["contract"]["id"]: item["contract"] for item in presets}
     sector_categories = contracts["tb_lqsj_ths.cn.index.sector_categories"]
+    ths_daily = contracts["tb_lqsj_ths.cn.index.daily"]
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
@@ -76,6 +78,14 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "type",
         "code",
     ]
+    assert ths_daily["provider"] == "tb_lqsj_ths"
+    assert ths_daily["primary_key"] == ["ths_code", "trade_date"]
+    assert ths_daily["storage_policy"]["layout"] == "yearly_with_delta"
+    assert {item["operation"] for item in ths_daily["collection_bindings"]} == {
+        "daily_initial",
+        "daily_incremental",
+        "daily_repair",
+    }
     assert index_basic["instrument"] == "index"
     assert index_basic["storage_policy"]["layout"] == "snapshot"
     assert index_basic["primary_key"] == ["ts_code"]

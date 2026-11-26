@@ -191,6 +191,68 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tb_lqsj_ths_daily",
+        category="tb_lqsj_ths · THS 板块",
+        contract=DatasetCreate(
+            id="tb_lqsj_ths.cn.index.daily",
+            provider="tb_lqsj_ths",
+            region="cn",
+            instrument="index",
+            dataset_name="daily",
+            market=None,
+            display_name="THS 板块日线",
+            description=(
+                "tb_lqsj_ths 提供的 THS 板块指数历史日线；每日保存接口返回的全部"
+                "可用板块，不以当前板块分类快照限制历史范围。"
+            ),
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "daily_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "daily_incremental",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "daily_repair",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ths_code", "trade_date"],
+            time_field="trade_date",
+            fields=[
+                field("ths_code", "string", "THS 指数代码", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("open", "float64", "开盘点位", nullable=False),
+                field("high", "float64", "最高点位", nullable=False),
+                field("low", "float64", "最低点位", nullable=False),
+                field("close", "float64", "收盘点位", nullable=False),
+                field("pre_close", "float64", "昨日收盘点位", nullable=False),
+                field("avg_price", "float64", "板块成分股均价", nullable=False),
+                field("change", "float64", "涨跌点", nullable=False),
+                field("pct_change", "float64", "涨跌幅", nullable=False, unit="%"),
+                field("vol", "float64", "成交量", nullable=False),
+                field("turnover_rate", "float64", "换手率", nullable=False, unit="%"),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_index_basic",
         category="TuShare · 指数",
         contract=DatasetCreate(
