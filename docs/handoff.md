@@ -90,7 +90,7 @@
   已发布到 `datasets/`，不依赖该测试源；
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
-- 服务端 Python 测试 146 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
+- 服务端 Python 测试 150 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
 
 ## 2026-11-26 — DeepSeek Harness（批量契约接口）
 

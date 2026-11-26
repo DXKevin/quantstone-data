@@ -5,6 +5,9 @@ from ...collector_types import (
     RateLimit,
     RetryPolicy,
 )
+from .constituent_stocks import DATASET_ID as CONSTITUENT_DATASET_ID
+from .constituent_stocks import collect_incremental as collect_constituent_incremental
+from .constituent_stocks import collect_initial as collect_constituent_initial
 from .daily import DATASET_ID as DAILY_DATASET_ID
 from .daily import collect_incremental as collect_daily_incremental
 from .daily import collect_initial as collect_daily_initial
@@ -78,6 +81,39 @@ OPERATIONS = (
         parameters=DATE_RANGE_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="constituent_stocks_initial",
+        name="THS 板块成分股首次采集",
+        description="按交易日展开 THS 板块历史成分，一行一只股票。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(CONSTITUENT_DATASET_ID,),
+        function=collect_constituent_initial,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="constituent_stocks_incremental",
+        name="THS 板块成分股增量更新",
+        description="从当前水位之后补充 THS 板块每日成分股。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(CONSTITUENT_DATASET_ID,),
+        function=collect_constituent_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="constituent_stocks_repair",
+        name="THS 板块成分股修复",
+        description="按交易日重新采集并替换 THS 板块成分股分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(CONSTITUENT_DATASET_ID,),
+        function=collect_constituent_incremental,
         rate_limit=RATE_LIMIT,
         retry=RETRY,
     ),

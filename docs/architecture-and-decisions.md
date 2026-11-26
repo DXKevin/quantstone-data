@@ -588,6 +588,13 @@ TuShare `suspend_d` 使用数据集 ID `tushare.cn.stock.suspend_d`，按交易�
 单个区间、多个区间或带秒的时间，格式不稳定，审核器不做时间格式强校验。`suspend_type`
 为 `S`（停牌）或 `R`（复牌）。
 
+THS 板块历史成分使用数据集 ID `tb_lqsj_ths.cn.index.constituent_stocks`，
+按交易日日分区，主键 `trade_date + index_code + stock_code`，一行一只股票，
+存储策略 `yearly_with_delta` 并支持年度合并。数据源为
+`/api/index/ths_constituent_stocks_history`：按交易日返回板块列表，每个板块包含
+`stocks` 数组，采集器展开数组并按三元组去重。历史接口不是所有宽基指数都有数据，
+不能以当前板块分类快照推断历史成分；不保存股票名称，需要时关联 `stock_basic`。
+
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
 `tb_sbkj2077.cn.stock.minute_1m`，范围仅沪深股票，
 默认不复权，不保存名称（名称通过 `stock_basic` 关联）。字段为

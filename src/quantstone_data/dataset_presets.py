@@ -191,6 +191,59 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tb_lqsj_ths_constituent_stocks",
+        category="tb_lqsj_ths · THS 板块",
+        contract=DatasetCreate(
+            id="tb_lqsj_ths.cn.index.constituent_stocks",
+            provider="tb_lqsj_ths",
+            region="cn",
+            instrument="index",
+            dataset_name="constituent_stocks",
+            market=None,
+            display_name="THS 板块成分股",
+            description=(
+                "tb_lqsj_ths 提供的 THS 板块每日历史成分股；每行一只股票，"
+                "按交易日和板块展开。"
+            ),
+            update_frequency="daily",
+            time_granularity="day",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "constituent_stocks_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "constituent_stocks_incremental",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "constituent_stocks_repair",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["trade_date", "index_code", "stock_code"],
+            time_field="trade_date",
+            fields=[
+                field("trade_date", "date", "交易日期", nullable=False),
+                field("index_code", "string", "THS 板块指数代码", nullable=False),
+                field("stock_code", "string", "成分股票代码", nullable=False),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tb_lqsj_ths_daily",
         category="tb_lqsj_ths · THS 板块",
         contract=DatasetCreate(
