@@ -46,7 +46,8 @@
 - `tushare.cn.stock.stk_limit` 已完成 2007-01-04 至 2026-11-24 全量采集：
   4,833 个分区；
 - `tushare.cn.stock.suspend_d` 主键修正为 `ts_code + trade_date + suspend_type`；
-  历史 repair 任务 `de36098d` 正在从 2011-05-23 继续，已成功分区保留；
+  审核器已支持逗号/分号分隔的多个 `suspend_timing` 区间；续采任务 `ec6ebe4b`
+  从 2012-08-08 继续，2012-08-07 之前的成功分区保留；
 - `tb_sbkj2077.cn.stock.minute_1m`（沪深股票 1 分钟，不复权，日分区）已完成 2015-01-05 至
   2026-11-24 采集，共 **2,889 个分区、2,718,527,482 行**；
 - `tb_lhsjk.cn.stock.auction_process` 已采集 2020-01-02 至 2026-11-24，共
@@ -78,6 +79,20 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 本轮完整测试：138 项通过、`ruff check .` 通过、`npm run build` 通过。
+
+## 2026-11-26 — DeepSeek Harness（suspend_timing 多区间）
+
+问题：
+
+- suspend_d repair 在 2012-08-08 审核失败，`suspend_timing` 为
+  `09:43-10:13,11:08-14:55`，原审核器只允许单个区间。
+
+修复：
+
+- 审核器放宽为逗号/分号分隔的多个时间段；
+- 从失败日 2012-08-08 创建 repair 任务 `ec6ebe4b`，目标 2026-11-25；
+- 2012-08-07 之前的成功分区保留；
+- 完整测试 138 项通过。
 
 ## 2026-11-26 — DeepSeek Harness（suspend_d 主键修复）
 

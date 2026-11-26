@@ -13,7 +13,9 @@ from .....checks import (
 )
 
 TYPES = {"S", "R"}
-TIMING_RE = re.compile(r"^\d{2}:\d{2}-\d{2}:\d{2}$")
+TIMING_RE = re.compile(
+    r"^\d{2}:\d{2}-\d{2}:\d{2}([,;]\s*\d{2}:\d{2}-\d{2}:\d{2})*$"
+)
 
 
 def _check_domain(table) -> list[dict]:

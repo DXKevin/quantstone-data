@@ -64,7 +64,7 @@ def test_suspend_d_reviewer_accepts_partition(tmp_path) -> None:
     rows = [
         {**_row("000001.SZ", "S"), "trade_date": date(2026, 11, 24)},
         {
-            **_row("000001.SZ", "R", "09:30-10:00"),
+            **_row("000001.SZ", "R", "09:30-10:00,11:00-11:30"),
             "trade_date": date(2026, 11, 24),
         },
     ]

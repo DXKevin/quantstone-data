@@ -574,7 +574,7 @@ TuShare `stk_limit` 使用数据集 ID `tushare.cn.stock.stk_limit`，按交易�
 TuShare `suspend_d` 使用数据集 ID `tushare.cn.stock.suspend_d`，按交易日日分区，
 主键 `ts_code + trade_date + suspend_type`，存储策略 `yearly_with_delta` 并支持年度合并。
 字段为 `ts_code/trade_date/suspend_timing/suspend_type`；同日同股票可能同时有 S 和 R，
-不能只用 `ts_code + trade_date`；`suspend_timing` 仅在日内停牌时有值，
+不能只用 `ts_code + trade_date`；`suspend_timing` 仅在日内停牌时有值，可能包含逗号/分号分隔的多个区间，
 `suspend_type` 为 `S`（停牌）或 `R`（复牌）。
 
 供应商 sbkj2077 的 A 股 1 分钟线使用数据集 ID
