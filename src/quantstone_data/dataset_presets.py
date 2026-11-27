@@ -306,6 +306,87 @@ DATASET_PRESETS = (
         ),
     ),
     DatasetPreset(
+        key="tb_lqsj_ths_minute_1m",
+        category="tb_lqsj_ths · THS 板块",
+        contract=DatasetCreate(
+            id="tb_lqsj_ths.cn.index.minute_1m",
+            provider="tb_lqsj_ths",
+            region="cn",
+            instrument="index",
+            dataset_name="minute_1m",
+            market=None,
+            display_name="THS 板块1分钟K",
+            description=(
+                "tb_lqsj_ths 提供的 THS 板块指数1分钟K；先按交易日取得日线代码全集，"
+                "再分批获取该日分钟行情。"
+            ),
+            update_frequency="daily",
+            time_granularity="minute",
+            collection_bindings=[
+                {
+                    "purpose": "initial",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "minute_1m_initial",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "incremental",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "minute_1m_incremental",
+                    "parameters": {},
+                },
+                {
+                    "purpose": "repair",
+                    "collector_key": "tb_lqsj_ths_index",
+                    "operation": "minute_1m_repair",
+                    "parameters": {},
+                },
+            ],
+            storage_policy={
+                "logical_partition_field": "trade_date",
+                "calendar_dataset_id": "tushare.cn.stock.trade_cal",
+                "allow_empty_partitions": False,
+                "layout": "yearly_with_delta",
+                "write_strategy": "replace_partition",
+                "compaction": "yearly",
+            },
+            primary_key=["ths_code", "trade_date", "bar_time"],
+            time_field="trade_date",
+            fields=[
+                field("ths_code", "string", "THS 指数代码", nullable=False),
+                field("trade_date", "date", "交易日期", nullable=False),
+                field(
+                    "bar_time",
+                    "int32",
+                    "K线结束时间，HHMMSS；093100~113000、130100~150000",
+                    nullable=False,
+                    unit="HHMMSS",
+                    source_name="trade_time",
+                ),
+                field("open", "float64", "开盘点位", nullable=False),
+                field("high", "float64", "最高点位", nullable=False),
+                field("low", "float64", "最低点位", nullable=False),
+                field("close", "float64", "收盘点位", nullable=False),
+                field(
+                    "volume",
+                    "float64",
+                    "成交量；源字段单位为股，入湖时除以100",
+                    nullable=False,
+                    unit="手",
+                ),
+                field(
+                    "amount",
+                    "float64",
+                    "成交额；源字段 turnover",
+                    nullable=False,
+                    unit="元",
+                    source_name="turnover",
+                ),
+                field("turnover_rate", "float64", "换手率", nullable=False, unit="%"),
+            ],
+        ),
+    ),
+    DatasetPreset(
         key="tushare_index_basic",
         category="TuShare · 指数",
         contract=DatasetCreate(

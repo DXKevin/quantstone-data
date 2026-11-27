@@ -2,6 +2,7 @@ from .reviewer_types import ReviewContext, ReviewerDefinition, ReviewReport
 from .reviewers.tb_lhsjk.cn.stock.auction_process import REVIEWER as TB_AUCTION_PROCESS
 from .reviewers.tb_lqsj_ths.cn.index.constituent_stocks import REVIEWER as TB_LQSJ_THS_CONSTITUENTS
 from .reviewers.tb_lqsj_ths.cn.index.daily import REVIEWER as TB_LQSJ_THS_DAILY
+from .reviewers.tb_lqsj_ths.cn.index.minute_1m import REVIEWER as TB_LQSJ_THS_MINUTE_1M
 from .reviewers.tb_lqsj_ths.cn.index.sector_categories import (
     REVIEWER as TB_LQSJ_THS_SECTOR_CATEGORIES,
 )
@@ -45,6 +46,7 @@ REVIEWERS = _build_registry(
         TB_LQSJ_THS_SECTOR_CATEGORIES,
         TB_LQSJ_THS_CONSTITUENTS,
         TB_LQSJ_THS_DAILY,
+        TB_LQSJ_THS_MINUTE_1M,
         TUSHARE_ETF_BASIC,
         TUSHARE_ETF_ETF_LIMIT,
         TUSHARE_ETF_FUND_ADJ,

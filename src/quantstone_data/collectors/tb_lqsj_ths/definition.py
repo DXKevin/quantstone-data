@@ -11,6 +11,9 @@ from .constituent_stocks import collect_initial as collect_constituent_initial
 from .daily import DATASET_ID as DAILY_DATASET_ID
 from .daily import collect_incremental as collect_daily_incremental
 from .daily import collect_initial as collect_daily_initial
+from .minute_1m import DATASET_ID as MINUTE_1M_DATASET_ID
+from .minute_1m import collect_incremental as collect_minute_1m_incremental
+from .minute_1m import collect_initial as collect_minute_1m_initial
 from .sector_categories import (
     DATASET_ID,
     collect_incremental,
@@ -81,6 +84,39 @@ OPERATIONS = (
         parameters=DATE_RANGE_PARAMETERS,
         datasets=(DAILY_DATASET_ID,),
         function=collect_daily_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="minute_1m_initial",
+        name="THS 板块1分钟K首次采集",
+        description="按交易日批量采集全部可用 THS 板块1分钟K。",
+        purpose="initial",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(MINUTE_1M_DATASET_ID,),
+        function=collect_minute_1m_initial,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="minute_1m_incremental",
+        name="THS 板块1分钟K增量更新",
+        description="从当前水位之后按交易日补充 THS 板块1分钟K。",
+        purpose="incremental",
+        parameters=INCREMENTAL_PARAMETERS,
+        datasets=(MINUTE_1M_DATASET_ID,),
+        function=collect_minute_1m_incremental,
+        rate_limit=RATE_LIMIT,
+        retry=RETRY,
+    ),
+    CollectorOperation(
+        key="minute_1m_repair",
+        name="THS 板块1分钟K修复",
+        description="重新采集指定日期范围并替换受影响的日分区。",
+        purpose="repair",
+        parameters=DATE_RANGE_PARAMETERS,
+        datasets=(MINUTE_1M_DATASET_ID,),
+        function=collect_minute_1m_incremental,
         rate_limit=RATE_LIMIT,
         retry=RETRY,
     ),

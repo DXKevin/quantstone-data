@@ -45,6 +45,7 @@ def test_reviewer_registry_uses_dataset_ids() -> None:
         "tb_lqsj_ths.cn.index.sector_categories",
         "tb_lqsj_ths.cn.index.constituent_stocks",
         "tb_lqsj_ths.cn.index.daily",
+        "tb_lqsj_ths.cn.index.minute_1m",
         "tushare.cn.etf.etf_basic",
         "tushare.cn.etf.fund_daily",
         "tushare.cn.etf.fund_adj",
