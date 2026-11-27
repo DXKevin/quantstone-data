@@ -148,13 +148,15 @@ def _upstream_failure_message(error: Exception) -> str:
         return f"上游数据服务暂时不可用（HTTP {error.code}{reason}），采集器重试后仍失败"
     if isinstance(error, URLError):
         return f"无法连接上游数据服务，采集器重试后仍失败：{error.reason}"
+    if isinstance(error, ConnectionError):
+        return f"上游数据服务连接中断，采集器重试后仍失败：{error}"
     if isinstance(error, RateLimitExceeded):
         return f"上游数据服务限流，采集器重试后仍失败：{error}"
     return str(error) or error.__class__.__name__
 
 
 def _is_upstream_failure(error: Exception) -> bool:
-    return isinstance(error, (CollectionError, URLError, RateLimitExceeded))
+    return isinstance(error, (CollectionError, URLError, ConnectionError, RateLimitExceeded))
 
 
 def _mark_job_failed(session: Session, job_id: str, error: Exception) -> None:
@@ -759,7 +761,7 @@ def _execute_snapshot_job(
             error_count=report["error_count"],
         )
         return serialize_job(job)
-    except (CollectionError, URLError, RateLimitExceeded) as error:
+    except (CollectionError, URLError, ConnectionError, RateLimitExceeded) as error:
         run_id = run.id
         job_id = job.id
         session.rollback()
