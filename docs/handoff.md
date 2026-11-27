@@ -104,6 +104,10 @@
 - 正式首次任务 `a426fd8a-b48e-4d3a-b9c3-c6909eb4257c` 成功发布 2026-11-25：
   114,960 行、479 个代码、每个代码 240 根，文件 5,075,113 bytes，审核 0 错误，耗时约
   2 分 28 秒；
+- 用户随后决定改用纯日文件。唯一验证文件已无损迁移到
+  `datasets/tb_lqsj_ths.cn.index.minute_1m/2026-11-25/`，运行库 storage policy、CatalogFile、
+  CatalogPartition 和原任务 published path 均已同步；旧 `delta` 目录不存在，覆盖仍为
+  1 个分区、114,960 行、缺失文件 0；
 - 真实双代码采集验证为 480 行并审核通过；新增专项测试 4 项通过，`ruff check .` 通过；
   完整 pytest 在 180 秒内仍卡在项目既有 FastAPI `TestClient` 启动阶段并被 timeout 终止，
   没有产生测试失败输出。
