@@ -36,9 +36,7 @@
 测试：
 
 - `pytest -q tests/test_dataset_presets.py` 通过；
-- 全量 `pytest -q` 151 项通过；
-- `ruff check src/quantstone_data/dataset_presets.py tests/test_dataset_presets.py` 通过；
-- 提交 `c6f32d0 feat: add THS sector minute contract` 已推送。
+- `ruff check src/quantstone_data/dataset_presets.py tests/test_dataset_presets.py` 通过。
 
 注意：
 
