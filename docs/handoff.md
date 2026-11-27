@@ -14,6 +14,36 @@
 - 完成测试、提交并推送后才算正常交接；
 - 不保留无说明的未提交修改。
 
+## 2026-11-27 — 板块分钟契约（draft）
+
+已完成：
+
+- 新增 preset `tb_lqsj_ths_minute_1m`，契约 ID
+  `tb_lqsj_ths.cn.index.minute_1m`，并创建 draft 数据集；
+- 字段：`ths_code, trade_date, bar_time, open, high, low, close,
+  volume, amount, turnover_rate`；
+- 主键 `[ths_code, trade_date, bar_time]`，日分区 `layout=daily`；
+- `time_granularity=minute`，`time_field=trade_date`；
+- 契约当前无 collection binding，不能激活/采集，下一步接 collector。
+
+源实测（`POST /api/index/ths_minute`，881101.TI / 2026-11-25）：
+
+- 240 行，`09:31..11:30`、`13:01..15:00`，无 09:30/13:00；
+- `volume` 源单位为股，日线 `vol` 为手，正好 /100；
+- `turnover` 为元；`turnover_rate` 分钟合计 3.2395，日线 3.24；
+- 最后一根 close 与日线 close 一致。
+
+测试：
+
+- `pytest -q tests/test_dataset_presets.py` 通过；
+- `ruff check src/quantstone_data/dataset_presets.py tests/test_dataset_presets.py` 通过。
+
+注意：
+
+- 后端当前进程不会自动加载新 preset，需要重启后才在 `/api/v1/dataset-presets` 出现；
+- 当前有采集任务时不要重启后端，先查运行任务；
+- draft 数据集 ID 已写入运行库，不可重复 POST。
+
 ## 2026-11-26 当前交接摘要（优先阅读）
 
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
