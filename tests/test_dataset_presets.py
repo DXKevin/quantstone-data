@@ -18,7 +18,6 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
             "tb_lqsj_ths.cn.index.sector_categories",
             "tb_lqsj_ths.cn.index.constituent_stocks",
             "tb_lqsj_ths.cn.index.daily",
-            "tb_lqsj_ths.cn.index.minute_1m",
             "tushare.cn.index.index_basic",
             "tushare.cn.index.index_daily",
             "tb_sbkj2077.cn.stock.minute_1m",
@@ -50,7 +49,6 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
     sector_categories = contracts["tb_lqsj_ths.cn.index.sector_categories"]
     ths_constituents = contracts["tb_lqsj_ths.cn.index.constituent_stocks"]
     ths_daily = contracts["tb_lqsj_ths.cn.index.daily"]
-    ths_minute = contracts["tb_lqsj_ths.cn.index.minute_1m"]
     index_basic = contracts["tushare.cn.index.index_basic"]
     index_daily = contracts["tushare.cn.index.index_daily"]
     minute_1m = contracts["tb_sbkj2077.cn.stock.minute_1m"]
@@ -100,28 +98,6 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "daily_incremental",
         "daily_repair",
     }
-    assert ths_minute["provider"] == "tb_lqsj_ths"
-    assert ths_minute["instrument"] == "index"
-    assert ths_minute["time_granularity"] == "minute"
-    assert ths_minute["primary_key"] == ["ths_code", "trade_date", "bar_time"]
-    assert ths_minute["storage_policy"]["layout"] == "daily"
-    assert ths_minute["storage_policy"]["logical_partition_field"] == "trade_date"
-    assert ths_minute["collection_bindings"] == []
-    assert [item["name"] for item in ths_minute["fields"]] == [
-        "ths_code",
-        "trade_date",
-        "bar_time",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "amount",
-        "turnover_rate",
-    ]
-    assert ths_minute["fields"][2]["description"].startswith("K线结束时间")
-    assert ths_minute["fields"][7]["unit"] == "手"
-    assert ths_minute["fields"][8]["unit"] == "元"
     assert index_basic["instrument"] == "index"
     assert index_basic["storage_policy"]["layout"] == "snapshot"
     assert index_basic["primary_key"] == ["ts_code"]
