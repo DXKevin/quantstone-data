@@ -19,13 +19,15 @@
 - 分支 `main`，工作区干净，最新提交见 `git log -1`；本次交接提交已推送；
 - 前后端已启动：后端 `0.0.0.0:8000`，前端 `0.0.0.0:5173`，局域网地址
   `http://192.168.1.57:5173`；当前没有排队、运行或取消中的任务；
-- 当前 22 个数据集均为 active；`tb_lqsj_ths.cn.index.sector_categories` 已发布
+- 当前 23 个数据集均为 active；`tb_lqsj_ths.cn.index.sector_categories` 已发布
   1 个 snapshot、1,676 行；`tb_lqsj_ths.cn.index.daily` 已完成 2007-08-01 至
   2026-11-26 采集，4,696 个分区、3,204,947 行；
+- `tb_lqsj_ths.cn.index.minute_1m` 已完成 2026-11-25 单日正式首次采集：1 个分区、
+  114,960 行、5,075,113 bytes，覆盖 479 个代码且每个代码正好 240 根，审核通过；
 - `tb_lqsj_ths.cn.index.constituent_stocks` 已完成 2014-01-02 至 2026-11-27 采集，
   共 **3,135 个分区、87,366,529 行**；无后缀代码已补 `.SH/.SZ/.BJ`，源日为空时
   run 标记 skipped，不发布空分区；
-- Catalog 实际为 **44,674 个分区、198,388,228,403 行**；
+- Catalog 实际为 **44,675 个分区、198,388,343,363 行**；
   数据根 `/home/hhd_data` 已用 2.0 TB、可用 5.3 TB；系统盘 `/home` 仅余约 163 GB；
 - `tb_xxlpd.cn.stock.l2_order.sz` / `l2_trade.sz` 各有 **174 个分区**，覆盖
   `2026-03-11` 至 `2026-11-23`：order 23,855,129,427 行、trade 21,055,637,280 行；
@@ -84,6 +86,32 @@
 - L2 审核器检查 Schema、非空、行数和分区日期，不做上亿行主键全量唯一性校验；
 - Catalog 全量前端页已按要求回退，当前只有按数据集的接口和概览热力图；
 - 服务端 Python 测试 151 项通过、`ruff` 和前端构建通过；Python SDK 测试 1 项、Rust `cargo test` 5 项通过。
+
+## 2026-11-27 — Codex（THS 板块1分钟K全流程）
+
+完成：
+
+- 新增并启用 `tb_lqsj_ths.cn.index.minute_1m`，主键
+  `ths_code + trade_date + bar_time`，按交易日日分区，使用 `yearly_with_delta`；
+- 契约字段为 `ths_code/trade_date/bar_time/open/high/low/close/volume/amount/turnover_rate`；
+  `bar_time` 为 K 线结束时间的 `HHMMSS` 整数，源成交量由股除以 100 记录为手，源
+  `turnover` 记录为元单位 `amount`；
+- 新增首次、增量和日期范围修复操作。采集器先获取同日 `ths_daily` 代码全集，再按 500 个
+  代码分批请求 `ths_minute`，不使用当前分类快照过滤历史代码；完全无数据的交易日标记
+  skipped，不发布空分区；
+- 新增专用审核器，检查 Schema、非空、主键、分区日期、代码格式、交易时段，以及成交量、
+  成交额和换手率非负；保留供应商原始 OHLC，不以包含关系阻断发布；
+- 正式首次任务 `a426fd8a-b48e-4d3a-b9c3-c6909eb4257c` 成功发布 2026-11-25：
+  114,960 行、479 个代码、每个代码 240 根，文件 5,075,113 bytes，审核 0 错误，耗时约
+  2 分 28 秒；
+- 真实双代码采集验证为 480 行并审核通过；新增专项测试 4 项通过，`ruff check .` 通过；
+  完整 pytest 在 180 秒内仍卡在项目既有 FastAPI `TestClient` 启动阶段并被 timeout 终止，
+  没有产生测试失败输出。
+
+后续：
+
+- 当前只正式发布了一个验证日，尚未启动历史全量。按验证日耗时估算，长期回补会持续数天；
+  应由用户确定起始日期后创建首次或 repair 任务，任务可保留逐日成功分区并从失败日续跑。
 
 ## 2026-11-27 — DeepSeek Harness（THS 成分股完成与交接）
 
