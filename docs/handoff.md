@@ -92,7 +92,7 @@
 完成：
 
 - 新增并启用 `tb_lqsj_ths.cn.index.minute_1m`，主键
-  `ths_code + trade_date + bar_time`，按交易日日分区，使用 `yearly_with_delta`；
+  `ths_code + trade_date + bar_time`，按交易日日分区，使用纯 `daily` 布局且不做年度合并；
 - 契约字段为 `ths_code/trade_date/bar_time/open/high/low/close/volume/amount/turnover_rate`；
   `bar_time` 为 K 线结束时间的 `HHMMSS` 整数，源成交量由股除以 100 记录为手，源
   `turnover` 记录为元单位 `amount`；

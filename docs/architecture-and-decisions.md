@@ -1279,7 +1279,9 @@ THS 板块数据通过 `tb_lqsj_ths` 数据产品接口获取，供应商稳定�
 先取得带历史有效期和指数类型的基础资料，再另建边界明确的数据集。
 
 `tb_lqsj_ths.cn.index.minute_1m` 保存 `/api/index/ths_minute` 的 1 分钟行情，主键为
-`ths_code + trade_date + bar_time`，按交易日日分区并使用 `yearly_with_delta`。`bar_time` 是
+`ths_code + trade_date + bar_time`，按交易日日分区并使用纯 `daily` 布局，不生成年度主文件。
+单日约 11.5 万行、5 MB，全历史也只有数千个日文件；纯日文件使单日替换、审核和故障排查
+更直接，年度合并的收益不足以抵消主文件与 delta 的维护复杂度。`bar_time` 是
 K 线结束时间的 `HHMMSS` 整数，正常交易时段为 `09:31:00–11:30:00` 和
 `13:01:00–15:00:00`。源 `volume` 单位为股，入湖时除以 100 统一记录为手；源
 `turnover` 记录为 `amount`，单位元。

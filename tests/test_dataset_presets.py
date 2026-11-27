@@ -101,7 +101,8 @@ def test_presets_are_valid_contracts_that_create_drafts(tmp_path: Path) -> None:
         "daily_repair",
     }
     assert ths_minute["primary_key"] == ["ths_code", "trade_date", "bar_time"]
-    assert ths_minute["storage_policy"]["layout"] == "yearly_with_delta"
+    assert ths_minute["storage_policy"]["layout"] == "daily"
+    assert ths_minute["storage_policy"]["compaction"] is None
     assert {item["operation"] for item in ths_minute["collection_bindings"]} == {
         "minute_1m_initial",
         "minute_1m_incremental",
