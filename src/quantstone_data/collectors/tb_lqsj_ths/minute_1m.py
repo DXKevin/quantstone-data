@@ -85,13 +85,22 @@ def _normalize_row(row: dict, trade_date: str) -> dict:
     code = normalize_ths_code(row.get("ths_code"))
     if not code:
         raise ThsCollectionError("THS 板块分钟缺少 ths_code")
+    amount = row.get("turnover")
+    if amount is not None:
+        amount = float(amount)
+        # The supplier has returned sign-inverted turnover for isolated historical
+        # minutes (for example, 296 sectors at 2022-11-09 09:44). Turnover is an
+        # unsigned amount; keep its magnitude and record the correction in
+        # provenance instead of allowing a bad sign into the dataset.
+        if amount < 0:
+            amount = abs(amount)
     return {
         **row,
         "ths_code": code,
         "trade_date": row_date,
         "bar_time": bar_time,
         "volume": None if row.get("volume") is None else float(row["volume"]) / 100,
-        "amount": row.get("turnover"),
+        "amount": amount,
     }
 
 
@@ -103,12 +112,16 @@ def collect_daily(
     codes = sorted(daily_by_code)
     by_key: dict[tuple[str, str, int], dict] = {}
     minute_pages = 0
+    corrected_negative_amounts = 0
     for start in range(0, len(codes), CODE_BATCH_SIZE):
         rows, pages = _fetch_batch(
             context.token, codes[start : start + CODE_BATCH_SIZE], trade_date
         )
         minute_pages += pages
         for source_row in rows:
+            source_amount = source_row.get("turnover")
+            if source_amount is not None and float(source_amount) < 0:
+                corrected_negative_amounts += 1
             row = _normalize_row(source_row, trade_date)
             key = (row["ths_code"], row["trade_date"], row["bar_time"])
             by_key[key] = row
@@ -165,6 +178,7 @@ def collect_daily(
             "daily_pages": daily_pages,
             "minute_pages": minute_pages,
             "minute_codes": len({key[0] for key in by_key}),
+            "corrected_negative_amounts": corrected_negative_amounts,
         },
     )
 

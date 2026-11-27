@@ -96,6 +96,31 @@ def test_ths_minute_collects_batched_partition(monkeypatch, tmp_path) -> None:
     assert table["volume"].to_pylist() == [123.0] * 3
     assert table["amount"].to_pylist() == [456_789.0] * 3
     assert result.provenance["minute_codes"] == 3
+    assert result.provenance["corrected_negative_amounts"] == 0
+
+
+def test_ths_minute_corrects_sign_inverted_turnover(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        minute_1m,
+        "_fetch_daily",
+        lambda _token, _date: ({"881102.TI": {}}, 1, 1),
+    )
+    source = _source_row("881102.TI", "2022-11-09 09:44:00")
+    source["turnover"] = -62_529_620.0
+    monkeypatch.setattr(minute_1m, "_fetch_batch", lambda *_args: ([source], 1))
+
+    result = minute_1m.collect_daily(
+        CollectionContext("run", tmp_path / "staging", "api-key"),
+        {"trade_date": "2022-11-09"},
+        _fields(),
+    )
+    artifact = result.outputs[minute_1m.DATASET_ID][0]
+    table = pq.read_table(artifact.path)
+
+    assert table["amount"].to_pylist() == [62_529_620.0]
+    assert result.provenance["corrected_negative_amounts"] == 1
+    report = review(ReviewContext(artifact.path, _dataset_schema(), date(2022, 11, 9)))
+    assert report.passed, report.errors
 
 
 def test_ths_minute_skips_empty_source_day(monkeypatch, tmp_path) -> None:
