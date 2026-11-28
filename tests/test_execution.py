@@ -1,3 +1,5 @@
+from http.client import IncompleteRead
+
 import pytest
 
 from quantstone_data import execution
@@ -128,6 +130,26 @@ def test_run_operation_retries_connection_reset(monkeypatch: pytest.MonkeyPatch)
         calls["count"] += 1
         if calls["count"] == 1:
             raise ConnectionResetError(104, "Connection reset by peer")
+        return "ok"
+
+    operation = make_operation(
+        retry=RetryPolicy(attempts=2, delay_seconds=2, max_delay_seconds=10)
+    )
+
+    assert run_operation("demo", operation, call) == "ok"
+    assert calls["count"] == 2
+    assert pauses == [2]
+
+
+def test_run_operation_retries_incomplete_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    pauses: list[float] = []
+    calls = {"count": 0}
+    monkeypatch.setattr(execution, "_sleep", pauses.append)
+
+    def call() -> str:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise IncompleteRead(b"partial", 18_801)
         return "ok"
 
     operation = make_operation(

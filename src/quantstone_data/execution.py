@@ -6,6 +6,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from http.client import IncompleteRead
 from typing import Any
 from urllib.error import URLError
 
@@ -105,7 +106,13 @@ def run_operation(
                 )
         try:
             return call()
-        except (RateLimitExceeded, TimeoutError, URLError, ConnectionError) as error:
+        except (
+            RateLimitExceeded,
+            TimeoutError,
+            URLError,
+            ConnectionError,
+            IncompleteRead,
+        ) as error:
             if attempt >= attempts:
                 raise
             pause = delay
